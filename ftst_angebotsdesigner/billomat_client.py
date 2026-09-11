@@ -12,7 +12,7 @@ class BillomatClient:
         self.headers = {
             "X-BillomatApiKey": (api_key or "").strip(),
             "Accept": "application/json",
-            "User-Agent": "FTST-AngebotsDesigner/0.1.7",
+            "User-Agent": "FTST-AngebotsDesigner/0.1.8",
         }
 
     def _get(self, path, params=None):
@@ -40,14 +40,16 @@ class BillomatClient:
         return obj.get(key, obj) if isinstance(obj, dict) else obj
 
     def list_offers(self, search=""):
-        params = {"format": "json", "per_page": 1000, "order_by": "date DESC,offer_number DESC"}
+        params = {"format": "json", "per_page": 1000, "order_by": "date DESC"}
         if search:
             params["offer_number"] = search
         data = self._get("/offers", params)
         offers = self._unwrap(data, "offers")
         if isinstance(offers, dict):
             offers = offers.get("offer", [])
-        return offers if isinstance(offers, list) else ([offers] if offers else [])
+        if not isinstance(offers, list):
+            offers = [offers] if offers else []
+        return sorted(offers, key=lambda x: (str(x.get("date", "")), str(x.get("offer_number") or x.get("number") or "")), reverse=True)
 
     def get_offer(self, offer_id):
         return self._unwrap(self._get(f"/offers/{offer_id}", {"format": "json"}), "offer")
