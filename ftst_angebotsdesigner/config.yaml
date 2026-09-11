@@ -1,0 +1,25 @@
+name: "FTST AngebotsDesigner"
+version: "0.1.6"
+slug: "ftst_angebotsdesigner"
+description: "Professioneller AngebotsDesigner für FT Sicherheitstechnik mit Billomat-Anbindung und PDF-Erstellung."
+arch:
+  - amd64
+startup: application
+boot: auto
+init: false
+stage: experimental
+ingress: true
+ingress_port: 8099
+ingress_entry: /
+panel_icon: mdi:file-document-edit-outline
+panel_title: "FTST Angebote"
+panel_admin: true
+webui: "http://[HOST]:[PORT:8099]/"
+options:
+  billomat_id: ""
+  billomat_api_key: ""
+  flask_secret: ""
+schema:
+  billomat_id: str?
+  billomat_api_key: password?
+  flask_secret: password?
