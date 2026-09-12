@@ -1,22 +1,16 @@
 # FTST AngebotsDesigner
 
-Interner AngebotsDesigner für FT Sicherheitstechnik.
+Home-Assistant-App mit Billomat als Datenquelle. Aktueller Entwicklungsstand: **0.2.0**.
 
-## Ziel
+## Funktionen
 
-Billomat bleibt das führende System für Kunden, Artikel, Preise und Angebote. Der FTST AngebotsDesigner erzeugt daraus professionelle FTST-Angebote im A4-Hochformat.
+Billomat-Angebote anzeigen, Angebotstyp erkennen, Kundendarstellung dauerhaft bearbeiten, A4-PDF in separatem Tab öffnen. Firmendaten/Logo und echte Referenzfotos ergänzen. Projekte aus Notizen, Bildern und Audiodateien erfassen; optional KI-Anforderungsentwürfe prüfen.
 
-## Roadmap
+## Dokumentation
 
-- Billomat API-Anbindung
-- Angebote importieren und neueste zuerst anzeigen
-- FTST A4-Angebotsdesign
-- Projektverwaltung
-- Fotos und Notizen zum Projekt
-- FTST-Projektassistent / Chat
-- Angebot aus Projektinformationen erzeugen
-- E-Mail- und WhatsApp-Versand
+- [Speicherung, Migration und lokaler Test](docs/PERSISTENZ.md)
+- [Abnahme und Anforderungen](docs/ABNAHME.md)
+- [KI-Einrichtung und noch offene Ausbaustufen](docs/PROJEKTASSISTENT.md)
+- [Änderungsverlauf](ftst_angebotsdesigner/CHANGELOG.md)
 
-## Home Assistant
-
-Das Projekt wird als Home Assistant App bereitgestellt.
+Es werden keine Preise oder Positionen in Billomat verändert. Der Projektassistent erstellt bislang Anforderungsentwürfe, keine automatisch kalkulierten oder versendeten Angebote.

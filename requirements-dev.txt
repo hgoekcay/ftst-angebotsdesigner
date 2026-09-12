@@ -1,0 +1,4 @@
+-r ftst_angebotsdesigner/requirements.txt
+pytest>=8,<10
+pypdf>=5,<7
+ruff>=0.12,<1
