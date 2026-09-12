@@ -20,3 +20,12 @@
 - Gemischte Gewerke als Kombination; automatische Erkennung im Editor wieder auswählbar.
 - PDF öffnet in eigenem Tab. Bestehende FTST-Gestaltung erhalten.
 - Automatisierte Tests und Abnahmeprotokoll ergänzt.
+# 0.3.0
+
+- Lokaler Angebotsentwurf aus Projektnotizen, auch ohne KI-Zugang.
+- Lesender Billomat-Katalog mit Artikelvorschlägen und genauer Variantenwahl.
+- Kundenauswahl, Preisgruppen, Rabatt und Nettokalkulation mit geprüften Steuersätzen.
+- Offene oder widersprüchliche Angaben verhindern eine Gesamtsumme.
+- Dauerhafte Entwürfe mit atomarem Schutz vor parallelem Überschreiben.
+- 50 Tests; Live-Abnahme des Katalogabrufs noch ausstehend.
+- Noch keine automatische Angebotsanlage in Billomat oder Entwurfs-Angebots-PDF.
