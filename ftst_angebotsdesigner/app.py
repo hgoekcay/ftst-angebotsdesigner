@@ -1,7 +1,4 @@
-import io
-import os
-import html
-import logging
+import io, os, html, logging
 from flask import Flask, request, send_file, abort, session
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -11,196 +8,125 @@ from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from billomat_client import BillomatClient
 
-APP_VERSION = "0.1.12"
-log = logging.getLogger("ftst.app")
+APP_VERSION = "0.1.13"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
+log = logging.getLogger("ftst.app")
 
-RED = colors.HexColor("#D71920")
-DARK = colors.HexColor("#111111")
-TEXT = colors.HexColor("#202020")
-MUTED = colors.HexColor("#6F6F6F")
-LIGHT = colors.HexColor("#F4F4F4")
-BORDER = colors.HexColor("#DDDDDD")
-GREEN = colors.HexColor("#218838")
-GREEN_LIGHT = colors.HexColor("#EAF6EE")
-WHITE = colors.white
+RED=colors.HexColor("#D71920"); DARK=colors.HexColor("#111111"); TEXT=colors.HexColor("#202020")
+MUTED=colors.HexColor("#6F6F6F"); LIGHT=colors.HexColor("#F4F4F4"); BORDER=colors.HexColor("#DCDCDC")
+GREEN=colors.HexColor("#218838"); GREEN_LIGHT=colors.HexColor("#EAF6EE"); WHITE=colors.white
 
-CSS = """
-:root{--red:#d71920;--dark:#111;--text:#222;--muted:#707070;--light:#f4f4f4;--green:#218838;--greenlight:#eaf6ee}
-*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;color:var(--text)}
-.top{background:var(--dark);color:#fff;border-bottom:5px solid var(--red)}.topin{max-width:1180px;margin:auto;padding:22px 26px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:22px;font-weight:800;letter-spacing:.5px}.sub{font-size:12px;opacity:.72;margin-top:3px}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border-radius:16px;padding:28px;margin-bottom:18px;box-shadow:0 6px 24px rgba(0,0,0,.07)}.hero{padding:36px}.eyebrow{color:var(--red);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px}.hero h1{font-size:34px;line-height:1.05;margin:10px 0}.hero p{font-size:16px;color:var(--muted);max-width:800px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:var(--light);padding:18px;border-radius:12px}.metric.green{background:var(--greenlight)}.metric .label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}.metric .value{font-size:22px;font-weight:800;margin-top:5px}.metric.green .value{color:var(--green)}
-.btn{display:inline-block;background:var(--red);color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;border:0;cursor:pointer}.btn.dark{background:var(--dark)}.btn.light{background:#efefef;color:#111}label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}input,select,textarea{width:100%;padding:12px;border:1px solid #d8d8d8;border-radius:8px;font:inherit;background:#fff}textarea{min-height:115px;resize:vertical}.field{margin-bottom:18px}.hint{font-size:12px;color:var(--muted);margin-top:5px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #e8e8e8;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.7px}.money{text-align:right;font-weight:800}.muted{color:var(--muted)}.small{font-size:12px}.footer-note{font-size:12px;color:var(--muted);text-align:center;margin:26px 0 10px}.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.check{background:var(--greenlight);color:var(--green);padding:10px;border-radius:8px;font-size:12px;font-weight:700}
-.section-title{font-size:22px;margin:0 0 14px}
-"""
+CSS='''body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;color:#222}.top{background:#111;color:#fff;border-bottom:5px solid #d71920}.topin{max-width:1180px;margin:auto;padding:22px;display:flex;justify-content:space-between}.brand{font-size:22px;font-weight:800}.sub,.small{font-size:12px;opacity:.75}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 5px 20px #00000012}.hero h1{font-size:34px;margin:8px 0}.eyebrow{color:#d71920;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f4f4f4;padding:18px;border-radius:12px}.metric.green{background:#eaf6ee}.metric .label{font-size:11px;color:#707070;text-transform:uppercase}.metric .value{font-size:22px;font-weight:800;margin-top:4px}.metric.green .value{color:#218838}.btn{display:inline-block;background:#d71920;color:#fff;text-decoration:none;padding:11px 17px;border-radius:8px;font-weight:700;margin-right:6px}.btn.dark{background:#111}.btn.light{background:#eee;color:#111}label{display:block;font-size:11px;color:#707070;text-transform:uppercase;font-weight:700;margin:0 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #d5d5d5;border-radius:8px;font:inherit}.field{margin-bottom:16px}textarea{min-height:110px}table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}th{font-size:11px;color:#707070;text-transform:uppercase}.money{text-align:right;font-weight:800}.muted{color:#707070}.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.check{background:#eaf6ee;color:#218838;padding:10px;border-radius:8px;font-weight:700;font-size:12px}'''
 
-OFFER_TYPES = {
-    "Videoüberwachung": {"headline":"Professionelle Videoüberwachung für Ihr Objekt","intro":"Moderne IP-Videoüberwachung mit professioneller Aufzeichnung und zuverlässiger Fernzugriffsmöglichkeit.","summary":"Wir planen und realisieren eine auf Ihr Objekt abgestimmte Videoüberwachung – inklusive Montage, Konfiguration, Funktionsprüfung und Einweisung.","benefits":["Hochauflösende Kameras","Intelligente Erkennung","Professionelle Aufzeichnung","Fernzugriff per App"]},
-    "Alarmanlage": {"headline":"Professionelle Alarmtechnik für Ihr Objekt","intro":"Zuverlässige Gefahrenmeldung mit moderner Alarmtechnik und klaren Alarmierungswegen.","summary":"Die Anlage wird objektbezogen geplant, fachgerecht montiert, eingerichtet und vollständig getestet übergeben.","benefits":["Schnelle Alarmierung","App-Steuerung","Sabotageschutz","Erweiterbar"]},
-    "Zutrittskontrolle": {"headline":"Sichere Zutrittskontrolle für Ihr Objekt","intro":"Kontrollieren Sie zuverlässig, wer Ihr Gebäude oder einzelne Bereiche betreten darf.","summary":"Von der Türkomponente bis zur Administration wird die Lösung vollständig eingerichtet und betriebsbereit übergeben.","benefits":["RFID / Code / App","Zutrittsrechte","Protokollierung","Flexible Erweiterung"]},
-    "Türsprechanlage": {"headline":"Moderne Video-Türsprechanlage","intro":"Sehen und sprechen Sie mit Besuchern – vor Ort oder komfortabel über Ihr Smartphone.","summary":"Wir liefern, montieren, konfigurieren und übergeben die Türkommunikation vollständig betriebsbereit.","benefits":["Video & Audio","Smartphone-Anbindung","Außentaugliche Komponenten","Einfache Bedienung"]},
-    "Brandmeldeanlage": {"headline":"Professionelle Brandmeldetechnik","intro":"Frühzeitige Detektion und strukturierte Alarmierung mit professioneller Brandmeldetechnik.","summary":"Planung, Installation, Konfiguration und Dokumentation werden auf die Anforderungen des Objekts abgestimmt.","benefits":["Frühe Detektion","Klare Alarmierung","Dokumentierte Prüfung","Normgerechte Umsetzung"]},
-    "Smart Home": {"headline":"Smarte Sicherheit und Gebäudeautomation","intro":"Sicherheit, Komfort und intelligente Steuerung in einer abgestimmten Lösung.","summary":"Wir verbinden die gewünschten Funktionen zu einer einfach bedienbaren und erweiterbaren Gesamtlösung.","benefits":["Zentrale Steuerung","App-Anbindung","Automationen","Erweiterbar"]},
-    "Kombination": {"headline":"Ihre individuelle Sicherheitslösung","intro":"Mehrere Sicherheitssysteme werden zu einer abgestimmten Gesamtlösung kombiniert.","summary":"Wir koordinieren die verschiedenen Gewerke und übergeben eine vollständig konfigurierte Gesamtlösung.","benefits":["Ganzheitliche Planung","Ein Ansprechpartner","Abgestimmte Systeme","Erweiterbar"]},
-}
-DEFAULT_STEPS = ["Angebot prüfen und bestätigen","Installationstermin abstimmen","Montage, Konfiguration und Inbetriebnahme","Übergabe und Einweisung"]
-
+TYPES={
+"Videoüberwachung":("Professionelle Videoüberwachung für Ihr Objekt","Moderne IP-Videoüberwachung mit professioneller Aufzeichnung und Fernzugriff.","Auf Ihr Objekt abgestimmte Videoüberwachung inklusive Montage, Konfiguration, Prüfung und Einweisung.",["Hochauflösende Kameras","Intelligente Erkennung","Professionelle Aufzeichnung","Fernzugriff per App"]),
+"Alarmanlage":("Professionelle Alarmtechnik für Ihr Objekt","Zuverlässige Alarmtechnik mit moderner Alarmierung.","Objektbezogen geplant, fachgerecht montiert, eingerichtet und getestet.",["Schnelle Alarmierung","App-Steuerung","Sabotageschutz","Erweiterbar"]),
+"Zutrittskontrolle":("Sichere Zutrittskontrolle für Ihr Objekt","Kontrollieren Sie zuverlässig, wer Ihr Gebäude betreten darf.","Komplett eingerichtete Zutrittslösung mit Rechteverwaltung und Übergabe.",["RFID / Code / App","Zutrittsrechte","Protokollierung","Erweiterbar"]),
+"Türsprechanlage":("Moderne Video-Türsprechanlage","Sehen und sprechen Sie mit Besuchern vor Ort oder per Smartphone.","Lieferung, Montage, Konfiguration und betriebsbereite Übergabe.",["Video & Audio","Smartphone-Anbindung","Außentauglich","Einfache Bedienung"]),
+"Brandmeldeanlage":("Professionelle Brandmeldetechnik","Frühzeitige Detektion und strukturierte Alarmierung.","Planung, Installation, Prüfung und Dokumentation abgestimmt auf das Objekt.",["Frühe Detektion","Klare Alarmierung","Dokumentierte Prüfung","Normgerechte Umsetzung"]),
+"Smart Home":("Smarte Sicherheit und Gebäudeautomation","Sicherheit, Komfort und intelligente Steuerung.","Abgestimmte, einfach bedienbare und erweiterbare Gesamtlösung.",["Zentrale Steuerung","App-Anbindung","Automationen","Erweiterbar"]),
+"Kombination":("Ihre individuelle Sicherheitslösung","Mehrere Sicherheitssysteme werden zu einer abgestimmten Gesamtlösung.","Koordinierte Planung und vollständig konfigurierte Gesamtlösung.",["Ganzheitliche Planung","Ein Ansprechpartner","Abgestimmte Systeme","Erweiterbar"])}
+DEFAULT_STEPS=["Angebot prüfen und bestätigen","Installationstermin abstimmen","Montage, Konfiguration und Inbetriebnahme","Übergabe und Einweisung"]
 
 def ingress(path="/"):
     base=request.headers.get("X-Ingress-Path","").strip().rstrip("/")
     return base+"/"+path.lstrip("/")
 
-
 def money(v):
     try:return f"{float(v):,.2f} €".replace(",","X").replace(".",",").replace("X",".")
     except:return "-"
 
-
-def one_or_list(v):
-    if v is None:return []
+def one_list(v):
     if isinstance(v,list):return v
     if isinstance(v,dict):
         for k in ("tax","item","offer-item","value"):
-            if k in v:
-                x=v[k]; return x if isinstance(x,list) else [x]
+            if k in v:return v[k] if isinstance(v[k],list) else [v[k]]
         return [v]
     return []
 
+def clean(v): return "" if v is None or isinstance(v,(dict,list)) else html.escape(str(v))
+def cname(c): return (c or {}).get("name") or (c or {}).get("company") or "Kunde"
 
-def client_name(c):
-    return (c if isinstance(c,dict) else {}).get("name") or (c if isinstance(c,dict) else {}).get("company") or "Kunde"
-
-
-def safe_text(v):
-    if v is None or isinstance(v,(dict,list)):return ""
-    return html.escape(str(v))
-
-
-def normalize_offer(o):
-    o=dict(o or {})
-    o["client"]=o.get("client") if isinstance(o.get("client"),dict) else {}
+def normalize(o):
+    o=dict(o or {}); o["client"]=o.get("client") if isinstance(o.get("client"),dict) else {}
     items=[]
-    for pos,x in enumerate(one_or_list(o.get("items")),1):
-        if isinstance(x,dict):
-            items.append({"position":x.get("position") or pos,"title":x.get("title") or "Leistung","description":x.get("description") or "","quantity":x.get("quantity") or 0,"unit":x.get("unit") or "","unit_price":x.get("unit_price") or 0,"total_net":x.get("total_net") or 0})
-    o["items"]=items
-    tax_amount=0.0
-    for t in one_or_list(o.get("taxes")):
-        if isinstance(t,dict):
-            try:tax_amount+=float(t.get("amount") or t.get("tax_amount") or 0)
-            except Exception:pass
-    o["tax_amount"]=tax_amount
+    for n,x in enumerate(one_list(o.get("items")),1):
+        if isinstance(x,dict):items.append({"position":x.get("position") or n,"title":x.get("title") or "Leistung","description":x.get("description") or "","quantity":x.get("quantity") or 0,"unit":x.get("unit") or "","unit_price":x.get("unit_price") or 0,"total_net":x.get("total_net") or 0})
+    o["items"]=items;o["tax_amount"]=sum(float(t.get("amount") or t.get("tax_amount") or 0) for t in one_list(o.get("taxes")) if isinstance(t,dict));return o
+
+def apply_source(raw,src):
+    o=normalize(raw); kind=src.get("offer_type") or "Kombination"; p=TYPES.get(kind,TYPES["Kombination"])
+    o["offer_type"]=kind;o["customer_title"]=src.get("customer_title") or p[0];o["customer_intro"]=src.get("customer_intro") or p[1];o["project_summary"]=src.get("project_summary") or p[2]
+    o["benefits"]=[x.strip() for x in str(src.get("benefits","")).splitlines() if x.strip()] or p[3]
+    o["next_steps"]=[x.strip() for x in str(src.get("next_steps","")).splitlines() if x.strip()] or DEFAULT_STEPS
     return o
-
-
-def offer_data(raw, source):
-    o=normalize_offer(raw)
-    kind=source.get("offer_type") or o.get("offer_type") or "Kombination"
-    preset=OFFER_TYPES.get(kind,OFFER_TYPES["Kombination"])
-    o["offer_type"]=kind
-    o["customer_title"]=source.get("customer_title") or o.get("customer_title") or preset["headline"]
-    o["customer_intro"]=source.get("customer_intro") or o.get("customer_intro") or preset["intro"]
-    o["project_summary"]=source.get("project_summary") or o.get("project_summary") or preset["summary"]
-    b=source.get("benefits", "")
-    o["benefits"]=[x.strip() for x in str(b).splitlines() if x.strip()] or o.get("benefits") or preset["benefits"]
-    s=source.get("next_steps", "")
-    o["next_steps"]=[x.strip() for x in str(s).splitlines() if x.strip()] or o.get("next_steps") or DEFAULT_STEPS
-    return o
-
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><div class="brand">FT SICHERHEITSTECHNIK</div><div class="sub">FTST AngebotsDesigner</div></div><div class="small">Version {APP_VERSION}</div></div></div><main class="wrap">{body}</main></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><div class="brand">FT SICHERHEITSTECHNIK</div><div class="sub">FTST AngebotsDesigner</div></div><div class="small">v{APP_VERSION}</div></div></div><main class="wrap">{body}</main></body></html>'
 
-
-def load_offer(offer_id):
+def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID");key=os.getenv("BILLOMAT_API_KEY")
     if not bid or not key:abort(503)
-    raw=BillomatClient(bid,key).get_full_offer(offer_id)
-    saved=session.get(f"ftst_offer_{offer_id}") or {}
-    return offer_data(raw,saved)
-
-
-def detail(o):
-    o=normalize_offer(o);c=o["client"]
-    rows="".join(f'<tr><td>{safe_text(i["position"])}</td><td><b>{safe_text(i["title"])}</b><br><span class="muted small">{safe_text(i["description"])}</span></td><td>{safe_text(i["quantity"])} {safe_text(i["unit"])}</td><td class="money">{money(i["unit_price"])}</td><td class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
-    benefits="".join(f'<span class="check">✓ {safe_text(x)}</span>' for x in o.get("benefits",[]))
-    body=f'''<div class="card hero"><div class="eyebrow">{safe_text(o.get('offer_type') or 'FTST')} · Ihr persönliches Angebot</div><h1>{safe_text(o.get('customer_title') or o.get('title') or 'Individuelle Sicherheitslösung')}</h1><p>{safe_text(o.get('customer_intro') or o.get('intro') or '')}</p><div style="margin-top:22px"><a class="btn" href="{ingress('offer/'+str(o.get('id'))+'/edit')}">Angebot bearbeiten</a> <a class="btn dark" href="{ingress('offer/'+str(o.get('id'))+'/pdf')}">A4-PDF erzeugen</a> <a class="btn light" href="{ingress('offers')}">← Übersicht</a></div></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{safe_text(client_name(c))}</div><div class="muted small">{safe_text(c.get('street',''))}<br>{safe_text(c.get('zip',''))} {safe_text(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {safe_text(o.get('offer_number') or o.get('number') or '-')}</div><div class="muted small">Datum: {safe_text(o.get('date','-'))}<br>Gültig: {safe_text(o.get('validity_date') or o.get('validity_days') or '-')}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2 class="section-title">Projekt auf einen Blick</h2><p>{safe_text(o.get('project_summary'))}</p></div><div class="card"><h2 class="section-title">Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2 class="section-title">Ihre Vorteile</h2><div class="checks">{benefits}</div></div><div class="card"><h2 class="section-title">Nächste Schritte</h2><ol>{''.join(f'<li>{safe_text(x)}</li>' for x in o.get('next_steps',[]))}</ol></div><div class="card"><h2 class="section-title">Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div><div class="footer-note">FT Sicherheitstechnik · Professionelle Sicherheitstechnik</div>'''
-    return base("FTST Angebot",body)
+    raw=BillomatClient(bid,key).get_full_offer(oid); return apply_source(raw,session.get("ftst_"+oid,{ }))
 
 @app.get("/health")
 def health():return {"ok":True,"version":APP_VERSION}
 
 @app.get("/")
-def index():
-    return base("FTST AngebotsDesigner",f'''<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Daten importieren, prüfen und als hochwertiges FTST-A4-Angebot ausgeben.</p><a class="btn" href="{ingress('offers')}">Angebote öffnen</a> <a class="btn dark" href="{ingress('demo')}">Design-Demo</a></div>''')
+def index():return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn dark" href="{ingress("demo")}">Design-Demo</a></div>')
 
 @app.get("/offers")
 def offers():
-    bid=os.getenv("BILLOMAT_ID");key=os.getenv("BILLOMAT_API_KEY")
-    if not bid or not key:return base("Billomat",'<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
     try:
+        bid=os.getenv("BILLOMAT_ID");key=os.getenv("BILLOMAT_API_KEY")
+        if not bid or not key:return base("Billomat",'<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
         data=BillomatClient(bid,key).list_offers(request.args.get("search",""));data=sorted(data,key=lambda x:str(x.get("date","") if isinstance(x,dict) else ""),reverse=True)
+        rows="".join(f'<tr><td><b>{clean(o.get("offer_number") or o.get("number") or "-")}</b></td><td>{clean(o.get("date"))}</td><td>{clean(o.get("title") or "-")}</td><td class="money">{money(o.get("total_gross"))}</td><td><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
+        return base("Angebote",f'<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">{len(data)} Angebote · neueste zuerst</p><table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>')
     except Exception as e:
-        log.exception("Offer list failed");return base("Billomat Fehler",f'<div class="card"><h1>Billomat-Fehler</h1><p>{safe_text(e)}</p></div>'),502
-    rows="".join(f'<tr><td><b>{safe_text(o.get("offer_number") or o.get("number") or "-")}</b></td><td>{safe_text(o.get("date"))}</td><td>{safe_text(o.get("title") or "-")}</td><td class="money">{money(o.get("total_gross"))}</td><td><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
-    return base("Angebote",f'<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">{len(data)} Angebote · neueste zuerst</p><table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>')
+        log.exception("Offer list failed");return base("Fehler",f'<div class="card"><h1>Fehler</h1><p>{clean(e)}</p></div>'),502
 
-@app.get("/offer/<offer_id>")
-def offer(offer_id):
-    try:return detail(load_offer(offer_id))
-    except Exception as e:
-        log.exception("Offer detail failed");return base("Fehler",f'<div class="card"><h1>Angebot konnte nicht geladen werden</h1><p>{safe_text(e)}</p></div>'),502
+@app.get("/offer/<oid>")
+def offer(oid):return detail(get_offer(oid))
 
-@app.route("/offer/<offer_id>/edit",methods=["GET","POST"])
-def edit_offer(offer_id):
-    raw=normalize_offer(load_offer.__wrapped__(offer_id) if hasattr(load_offer,"__wrapped__") else BillomatClient(os.getenv("BILLOMAT_ID"),os.getenv("BILLOMAT_API_KEY")).get_full_offer(offer_id))
-    if request.args.get("reset"):session.pop(f"ftst_offer_{offer_id}",None)
-    saved=session.get(f"ftst_offer_{offer_id}") or {}
-    raw=offer_data(raw,saved)
+@app.route("/offer/<oid>/edit",methods=["GET","POST"])
+def edit(oid):
+    o=get_offer(oid)
     if request.method=="POST":
-        saved={k:request.form.get(k,"") for k in ("offer_type","customer_title","customer_intro","project_summary","benefits","next_steps")}
-        session[f"ftst_offer_{offer_id}"]=saved
-        return detail(offer_data(raw,saved))
-    kind=raw.get("offer_type") or "Kombination";preset=OFFER_TYPES.get(kind,OFFER_TYPES["Kombination"])
-    body=f'''<div class="card"><div class="eyebrow">FTST Angebotseditor</div><h1>Ihr Angebot individuell aufbauen</h1><p class="muted">Preise und Billomat-Positionen bleiben unverändert. Hier bearbeitest du nur die kundenseitige Präsentation.</p><a class="btn light" href="{ingress('offer/'+str(offer_id)+'/edit?reset=1')}">Texte zurücksetzen</a></div><form method="post" action="{ingress('offer/'+str(offer_id)+'/edit')}"><div class="card"><h2 class="section-title">1. Angebotsart</h2><div class="field"><label>Angebotstyp</label><select name="offer_type">{''.join(f'<option value="{safe_text(k)}" {"selected" if k==kind else ""}>{safe_text(k)}</option>' for k in OFFER_TYPES)}</select></div><div class="field"><label>Kundentitel</label><input name="customer_title" value="{safe_text(raw.get('customer_title') or preset['headline'])}"></div><div class="field"><label>Einleitung</label><textarea name="customer_intro">{safe_text(raw.get('customer_intro') or preset['intro'])}</textarea></div></div><div class="card"><h2 class="section-title">2. Projekt auf einen Blick</h2><div class="field"><label>Projektbeschreibung</label><textarea name="project_summary">{safe_text(raw.get('project_summary') or preset['summary'])}</textarea></div></div><div class="card"><h2 class="section-title">3. Ihre Vorteile</h2><div class="field"><label>Ein Punkt pro Zeile</label><textarea name="benefits">{safe_text(chr(10).join(raw.get('benefits') or preset['benefits']))}</textarea></div></div><div class="card"><h2 class="section-title">4. Nächste Schritte</h2><div class="field"><label>Ein Punkt pro Zeile</label><textarea name="next_steps">{safe_text(chr(10).join(raw.get('next_steps') or DEFAULT_STEPS))}</textarea></div></div><div class="card"><button class="btn" type="submit">Vorschau erstellen</button> <a class="btn light" href="{ingress('offer/'+str(offer_id))}">Abbrechen</a></div></form>'''
+        src={k:request.form.get(k,"") for k in ("offer_type","customer_title","customer_intro","project_summary","benefits","next_steps")};session["ftst_"+oid]=src;session.modified=True;o=apply_source(o,src)
+    options="".join(f'<option {"selected" if o.get("offer_type")==k else ""}>{k}</option>' for k in TYPES)
+    benefits="\n".join(o.get("benefits",[]));steps="\n".join(o.get("next_steps",[]))
+    body=f'''<div class="card"><div class="eyebrow">Angebot bearbeiten</div><h1>Kundendarstellung</h1><p class="muted">Billomat-Preise und Positionen bleiben unverändert. Hier bearbeiten Sie nur die Präsentation.</p><form method="post"><div class="field"><label>Angebotstyp</label><select name="offer_type">{options}</select></div><div class="field"><label>Kundentitel</label><input name="customer_title" value="{clean(o.get('customer_title'))}"></div><div class="field"><label>Einleitung</label><textarea name="customer_intro">{clean(o.get('customer_intro'))}</textarea></div><div class="field"><label>Projekt auf einen Blick</label><textarea name="project_summary">{clean(o.get('project_summary'))}</textarea></div><div class="field"><label>Ihre Vorteile · ein Vorteil pro Zeile</label><textarea name="benefits">{clean(benefits)}</textarea></div><div class="field"><label>Nächste Schritte · ein Schritt pro Zeile</label><textarea name="next_steps">{clean(steps)}</textarea></div><button class="btn" type="submit">Speichern</button><a class="btn light" href="{ingress('offer/'+oid)}">Abbrechen</a></form></div>'''
     return base("Angebot bearbeiten",body)
+
+def detail(o):
+    rows="".join(f'<tr><td>{clean(i["position"])}</td><td><b>{clean(i["title"])}</b><br><span class="muted small">{clean(i["description"])}</span></td><td>{clean(i["quantity"])} {clean(i["unit"])}</td><td class="money">{money(i["unit_price"])}</td><td class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
+    checks="".join(f'<span class="check">✓ {clean(x)}</span>' for x in o.get("benefits",[]))
+    steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[]))
+    c=o["client"]
+    body=f'''<div class="card hero"><div class="eyebrow">{clean(o.get("offer_type"))} · Ihr persönliches Angebot</div><h1>{clean(o.get("customer_title") or o.get("title"))}</h1><p>{clean(o.get("customer_intro"))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress('offers')}">Übersicht</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {clean(o.get('date'))}<br>Gültig: {clean(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div></div>'''
+    return base("FTST Angebot",body)
 
 @app.get("/demo")
 def demo():
-    o={"id":"demo","offer_number":"26-79","date":"12.06.2026","validity_date":"26.06.2026","status":"draft","title":"Videoüberwachung – Pasa Firin","total_net":6452.40,"total_gross":7678.36,"taxes":[{"amount":1225.96}],"client":{"name":"Pasa Firin","street":"G2 9","zip":"68159","city":"Mannheim"},"items":[{"position":1,"title":"8MP Domekamera","description":"2.8mm · Tag/Nacht · KI Person/Fahrzeug","quantity":16,"unit":"Stk.","unit_price":298,"total_net":4768},{"position":2,"title":"16-Kanal NVR","description":"AI-Aufzeichnung","quantity":1,"unit":"Stk.","unit_price":900,"total_net":900},{"position":3,"title":"24-Port PoE Switch","description":"Managed PoE","quantity":1,"unit":"Stk.","unit_price":222,"total_net":222},{"position":4,"title":"Techniker","description":"Montage und Inbetriebnahme","quantity":4,"unit":"Std.","unit_price":85,"total_net":340},{"position":5,"title":"Helfer","description":"Unterstützende Montagearbeiten","quantity":4,"unit":"Std.","unit_price":35,"total_net":140}]}
-    return detail(offer_data(o,{"offer_type":"Videoüberwachung"}))
-
+    return detail(apply_source({"id":"demo","offer_number":"26-79","date":"12.06.2026","validity_date":"26.06.2026","total_net":6452.4,"total_gross":7678.36,"taxes":[{"amount":1225.96}],"client":{"name":"Pasa Firin","street":"G2 9","zip":"68159","city":"Mannheim"},"items":[]},{}))
 
 def footer(canvas,doc):
     canvas.saveState();w,_=A4;canvas.setFont("Helvetica",7.5);canvas.setFillColor(MUTED);canvas.drawString(18*mm,9*mm,"FT Sicherheitstechnik · Professionelle Sicherheitstechnik");canvas.drawRightString(w-18*mm,9*mm,f"Seite {doc.page}");canvas.setStrokeColor(BORDER);canvas.line(18*mm,13*mm,w-18*mm,13*mm);canvas.restoreState()
 
-
 def make_pdf(o):
-    o=normalize_offer(o);buffer=io.BytesIO();doc=SimpleDocTemplate(buffer,pagesize=A4,leftMargin=18*mm,rightMargin=18*mm,topMargin=18*mm,bottomMargin=19*mm)
-    styles=getSampleStyleSheet();title=ParagraphStyle("FTTitle",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=25,leading=29,textColor=DARK,spaceAfter=8);h2=ParagraphStyle("FTH2",parent=styles["Heading2"],fontName="Helvetica-Bold",fontSize=16,leading=19,textColor=DARK,spaceBefore=8,spaceAfter=8);body=ParagraphStyle("FTBody",parent=styles["BodyText"],fontName="Helvetica",fontSize=9.4,leading=13.5,textColor=TEXT);small=ParagraphStyle("FTSmall",parent=body,fontSize=7.8,leading=10,textColor=MUTED);redsmall=ParagraphStyle("FTRedSmall",parent=small,textColor=RED,fontName="Helvetica-Bold");greensmall=ParagraphStyle("FTGreenSmall",parent=small,textColor=GREEN,fontName="Helvetica-Bold");right=ParagraphStyle("FTRight",parent=body,alignment=TA_RIGHT)
-    story=[]
-    header=Table([[Paragraph("FT SICHERHEITSTECHNIK",ParagraphStyle("brand",parent=body,fontName="Helvetica-Bold",fontSize=15,textColor=WHITE)),""]],colWidths=[120*mm,50*mm]);header.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),DARK),("TEXTCOLOR",(0,0),(-1,-1),WHITE),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("BOTTOMPADDING",(0,0),(-1,-1),7*mm),("TOPPADDING",(0,0),(-1,-1),7*mm),("LINEBELOW",(0,0),(-1,0),2*mm,RED)]));story += [header,Spacer(1,11*mm),Paragraph("IHR PERSÖNLICHES ANGEBOT",redsmall),Paragraph(str(o.get("customer_title") or o.get("title") or "Individuelle Sicherheitslösung"),title),Paragraph(str(o.get("customer_intro") or o.get("intro") or "Professionelle Sicherheitstechnik – geplant und umgesetzt von FT Sicherheitstechnik."),body),Spacer(1,7*mm)]
-    customer=Table([[Paragraph("KUNDE",redsmall),Paragraph("ANGEBOT",redsmall)],[Paragraph(f"<b>{safe_text(client_name(o['client']))}</b><br/>{safe_text(o['client'].get('street',''))}<br/>{safe_text(o['client'].get('zip',''))} {safe_text(o['client'].get('city',''))}",body),Paragraph(f"<b>Nr. {safe_text(o.get('offer_number') or o.get('number') or '-')}</b><br/>Datum: {safe_text(o.get('date','-'))}<br/>Gültig: {safe_text(o.get('validity_date') or o.get('validity_days') or '-')}",body)]],colWidths=[82*mm,88*mm]);customer.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("INNERGRID",(0,0),(-1,-1),0.5,colors.HexColor('#E5E5E5'))),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),5*mm),("RIGHTPADDING",(0,0),(-1,-1),5*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)]));story += [customer,Spacer(1,8*mm)]
-    stat1=Paragraph(money(o.get("total_net")),ParagraphStyle("st1",parent=body,fontSize=15,fontName="Helvetica-Bold"));stat2=Paragraph(money(o.get("tax_amount")),ParagraphStyle("st2",parent=body,fontSize=15,fontName="Helvetica-Bold"));stat3=Paragraph(money(o.get("total_gross")),ParagraphStyle("st3",parent=body,fontSize=16,fontName="Helvetica-Bold",textColor=GREEN));stats=Table([[Paragraph("GESAMT NETTO",redsmall),Paragraph("MWST.",redsmall),Paragraph("IHR FESTPREIS",greensmall)],[stat1,stat2,stat3]],colWidths=[56*mm,56*mm,58*mm]);stats.setStyle(TableStyle([("BACKGROUND",(0,0),(1,-1),LIGHT),("BACKGROUND",(2,0),(2,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),5*mm)]));story += [stats,Spacer(1,10*mm),Paragraph("01 · IHR PROJEKT AUF EINEN BLICK",redsmall),Paragraph("Das haben wir für Sie zusammengestellt.",title),Paragraph(str(o.get("project_summary") or "Ihr Projekt wurde anhand der aufgeführten Leistungen und Artikel vorbereitet."),body),Spacer(1,7*mm)]
-    ben=o.get("benefits") or [];bdata=[[Paragraph(f"✓ {safe_text(x)}",ParagraphStyle(f"b{i}",parent=body,textColor=GREEN,fontName="Helvetica-Bold")) for i,x in enumerate(ben)]] if ben else []
-    if bdata:
-        while len(bdata[0])<4:bdata[0].append("")
-        bt=Table(bdata,colWidths=[42.5*mm]*4);bt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.4,colors.HexColor('#CDE8D5'))),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),3*mm),("RIGHTPADDING",(0,0),(-1,-1),3*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)]));story += [bt,Spacer(1,7*mm)]
-    story += [PageBreak(),Paragraph("02 · IHRE FESTPREIS-LEISTUNG",redsmall),Paragraph("Ein Preis. Alles drin.",title)]
+    styles=getSampleStyleSheet();body=ParagraphStyle("body",parent=styles["BodyText"],fontSize=9.5,leading=14,textColor=TEXT);small=ParagraphStyle("small",parent=body,fontSize=7.8,leading=10,textColor=MUTED);h1=ParagraphStyle("h1",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=25,leading=29,textColor=DARK);h2=ParagraphStyle("h2",parent=styles["Heading2"],fontSize=16,leading=19,textColor=DARK);red=ParagraphStyle("red",parent=small,fontName="Helvetica-Bold",textColor=RED);right=ParagraphStyle("right",parent=body,alignment=TA_RIGHT);brand=ParagraphStyle("brand",parent=body,fontName="Helvetica-Bold",fontSize=15,textColor=WHITE);green=ParagraphStyle("green",parent=body,fontName="Helvetica-Bold",fontSize=16,textColor=GREEN)
+    o=normalize(o);c=o["client"];buf=io.BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=18*mm,rightMargin=18*mm,topMargin=18*mm,bottomMargin=19*mm);story=[]
+    header=Table([[Paragraph("FT SICHERHEITSTECHNIK",brand),""]],colWidths=[120*mm,50*mm]);header.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),DARK),("BOTTOMPADDING",(0,0),(-1,-1),7*mm),("TOPPADDING",(0,0),(-1,-1),7*mm),("LINEBELOW",(0,0),(-1,0),3*mm,RED)]));story += [header,Spacer(1,10*mm),Paragraph("IHR PERSÖNLICHES ANGEBOT",red),Paragraph(clean(o.get("customer_title") or o.get("title") or "Individuelle Sicherheitslösung"),h1),Paragraph(clean(o.get("customer_intro") or "Professionelle Sicherheitstechnik."),body),Spacer(1,7*mm)]
+    customer=Table([[Paragraph("KUNDE",red),Paragraph("ANGEBOT",red)],[Paragraph(f"<b>{clean(cname(c))}</b><br>{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}",body),Paragraph(f"<b>Nr. {clean(o.get('offer_number') or o.get('number'))}</b><br>Datum: {clean(o.get('date'))}<br>Gültig: {clean(o.get('validity_date') or o.get('validity_days'))}",body)]],colWidths=[82*mm,88*mm]);customer.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("INNERGRID",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)]));story += [customer,Spacer(1,7*mm)]
+    stats=Table([[Paragraph("NETTO",red),Paragraph("MWST.",red),Paragraph("IHR FESTPREIS",red)],[Paragraph(money(o.get("total_net")),body),Paragraph(money(o.get("tax_amount")),body),Paragraph(money(o.get("total_gross")),green)]],colWidths=[56*mm,56*mm,58*mm]);stats.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),LIGHT),("BACKGROUND",(2,0),(2,1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),5*mm)]));story += [stats,Spacer(1,8*mm),Paragraph("01 · IHR PROJEKT AUF EINEN BLICK",red),Paragraph("Das haben wir für Sie zusammengestellt.",h2),Paragraph(clean(o.get("project_summary")),body),PageBreak(),Paragraph("02 · IHRE FESTPREIS-LEISTUNG",red),Paragraph("Ein Preis. Alles drin.",h1)]
     rows=[[Paragraph("POS.",small),Paragraph("LEISTUNG / ARTIKEL",small),Paragraph("MENGE",small),Paragraph("PREIS",small),Paragraph("NETTO",small)]]
-    for i in o["items"]:rows.append([Paragraph(str(i["position"]),body),Paragraph(f"<b>{safe_text(i['title'])}</b><br/><font color='#6F6F6F'>{safe_text(i['description'])}</font>",body),Paragraph(f"{safe_text(i['quantity'])} {safe_text(i['unit'])}",body),Paragraph(money(i["unit_price"]),right),Paragraph(money(i["total_net"]),right)])
-    tbl=Table(rows,colWidths=[12*mm,84*mm,22*mm,27*mm,30*mm],repeatRows=1);tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),DARK),("TEXTCOLOR",(0,0),(-1,0),WHITE),("GRID",(0,0),(-1,-1),0.3,BORDER),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),2.5*mm),("RIGHTPADDING",(0,0),(-1,-1),2.5*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)]));story += [tbl,Spacer(1,7*mm),stats,Spacer(1,10*mm),Paragraph("Im Preis enthalten",h2)]
-    includes=["Fachgerechte Montage","Konfiguration und Inbetriebnahme","Funktionsprüfung","Einweisung und Übergabe"];inc=Table([[Paragraph(f"✓ {x}",ParagraphStyle(f"inc{i}",parent=body,textColor=GREEN,fontName="Helvetica-Bold")) for i,x in enumerate(includes)]],colWidths=[42.5*mm]*4);inc.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.4,colors.HexColor('#CDE8D5'))),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),3*mm),("RIGHTPADDING",(0,0),(-1,-1),3*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)]));story.append(inc)
-    story += [PageBreak(),Paragraph("03 · NÄCHSTE SCHRITTE",redsmall),Paragraph("So geht es weiter.",title)]
-    steps=o.get("next_steps") or DEFAULT_STEPS;step_rows=[[Paragraph(str(idx),ParagraphStyle(f"s{idx}",parent=body,fontName="Helvetica-Bold",fontSize=13,textColor=WHITE)),Paragraph(safe_text(step),body)] for idx,step in enumerate(steps[:6],1)];st=Table(step_rows,colWidths=[16*mm,154*mm]);st.setStyle(TableStyle([("BACKGROUND",(0,0),(0,-1),RED),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("BOX",(0,0),(-1,-1),0.4,BORDER),("INNERGRID",(0,0),(-1,-1),0.4,colors.HexColor('#EEEEEE'))),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),5*mm),("BOTTOMPADDING",(0,0),(-1,-1),5*mm)]));story += [st,Spacer(1,12*mm),Paragraph("Vielen Dank für Ihr Vertrauen in FT Sicherheitstechnik.",h2),Paragraph("Die Preise und Positionen stammen aus dem zugrunde liegenden Billomat-Angebot. Die kundenseitige Präsentation kann separat angepasst werden.",small)]
-    doc.build(story,onFirstPage=footer,onLaterPages=footer);buffer.seek(0);return buffer
+    for i in o["items"]:rows.append([Paragraph(str(i["position"]),body),Paragraph(f"<b>{clean(i['title'])}</b><br/><font color='#6F6F6F'>{clean(i['description'])}</font>",body),Paragraph(f"{clean(i['quantity'])} {clean(i['unit'])}",body),Paragraph(money(i['unit_price']),right),Paragraph(money(i['total_net']),right)])
+    tbl=Table(rows,colWidths=[12*mm,84*mm,22*mm,27*mm,30*mm],repeatRows=1);tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),DARK),("TEXTCOLOR",(0,0),(-1,0),WHITE),("GRID",(0,0),(-1,-1),0.3,BORDER),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),2.5*mm),("RIGHTPADDING",(0,0),(-1,-1),2.5*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)]));story += [tbl,Spacer(1,8*mm),Paragraph("Ihre Vorteile",h2),Paragraph(" ·  ".join(str(x) for x in o.get("benefits",[])),body),PageBreak(),Paragraph("03 · NÄCHSTE SCHRITTE",red),Paragraph("So geht es weiter.",h1),Paragraph("\n".join(f"{n}. {x}" for n,x in enumerate(o.get("next_steps",[]),1)),body),Spacer(1,10*mm),Paragraph("Vielen Dank für Ihr Vertrauen in FT Sicherheitstechnik.",h2)];doc.build(story,onFirstPage=footer,onLaterPages=footer);buf.seek(0);return buf
 
-@app.route("/offer/<offer_id>/pdf",methods=["GET","POST"])
-def offer_pdf(offer_id):
-    if offer_id=="demo":
-        o={"offer_number":"26-79","date":"12.06.2026","validity_date":"26.06.2026","title":"Videoüberwachung – Pasa Firin","intro":"Professionelle IP-Videoüberwachung mit KI-Personen-/Fahrzeugerkennung.","total_net":6452.40,"total_gross":7678.36,"taxes":[{"amount":1225.96}],"client":{"name":"Pasa Firin","street":"G2 9","zip":"68159","city":"Mannheim"},"items":[]}
-    else:o=load_offer(offer_id)
-    if request.method=="POST":o=offer_data(o,request.form);session[f"ftst_offer_{offer_id}"]={k:request.form.get(k,"") for k in ("offer_type","customer_title","customer_intro","project_summary","benefits","next_steps")}
-    number=str(o.get("offer_number") or o.get("number") or offer_id);return send_file(make_pdf(o),mimetype="application/pdf",as_attachment=False,download_name=f"FTST-Angebot-{number}.pdf")
+@app.get("/offer/<oid>/pdf")
+def offer_pdf(oid):
+    return send_file(make_pdf(get_offer(oid)),mimetype="application/pdf",as_attachment=False,download_name=f"FTST-Angebot-{oid}.pdf")
 
 if __name__=="__main__":app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))
