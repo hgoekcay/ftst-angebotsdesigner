@@ -150,7 +150,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><div class="brand">FT SICHERHEITSTECHNIK</div><div class="sub">FTST AngebotsDesigner</div></div><div class="small">v{APP_VERSION}</div></div></div><main class="wrap">{body}</main></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:340px;max-width:65vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><div class="small">v{APP_VERSION}</div></div></div><main class="wrap">{body}</main></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -237,7 +237,8 @@ def make_pdf(o):
 
     if o.get("logo_path"):
         logo = Image(o["logo_path"])
-        logo._restrictSize(55*mm, 22*mm)
+        logo._restrictSize(135*mm, 28*mm)
+        logo.hAlign = "LEFT"
         story.extend([logo, Spacer(1, 3*mm)])
     header=Table([[Paragraph("FT SICHERHEITSTECHNIK",brand),""]],colWidths=[120*mm,50*mm])
     header.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),DARK),("BOTTOMPADDING",(0,0),(-1,-1),6*mm),("TOPPADDING",(0,0),(-1,-1),6*mm),("LINEBELOW",(0,0),(-1,0),3*mm,RED)]))

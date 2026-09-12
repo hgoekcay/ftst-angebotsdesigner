@@ -1,5 +1,20 @@
 # Änderungen
 
+## 0.3.0
+
+- Lokaler Angebotsentwurf aus Projektnotizen, auch ohne KI-Zugang.
+- Lesender Billomat-Katalog mit Artikelvorschlägen und genauer Variantenwahl.
+- Kundenauswahl, Preisgruppen, Rabatt und Nettokalkulation mit geprüften Steuersätzen.
+- Offene oder widersprüchliche Angaben verhindern eine Gesamtsumme.
+- Dauerhafte Entwürfe mit atomarem Schutz vor parallelem Überschreiben.
+- 55 Tests; Live-Abnahme des Katalogabrufs noch ausstehend.
+- Noch keine automatische Angebotsanlage in Billomat oder Entwurfs-Angebots-PDF.
+
+- Zwölf mitgelieferte Originaldateien: vier Logos, fünf Montagefotos, zwei Symbolfotos und eine Hinweisgrafik.
+- FT-Firmenlogo standardmäßig in App und PDF; vorhandene PDF-Logowahl bleibt erhalten.
+- Bildauswahl mit Vorschauen, dauerhafter Speicherung und Quellenart im PDF.
+- FTronics als Produktmarke hinterlegt; keine KI-Motive im festen Bildbestand.
+
 ## 0.2.0
 
 - Firmendaten und Logo zentral speichern und im PDF verwenden.
@@ -20,12 +35,3 @@
 - Gemischte Gewerke als Kombination; automatische Erkennung im Editor wieder auswählbar.
 - PDF öffnet in eigenem Tab. Bestehende FTST-Gestaltung erhalten.
 - Automatisierte Tests und Abnahmeprotokoll ergänzt.
-# 0.3.0
-
-- Lokaler Angebotsentwurf aus Projektnotizen, auch ohne KI-Zugang.
-- Lesender Billomat-Katalog mit Artikelvorschlägen und genauer Variantenwahl.
-- Kundenauswahl, Preisgruppen, Rabatt und Nettokalkulation mit geprüften Steuersätzen.
-- Offene oder widersprüchliche Angaben verhindern eine Gesamtsumme.
-- Dauerhafte Entwürfe mit atomarem Schutz vor parallelem Überschreiben.
-- 50 Tests; Live-Abnahme des Katalogabrufs noch ausstehend.
-- Noch keine automatische Angebotsanlage in Billomat oder Entwurfs-Angebots-PDF.
