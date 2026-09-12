@@ -7,9 +7,12 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from billomat_client import BillomatClient
+import materials
+import projects
+from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.1.19"
+APP_VERSION = "0.2.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -155,7 +158,7 @@ def get_offer(oid):
     legacy_key = 'ftst_' + oid
     source = offer_store().load(bid.strip().lower(), oid, session.get(legacy_key))
     session.pop(legacy_key, None)
-    return apply_source(raw, source)
+    return materials.enrich(apply_source(raw, source), offer_store())
 
 @app.get("/health")
 def health():
@@ -167,7 +170,7 @@ def health():
 
 @app.get("/")
 def index():
-    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a></div>')
+    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("projects")}">Projekte & Assistent</a></div>')
 
 @app.get("/offers")
 def offers():
@@ -207,7 +210,7 @@ def detail(o):
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
-    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
+    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
@@ -221,6 +224,7 @@ def make_pdf(o):
     styles=getSampleStyleSheet()
     body=ParagraphStyle("body",parent=styles["BodyText"],fontSize=9.1,leading=12.6,textColor=TEXT)
     small=ParagraphStyle("small",parent=body,fontSize=7.2,leading=9.1,textColor=MUTED)
+    table_head=ParagraphStyle("table_head",parent=small,textColor=WHITE)
     h1=ParagraphStyle("h1",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=23,leading=27,textColor=DARK)
     h2=ParagraphStyle("h2",parent=styles["Heading2"],fontSize=15,leading=18,textColor=DARK)
     red=ParagraphStyle("red",parent=small,fontName="Helvetica-Bold",textColor=RED)
@@ -230,6 +234,10 @@ def make_pdf(o):
     o=normalize(o); c=o["client"]; buf=io.BytesIO()
     doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=18*mm,rightMargin=18*mm,topMargin=16*mm,bottomMargin=19*mm); story=[]
 
+    if o.get("logo_path"):
+        logo = Image(o["logo_path"])
+        logo._restrictSize(55*mm, 22*mm)
+        story.extend([logo, Spacer(1, 3*mm)])
     header=Table([[Paragraph("FT SICHERHEITSTECHNIK",brand),""]],colWidths=[120*mm,50*mm])
     header.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),DARK),("BOTTOMPADDING",(0,0),(-1,-1),6*mm),("TOPPADDING",(0,0),(-1,-1),6*mm),("LINEBELOW",(0,0),(-1,0),3*mm,RED)]))
     story += [header,Spacer(1,7*mm),Paragraph("IHR PERSÖNLICHES ANGEBOT",red),Paragraph(clean(o.get("customer_title") or o.get("title") or "Individuelle Sicherheitslösung"),h1),Paragraph(clean(o.get("customer_intro") or "Professionelle Sicherheitstechnik."),body),Spacer(1,5*mm)]
@@ -245,7 +253,7 @@ def make_pdf(o):
     benefits=o.get("benefits",[])[:4]; benefit_rows=[]
     for i,x in enumerate(benefits):
         if i%2==0: benefit_rows.append([])
-        benefit_rows[-1].append(Paragraph("✓ "+clean(x),body))
+        benefit_rows[-1].append(Paragraph("+ "+clean(x),body))
     if benefit_rows:
         if len(benefit_rows[-1])<2: benefit_rows[-1].append("")
         bt=Table(benefit_rows,colWidths=[85*mm,85*mm])
@@ -253,11 +261,11 @@ def make_pdf(o):
     story += [Paragraph("Alles aus einer Hand – von der Planung bis zur betriebsbereiten Übergabe.",body),PageBreak()]
 
     story += [Paragraph("02 · IHRE FESTPREIS-LEISTUNG",red),Paragraph("Ein Preis. Die passende Lösung. Klar dargestellt.",h1),Paragraph("Die folgenden Positionen bilden die technische Grundlage Ihres Angebots.",body),Spacer(1,4*mm)]
-    rows=[[Paragraph("POS.",small),Paragraph("LEISTUNG / ARTIKEL",small),Paragraph("MENGE",small),Paragraph("PREIS",small),Paragraph("NETTO",small)]]
+    rows=[[Paragraph("POS.",table_head),Paragraph("LEISTUNG / ARTIKEL",table_head),Paragraph("MENGE",table_head),Paragraph("PREIS",table_head),Paragraph("NETTO",table_head)]]
     for i in o["items"]:
         desc=compact(i["description"],175); desc_html=f"<br/><font color='#6F6F6F'>{clean(desc)}</font>" if desc else ""
         rows.append([Paragraph(str(i["position"]),small),Paragraph(f"<b>{clean(i['title'])}</b>{desc_html}",small),Paragraph(f"{clean(i['quantity'])} {clean(i['unit'])}",small),Paragraph(money(i["unit_price"]),right),Paragraph(money(i["total_net"]),right)])
-    tbl=Table(rows,colWidths=[11*mm,92*mm,20*mm,25*mm,32*mm],repeatRows=1)
+    tbl=Table(rows,colWidths=[11*mm,82*mm,20*mm,25*mm,32*mm],repeatRows=1)
     tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),DARK),("TEXTCOLOR",(0,0),(-1,0),WHITE),("GRID",(0,0),(-1,-1),0.3,BORDER),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),2.1*mm),("RIGHTPADDING",(0,0),(-1,-1),2.1*mm),("TOPPADDING",(0,0),(-1,-1),2.4*mm),("BOTTOMPADDING",(0,0),(-1,-1),2.4*mm)]))
     story += [tbl,Spacer(1,6*mm)]
 
@@ -269,7 +277,7 @@ def make_pdf(o):
     totals.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),LIGHT),("BACKGROUND",(2,0),(2,1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)])); story += [totals,PageBreak()]
 
     story += [Paragraph("03 · IHRE VORTEILE",red),Paragraph("Professionell geplant. Sauber umgesetzt.",h1),Paragraph("Ihr Vorteil liegt nicht nur in einzelnen Komponenten, sondern in der abgestimmten Gesamtlösung.",body),Spacer(1,5*mm)]
-    benefit_cards=[[Paragraph("✓",green),Paragraph(f"<b>{clean(x)}</b>",body)] for x in o.get("benefits",[])[:6]]
+    benefit_cards=[[Paragraph("+",green),Paragraph(f"<b>{clean(x)}</b>",body)] for x in o.get("benefits",[])[:6]]
     if benefit_cards:
         bt=Table(benefit_cards,colWidths=[12*mm,158*mm])
         bt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#B9DFC5")),("INNERGRID",(0,0),(-1,-1),0.3,WHITE),("LEFTPADDING",(0,0),(-1,-1),3*mm),("RIGHTPADDING",(0,0),(-1,-1),3*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)])); story += [bt,Spacer(1,7*mm)]
@@ -283,6 +291,7 @@ def make_pdf(o):
     closing.setStyle(TableStyle([("BACKGROUND",(0,0),(0,1),GREEN_LIGHT),("BACKGROUND",(1,0),(1,1),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("INNERGRID",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),5*mm),("BOTTOMPADDING",(0,0),(-1,-1),5*mm)]))
     story += [closing,Spacer(1,4*mm),Paragraph("Hinweis: Maßgeblich für Preise, Mengen und Abrechnung bleiben die in Billomat hinterlegten Angebotspositionen.",small)]
 
+    materials.pdf_materials(story, o, styles, clean)
     doc.build(story,onFirstPage=footer,onLaterPages=footer); buf.seek(0); return buf
 
 @app.get("/offer/<oid>/pdf")
@@ -293,6 +302,9 @@ def offer_pdf(oid):
     except Exception as e:
         log.exception("PDF generation failed")
         return base("PDF Fehler",f'<div class="back"><a href="{ingress("offer/"+oid)}">← Zurück zum Angebot</a></div><div class="card"><h1>PDF konnte nicht erstellt werden</h1><p>{clean(e)}</p></div>'),500
+
+materials.register(app, base, ingress, clean, offer_store, TYPES)
+projects.register(app, base, ingress, clean, offer_store)
 
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))

@@ -32,7 +32,7 @@ class OfferStore:
             db.execute('PRAGMA busy_timeout=5000')
             db.execute('BEGIN IMMEDIATE')
             version = db.execute('PRAGMA user_version').fetchone()[0]
-            if version > 1:
+            if version > 2:
                 raise StorageError('Neuere Datenbankversion. Bitte die passende App-Version verwenden.')
             if version == 0:
                 db.execute('CREATE TABLE IF NOT EXISTS presentations ('
@@ -40,6 +40,11 @@ class OfferStore:
                            'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, '
                            'PRIMARY KEY(account, offer_id))')
                 db.execute('PRAGMA user_version=1')
+            if version < 2:
+                db.execute('CREATE TABLE IF NOT EXISTS records ('
+                           'account TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, '
+                           'payload TEXT NOT NULL, PRIMARY KEY(account,kind,id))')
+                db.execute('PRAGMA user_version=2')
             db.commit()
             return db
         except Exception:
@@ -78,3 +83,20 @@ class OfferStore:
                     raise StorageError('Datenbankprüfung fehlgeschlagen.')
         except (sqlite3.Error, OSError) as exc:
             raise StorageError('Datenbank nicht verfügbar.') from exc
+
+    def records(self, account, kind):
+        try:
+            with closing(self._connect()) as db:
+                rows = db.execute('SELECT id,payload FROM records WHERE account=? AND kind=? ORDER BY rowid DESC', (account, kind)).fetchall()
+                return {key: json.loads(value) for key, value in rows}
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            raise StorageError('Projektdaten sind derzeit nicht verfügbar.') from exc
+
+    def put_record(self, account, kind, key, value):
+        try:
+            with closing(self._connect()) as db, db:
+                db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?) '
+                           'ON CONFLICT(account,kind,id) DO UPDATE SET payload=excluded.payload',
+                           (account, kind, key, json.dumps(value, ensure_ascii=False)))
+        except (sqlite3.Error, OSError) as exc:
+            raise StorageError('Projektdaten konnten nicht gespeichert werden.') from exc

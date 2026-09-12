@@ -1,0 +1,117 @@
+"""Persistent project intake and reviewable AI requirements drafts."""
+import io
+import os
+import uuid
+from pathlib import Path
+from flask import abort, redirect, request, send_file
+from PIL import Image, ImageOps, UnidentifiedImageError
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from materials import account
+from project_ai import extract, AIError
+
+
+def register(app, base, ingress, escape, get_store):
+    def project(key):
+        value = get_store().records(account(), 'project').get(key)
+        if value is None:
+            abort(404)
+        return value
+
+    @app.route('/projects', methods=['GET', 'POST'])
+    def projects():
+        store = get_store()
+        if request.method == 'POST':
+            key = uuid.uuid4().hex
+            value = {'title': request.form.get('title','').strip()[:200] or 'Neues Projekt',
+                     'notes':request.form.get('notes','')[:20000], 'offer_id':'', 'analysis':{}}
+            store.put_record(account(), 'project', key, value)
+            return redirect(ingress('projects/'+key))
+        rows = ''.join(f'<div class="card"><a href="{ingress("projects/"+key)}">{escape(value.get("title"))}</a></div>' for key,value in store.records(account(),'project').items())
+        return base('Projekte', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Neues Projekt</h1><p>Notizen, Merkzettel und Sprachnotizen an einem Ort.</p><form method="post"><label for="title">Projekt / Kunde</label><input id="title" name="title" required><label for="notes">Ihre Notizen</label><textarea id="notes" name="notes"></textarea><p><button class="btn">Projekt anlegen</button></p></form></div>{rows}')
+
+    @app.route('/projects/<key>', methods=['GET','POST'])
+    def project_detail(key):
+        value = project(key)
+        store = get_store()
+        if request.method == 'POST':
+            value['notes'] = request.form.get('notes','')[:20000]
+            oid = request.form.get('offer_id','').strip()
+            if oid and not oid.isdigit():
+                abort(400, 'Bitte die numerische Billomat-Angebots-ID verwenden.')
+            value['offer_id'] = oid
+            # A changed source invalidates the previous analysis.
+            value['analysis'] = {}
+            value.pop('error', None)
+            folder = store.directory / 'projects' / key
+            for field in ('image','audio'):
+                upload = request.files.get(field)
+                if not upload or not upload.filename:
+                    continue
+                folder.mkdir(parents=True, exist_ok=True)
+                if field == 'image':
+                    try:
+                        picture = Image.open(upload.stream)
+                        if picture.width*picture.height>25_000_000:
+                            abort(400, 'Bild zu groß.')
+                        picture = ImageOps.exif_transpose(picture).convert('RGB')
+                        picture.thumbnail((2400,2400))
+                        picture.save(folder/'note.png')
+                        value['image'] = 'note.png'
+                    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+                        abort(400, 'Ungültiges Bild.')
+                else:
+                    suffix = Path(upload.filename).suffix.lower()
+                    if suffix not in ('.mp3','.m4a','.wav','.webm','.mp4','.ogg'):
+                        abort(400, 'Nicht unterstützte Audiodatei.')
+                    name = 'voice'+suffix
+                    upload.save(folder/name)
+                    value['audio'] = name
+            store.put_record(account(), 'project', key, value)
+            return redirect(ingress('projects/'+key)+'?saved=1')
+        result = value.get('analysis', {})
+        rows = ''.join(f'<tr><td>{escape(row.get("description"))}</td><td>{escape(row.get("quantity") if row.get("quantity") is not None else "Offen")}</td><td>{escape(row.get("evidence"))}</td></tr>' for row in result.get('components',[]))
+        questions = ''.join(f'<li>{escape(q)}</li>' for q in result.get('questions',[]))
+        summary = f'<div class="card"><h2>Anforderungsentwurf · bitte prüfen</h2><p>{escape(result.get("summary"))}</p><table><tr><th>Komponente</th><th>Menge</th><th>Beleg</th></tr>{rows}</table><h3>Offene Angaben</h3><ul>{questions}</ul><p>Artikelzuordnung und Preise müssen anschließend aus Billomat übernommen und geprüft werden.</p><a class="btn dark" target="_blank" rel="noopener" href="{ingress("projects/"+key+"/pdf")}">Projektentwurf als PDF</a></div>' if result else ''
+        error = f'<p>{escape(value.get("error"))}</p>' if value.get('error') else ''
+        state = 'KI ist eingerichtet.' if os.getenv('OPENAI_API_KEY') else 'KI noch nicht eingerichtet: OpenAI-API-Schlüssel in der Home-Assistant-App-Konfiguration hinterlegen.'
+        link = f'<a class="btn" href="{ingress("offer/"+value["offer_id"])}">Billomat-Angebot öffnen</a>' if value.get('offer_id') else ''
+        saved = '<p class="success">Projekt gespeichert.</p>' if request.args.get('saved') else ''
+        attachments = ' · '.join(label for field,label in [('image','Merkzettelfoto vorhanden'),('audio','Sprachnotiz vorhanden')] if value.get(field))
+        return base('Projekt', f'<div class="back"><a href="{ingress("projects")}">← Projekte</a></div><div class="card"><h1>{escape(value["title"])}</h1>{saved}<form method="post" enctype="multipart/form-data"><label for="notes">Notizen / Anforderungen</label><textarea id="notes" name="notes">{escape(value["notes"])}</textarea><label for="image">Merkzettel / Objektfoto</label><input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp"><label for="audio">Sprachnotiz hochladen</label><input id="audio" type="file" name="audio" accept="audio/*"><p>{attachments}</p><label for="offer_id">Billomat-Angebots-ID (falls vorhanden)</label><input id="offer_id" name="offer_id" value="{escape(value.get("offer_id"))}"><p><button class="btn">Eingaben speichern</button>{link}</p></form></div><div class="card"><h2>FTST Projektassistent</h2><p>{state}</p>{error}<form method="post" action="{ingress("projects/"+key+"/analyze")}"><p>Beim Analysieren werden die gespeicherten Notizen, das Merkzettelfoto und die Sprachnotiz an OpenAI übertragen. Es können API-Kosten entstehen.</p><button class="btn">Gespeicherte Eingaben analysieren</button></form></div>{summary}')
+
+    @app.post('/projects/<key>/analyze')
+    def analyze(key):
+        value = project(key)
+        store = get_store()
+        folder = store.directory / 'projects' / key
+        try:
+            image = (folder/value['image']).read_bytes() if value.get('image') else None
+            audio = (value['audio'], (folder/value['audio']).read_bytes()) if value.get('audio') else None
+            if not value['notes'].strip() and not image and not audio:
+                raise AIError('Bitte zuerst Notizen, ein Bild oder eine Sprachnotiz speichern.')
+            value['analysis'] = extract(value['notes'], image, audio)
+            value.pop('error', None)
+        except (AIError, OSError) as exc:
+            value['error'] = str(exc) if isinstance(exc,AIError) else 'Anhang derzeit nicht lesbar.'
+        store.put_record(account(), 'project', key, value)
+        return redirect(ingress('projects/'+key))
+
+    @app.get('/projects/<key>/pdf')
+    def project_pdf(key):
+        value = project(key)
+        result = value.get('analysis', {})
+        styles = getSampleStyleSheet()
+        story = [Paragraph('PROJEKTENTWURF – ZUR PRÜFUNG', styles['Title']),
+                 Paragraph(escape(value['title']), styles['Heading2']),
+                 Paragraph('Kein freigegebenes Angebot. Artikel, Preise und technische Planung sind noch zu prüfen.', styles['BodyText']),
+                 Spacer(1,12), Paragraph(escape(result.get('summary') or value['notes']), styles['BodyText'])]
+        for row in result.get('components',[]):
+            story.append(Paragraph(escape(str(row.get('quantity') or 'Menge offen')+' × '+row['description']),styles['BodyText']))
+        for q in result.get('questions',[]):
+            story.append(Paragraph(escape('Offen: '+q),styles['BodyText']))
+        output = io.BytesIO()
+        SimpleDocTemplate(output,pagesize=A4).build(story)
+        output.seek(0)
+        return send_file(output,mimetype='application/pdf',download_name='FTST-Projektentwurf.pdf')

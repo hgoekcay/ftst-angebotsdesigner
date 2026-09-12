@@ -5,6 +5,9 @@ export BILLOMAT_API_KEY="$(bashio::config 'billomat_api_key')"
 export FLASK_SECRET="$(bashio::config 'flask_secret')"
 export PORT="8099"
 export FTST_DATA_DIR="/data/ftst_angebotsdesigner"
+export OPENAI_API_KEY="$(bashio::config 'openai_api_key')"
+export OPENAI_MODEL="$(bashio::config 'openai_model')"
+export OPENAI_TRANSCRIBE_MODEL="$(bashio::config 'openai_transcribe_model')"
 if [ -z "${FLASK_SECRET}" ]; then export FLASK_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"; fi
 bashio::log.info "Starting FTST AngebotsDesigner on port 8099"
 exec python3 /app/app.py

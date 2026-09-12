@@ -86,6 +86,10 @@ def test_invalid_type_rejected_and_pdf_new_tab(client):
     (['Hub'], 'Kombination'),
     (['BWA', 'Hub', 'FireProtect'], 'Brandwarnanlage'),
     (['BWA.'], 'Brandwarnanlage'),
+    (['IP-Kamera', 'MotionProtect'], 'Kombination'),
+    (['IP-Kamera'], 'Videoüberwachung'),
+    (['Zutrittsleser'], 'Zutrittskontrolle'),
+    (['Türsprechanlage'], 'Türsprechanlage'),
 ])
 def test_detection(items, expected):
     assert module.detect_offer_type({'items': [{'title': t} for t in items]}) == expected
@@ -94,3 +98,23 @@ def test_detection(items, expected):
 @pytest.mark.parametrize('legacy', ['BMA', 'Brandmeldeanlage', 'brandmeldeanlage', 'Unbekannt'])
 def test_obsolete_types_cannot_escape(raw, legacy):
     assert module.apply_source(raw, {'offer_type': legacy})['offer_type'] == 'Rauchmeldeanlage'
+
+
+def test_long_unicode_and_restart(tmp_path):
+    import subprocess
+    import sys
+    from pathlib import Path
+    value = 'Änderung für Wärme & Rauch ' * 1000
+    OfferStore(tmp_path).save('test', '42', {'customer_title':value})
+    code = 'from storage import OfferStore; import sys; assert len(OfferStore(sys.argv[1]).load("test", "42")["customer_title"]) > 10000'
+    result = subprocess.run([sys.executable, '-c', code, str(tmp_path)], cwd=Path(module.__file__).parent, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_write_failure_does_not_claim_success(client, monkeypatch):
+    def fail(*args):
+        raise StorageError('Speichern fehlgeschlagen')
+    monkeypatch.setattr(OfferStore, 'save', fail)
+    response = client.post('/offer/42/edit', data={'customer_title':'Nicht gespeichert'})
+    assert response.status_code == 503
+    assert 'Änderungen gespeichert' not in response.text

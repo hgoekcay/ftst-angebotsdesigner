@@ -41,3 +41,7 @@ Browser: Übersicht → Angebot; Hub + 11 FireProtect als Rauchmeldeanlage; PDF 
 KI: Anbieterzugang/Abrechnung noch nicht eingerichtet. Modellzugriff, Sprache, Handschrift, Rückfragen und Preis-/Artikelzuordnung müssen mit echten freigegebenen Beispielen getestet werden.
 Pläne: Grundrisse, Maßstab und konkrete Gerätedaten benötigt; keine automatische Zusicherung von Reichweiten oder Normkonformität.
 Versand: E-Mail/WhatsApp nur nach gesonderter Einrichtung und ausdrücklicher Versandaktion. Keine automatische Kundenkommunikation beim Entwickeln.
+
+## Tatsächlicher HA-Lesetest
+
+Am 12.09.2026 war die bestehende Version 0.1.18 über den angemeldeten Browser erreichbar. 704 Angebote wurden geladen; Angebot 26-136 mit Hub und elf FireProtect wurde als Rauchmeldeanlage erkannt. Kein Kundenangebot wurde dabei verändert. Die neue Version muss nach Installation separat abgenommen werden.
