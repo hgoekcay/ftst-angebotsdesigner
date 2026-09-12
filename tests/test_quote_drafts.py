@@ -60,6 +60,16 @@ def test_tax_free_and_ambiguous_default(draft):
     assert calculate(draft)['total'] is None
 
 
+@pytest.mark.parametrize('tax_rule', [None, '', 'UNKNOWN'])
+def test_unknown_tax_rule_cannot_be_confirmed_as_country(draft, tax_rule):
+    draft['catalog']['clients'][0]['tax_rule'] = tax_rule
+    draft['tax_confirmed'] = 'yes'
+    result = calculate(draft)
+    assert result['total'] is None
+    assert result['lines'] == []
+    assert 'Unbekannte oder fehlende Steuerregel' in result['problems'][0]
+
+
 def test_plain_notes_and_ambiguous_variants(catalog):
     result=components({'notes':'1 Hub + 11 FireProtect\nMontage offen'})
     assert [x['quantity'] for x in result]==['1','11','']

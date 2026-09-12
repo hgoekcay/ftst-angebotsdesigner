@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.3.2
+
+- Bildauswahl nach Bereichen mit Quellenlabels und gespeichertem/live aktualisiertem Auswahlzähler.
+- Unbekannte Kundensteuerregeln sperren die Kalkulation auch bei gesetzter Steuerbestätigung.
+- Individuelle Titel bleiben vollständig erhalten; lange PDF-Inhalte können umbrechen, Footer bleibt im Footerband.
+- Firmenkontext und gemeinsame Automatisierungsziele dokumentiert.
+- 67 Tests erfolgreich; Bildauswahl im Desktop-/Handybrowser und Muster-PDF visuell geprüft.
+
 ## 0.3.1
 
 - PDF-Redesign anhand „FT Angebot — Muster (final).pdf“: Titelblatt, große linksbündige Typografie, ruhiger Briefkopf, grüner Preisbereich und nummerierte Abschlussseite.

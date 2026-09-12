@@ -10,7 +10,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     BaseDocTemplate, Frame, PageTemplate, NextPageTemplate, PageBreak,
-    Paragraph, Spacer, Table, TableStyle, Flowable,
+    Paragraph, Spacer, Table, TableStyle, Flowable, KeepInFrame,
 )
 
 RED = colors.HexColor('#e30613')
@@ -70,8 +70,8 @@ def build(offer, escape, money, date_de, cname):
     styles = {
         'body': ParagraphStyle('body', fontName=font, fontSize=10.5, leading=15, textColor=INK, spaceAfter=5),
         'small': ParagraphStyle('small', fontName=font, fontSize=8.5, leading=11, textColor=MUTED),
-        'label': ParagraphStyle('label', fontName=font, fontSize=9, leading=13, textColor=RED, spaceAfter=5),
-        'title': ParagraphStyle('title', fontName='Helvetica-Bold', fontSize=27, leading=31, textColor=INK, spaceAfter=16),
+        'label': ParagraphStyle('label', fontName=font, fontSize=9, leading=13, textColor=RED, spaceAfter=5, keepWithNext=True),
+        'title': ParagraphStyle('title', fontName='Helvetica-Bold', fontSize=27, leading=31, textColor=INK, spaceAfter=16, keepWithNext=True),
         'cover': ParagraphStyle('cover', fontName='Helvetica-Bold', fontSize=32, leading=37, textColor=INK, spaceAfter=20),
         'white': ParagraphStyle('white', fontName=font, fontSize=10, leading=14, textColor=WHITE),
         'price': ParagraphStyle('price', fontName='Helvetica-Bold', fontSize=36, leading=44, textColor=WHITE),
@@ -85,7 +85,7 @@ def build(offer, escape, money, date_de, cname):
         return [p(label, 'label'), p(title, 'title')]
 
     def box(content, width=WIDTH, background=PALE, accent=False):
-        table = Table([[content]], colWidths=[width])
+        table = Table([[content]], colWidths=[width], splitInRow=1)
         table.hAlign = 'LEFT'
         commands = [('BACKGROUND', (0, 0), (-1, -1), background),
                     ('LEFTPADDING', (0, 0), (-1, -1), 7*mm),
@@ -137,9 +137,10 @@ def build(offer, escape, money, date_de, cname):
         foot = profile.get('company') or 'FT Sicherheitstechnik'
         if profile.get('email'):
             foot += ' · ' + profile['email']
-        footer = p(foot, 'small')
-        footer.wrapOn(canvas, 145*mm, 15*mm)
-        footer.drawOn(canvas, 20*mm, 13*mm)
+        # Keep even unusually long company/contact names inside the footer band.
+        footer = KeepInFrame(145*mm, 12*mm, [p(foot, 'small')], mode='shrink')
+        _, footer_height = footer.wrapOn(canvas, 145*mm, 12*mm)
+        footer.drawOn(canvas, 20*mm, 18*mm-footer_height)
         canvas.restoreState()
 
     buffer = io.BytesIO()
@@ -153,13 +154,15 @@ def build(offer, escape, money, date_de, cname):
         styles['cover'].fontSize = 25
         styles['cover'].leading = 30
     title_html = escape(title)
-    if ' für Ihr Objekt' in title:
-        title_html = escape(title.split(' für Ihr Objekt')[0]) + '<br/><font color="#6c7379">für Ihr Objekt.</font>'
+    for ending in (' für Ihr Objekt.', ' für Ihr Objekt'):
+        if title.endswith(ending):
+            title_html = escape(title[:-len(ending)]) + '<br/><font color="#6c7379">' + escape(ending.strip()) + '</font>'
+            break
     details = [p('ERSTELLT FÜR', 'small'), Paragraph('<b>'+escape(cname(customer))+'</b>', styles['body'])]
     address = ' · '.join(x for x in [customer.get('street'), ' '.join(str(customer.get(k) or '') for k in ('zip','city')).strip()] if x)
     if address:
         details.append(p(address, 'small'))
-    story = [p('ANGEBOT · '+number, 'label'), Paragraph(title_html, styles['cover']),
+    story = [NextPageTemplate('content'), p('ANGEBOT · '+number, 'label'), Paragraph(title_html, styles['cover']),
              p(o.get('customer_intro')), Spacer(1, 12*mm), box(details, width=128*mm, accent=True),
              NextPageTemplate('content'), PageBreak()]
 
@@ -210,7 +213,7 @@ def build(offer, escape, money, date_de, cname):
                                   p(item.get('description'), 'small')])
                 if len(cells)==1:
                     cells.append('')
-                row = Table([[cells[0], '', cells[1]]], colWidths=[82*mm,6*mm,82*mm])
+                row = Table([[cells[0], '', cells[1]]], colWidths=[82*mm,6*mm,82*mm], splitInRow=1)
                 row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),0)]))
                 story += [row, Spacer(1,10*mm)]
             section_number += 1
@@ -218,7 +221,7 @@ def build(offer, escape, money, date_de, cname):
     story += [PageBreak()] + section(f'{section_number:02d} · NÄCHSTE SCHRITTE', 'So geht es weiter.')
     story += [p('Wir begleiten Sie von der Abstimmung bis zur Übergabe.'), Spacer(1,8*mm)]
     for n, step in enumerate(o.get('next_steps', []),1):
-        row = Table([[p(n,'step'), p(step)]], colWidths=[16*mm,154*mm])
+        row = Table([[p(n,'step'), p(step)]], colWidths=[16*mm,154*mm], splitInRow=1)
         row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEBELOW',(0,0),(-1,-1),0.4,LINE),('TOPPADDING',(0,0),(-1,-1),5*mm),('BOTTOMPADDING',(0,0),(-1,-1),5*mm)]))
         story.append(row)
     story += [Spacer(1,10*mm)]

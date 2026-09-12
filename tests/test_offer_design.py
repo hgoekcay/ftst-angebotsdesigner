@@ -43,3 +43,35 @@ def test_no_reference_claims_or_payment_promises_from_template(raw):
     assert '500+' not in text
     assert '5-7 Werktage' not in text
     assert 'Vorkasse' not in text
+
+
+def test_custom_title_suffix_is_preserved(raw):
+    offer = module.apply_source(deepcopy(raw), {})
+    offer['customer_title'] = 'Sicherheit für Ihr Objekt einschließlich Nebengebäude'
+    pdf = PdfReader(module.make_pdf(offer))
+    assert 'Nebengebäude' in pdf.pages[0].extract_text()
+
+
+def test_long_cover_text_uses_content_template_for_overflow(raw):
+    offer = module.apply_source(deepcopy(raw), {})
+    offer['customer_title'] = 'Individuelle Sicherheitslösung ' * 30
+    offer['customer_intro'] = ('Die Planung berücksichtigt die Anforderungen Ihres Objekts. ' * 100) + 'INTRO-ENDE'
+    pdf = PdfReader(module.make_pdf(offer))
+    text = '\n'.join(page.extract_text() for page in pdf.pages)
+    assert 'INTRO-ENDE' in text
+    assert 'IHR PERSÖNLICHES ANGEBOT' not in pdf.pages[1].extract_text()
+
+
+def test_long_reference_caption_and_contact_can_span_pages(raw, client):
+    from asset_library import catalog
+    source = catalog(module.offer_store(), 'test')['builtin-video-entry']
+    offer = module.apply_source(deepcopy(raw), {})
+    offer['reference_images'] = [dict(source, title='Montageübersicht',
+        description=('Ausführliche Beschreibung der Installation. ' * 350) + 'BILD-ENDE')]
+    offer['company_profile'] = {'company': 'FT Sicherheitstechnik',
+        'contact': ('Kontaktinformationen und Ansprechpartner. ' * 300) + 'KONTAKT-ENDE',
+        'email': 'sehr-lange-kontaktadresse@' + 'beispiel.' * 20 + 'de'}
+    pdf = PdfReader(module.make_pdf(offer))
+    text = '\n'.join(page.extract_text() for page in pdf.pages)
+    assert 'BILD-ENDE' in text
+    assert 'KONTAKT-ENDE' in text

@@ -99,7 +99,9 @@ def calculate(draft):
     if not currency:
         problems.append('Währung fehlt.')
     tax_rule = client.get('tax_rule')
-    if tax_rule not in ('TAX', 'NO_TAX') and draft.get('tax_confirmed') != 'yes':
+    if tax_rule not in ('TAX', 'NO_TAX', 'COUNTRY'):
+        problems.append('Unbekannte oder fehlende Steuerregel: Kundendaten in Billomat prüfen.')
+    elif tax_rule == 'COUNTRY' and draft.get('tax_confirmed') != 'yes':
         problems.append('Länderabhängige Steuerregel: Anwendung der Artikelsteuersätze bitte fachlich bestätigen.')
     if problems:
         return {'problems':problems, 'lines':[], 'total':None, 'currency':currency}
