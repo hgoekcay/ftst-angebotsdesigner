@@ -9,10 +9,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from billomat_client import BillomatClient
 import materials
 import projects
+import quote_drafts
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -305,6 +306,7 @@ def offer_pdf(oid):
 
 materials.register(app, base, ingress, clean, offer_store, TYPES)
 projects.register(app, base, ingress, clean, offer_store)
+quote_drafts.register(app, base, ingress, clean, offer_store)
 
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))

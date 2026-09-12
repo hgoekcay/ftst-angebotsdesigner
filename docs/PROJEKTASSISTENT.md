@@ -1,5 +1,9 @@
 # Projektassistent und weitere Fertigstellung
 
+## Erweiterung 0.3.0
+
+Lokaler Angebotsentwurf mit Artikelvorschlägen, Kundenauswahl, Preisgruppe, Rabatt und prüfbarer Kalkulation: siehe [ANGEBOTSENTWURF.md](ANGEBOTSENTWURF.md). Texte funktionieren auch ohne KI-Zugang. Die folgenden Abschnitte beschreiben den ursprünglichen Stand 0.2.0 und die darüber hinausgehenden Ziele.
+
 ## In 0.2.0 nutzbar
 
 Projekte anlegen, Notizen speichern, Merkzettelfoto und Sprachnotiz hochladen. Daten bleiben lokal im persistenten App-Verzeichnis. Bilder werden normalisiert und Metadaten entfernt.

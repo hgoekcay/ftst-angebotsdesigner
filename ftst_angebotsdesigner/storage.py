@@ -10,6 +10,10 @@ class StorageError(RuntimeError):
     pass
 
 
+class RecordConflict(RuntimeError):
+    pass
+
+
 def data_directory():
     configured = os.environ.get('FTST_DATA_DIR')
     if configured:
@@ -100,3 +104,26 @@ class OfferStore:
                            (account, kind, key, json.dumps(value, ensure_ascii=False)))
         except (sqlite3.Error, OSError) as exc:
             raise StorageError('Projektdaten konnten nicht gespeichert werden.') from exc
+
+    def record(self, account, kind, key):
+        try:
+            with closing(self._connect()) as db:
+                row = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?', (account, kind, key)).fetchone()
+                return json.loads(row[0]) if row else None
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            raise StorageError('Projektdaten sind derzeit nicht verfügbar.') from exc
+
+    def put_revision(self, account, kind, key, value, expected):
+        """Compare and write inside one transaction, including first-save races."""
+        try:
+            with closing(self._connect()) as db, db:
+                db.execute('BEGIN IMMEDIATE')
+                row = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?', (account, kind, key)).fetchone()
+                current = json.loads(row[0]).get('revision', '') if row else ''
+                if current != expected:
+                    raise RecordConflict('Der Entwurf wurde inzwischen geändert. Bitte neu laden.')
+                db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?) '
+                           'ON CONFLICT(account,kind,id) DO UPDATE SET payload=excluded.payload',
+                           (account, kind, key, json.dumps(value, ensure_ascii=False)))
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            raise StorageError('Entwurf konnte nicht gespeichert werden.') from exc

@@ -71,3 +71,31 @@ class BillomatClient:
         offer["items"] = self.get_offer_items(offer_id)
         offer["client"] = self.get_client(offer.get("client_id"))
         return offer
+
+    def collection(self, plural, singular, params=None):
+        """Read a complete catalog or fail; never silently price from a partial list."""
+        rows, seen = [], set()
+        for page in range(1, 101):
+            data = self._unwrap(self._get('/'+plural, dict(params or {}, format='json', per_page=100, page=page)), plural)
+            batch = data.get(singular, []) if isinstance(data, dict) else data
+            batch = batch if isinstance(batch, list) else ([batch] if batch else [])
+            if not batch:
+                return rows
+            for row in batch:
+                if not isinstance(row, dict) or not str(row.get('id', '')).isdigit() or str(row['id']) in seen:
+                    raise RuntimeError('Billomat-Katalog unvollständig oder ungültig.')
+                seen.add(str(row['id']))
+                rows.append(row)
+            total = data.get('@total', data.get('total')) if isinstance(data, dict) else None
+            if total is not None and len(rows) >= int(total):
+                return rows
+        raise RuntimeError('Billomat-Katalog zu groß. Bitte Suche eingrenzen.')
+
+    def draft_catalog(self):
+        return {
+            'articles': self.collection('articles', 'article'),
+            'clients': self.collection('clients', 'client'),
+            'taxes': self.collection('taxes', 'tax'),
+            'units': self.collection('units', 'unit'),
+            'settings': self._unwrap(self._get('/settings', {'format':'json'}), 'settings'),
+        }
