@@ -13,7 +13,7 @@ import quote_drafts
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.3.1"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -34,6 +34,27 @@ MUTED=colors.HexColor("#6F6F6F"); LIGHT=colors.HexColor("#F4F4F4"); BORDER=color
 GREEN=colors.HexColor("#218838"); GREEN_LIGHT=colors.HexColor("#EAF6EE"); WHITE=colors.white
 
 CSS='body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;color:#222}.top{background:#111;color:#fff;border-bottom:5px solid #d71920}.topin{max-width:1180px;margin:auto;padding:22px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:22px;font-weight:800}.sub,.small{font-size:12px;opacity:.75}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 5px 20px #00000012}.hero h1{font-size:34px;margin:8px 0}.eyebrow{color:#d71920;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f4f4f4;padding:18px;border-radius:12px}.metric.green{background:#eaf6ee}.metric .label{font-size:11px;color:#707070;text-transform:uppercase}.metric .value{font-size:22px;font-weight:800;margin-top:4px}.metric.green .value{color:#218838}.btn{display:inline-block;background:#d71920;color:#fff;text-decoration:none;padding:11px 17px;border-radius:8px;font-weight:700;margin-right:6px;border:0;cursor:pointer}.btn.dark{background:#111}.btn.light{background:#eee;color:#111}label{display:block;font-size:11px;color:#707070;text-transform:uppercase;font-weight:700;margin:0 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #d5d5d5;border-radius:8px;font:inherit}.field{margin-bottom:16px}textarea{min-height:110px}table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}th{font-size:11px;color:#707070;text-transform:uppercase}.money{text-align:right;font-weight:800}.muted{color:#707070}.small{font-size:12px}.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.check{background:#eaf6ee;color:#218838;padding:10px;border-radius:8px;font-weight:700;font-size:12px}.back{margin-bottom:16px}.back a{color:#111;text-decoration:none;font-weight:700}.back a:hover{color:#d71920}.success{background:#eaf6ee;color:#218838;border:1px solid #b9dfc5;padding:13px 16px;border-radius:10px;font-weight:700;margin-bottom:18px}.success span{color:#17682b;font-weight:800}.auto{display:inline-block;background:#eef3f7;color:#425466;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;margin-left:8px}'
+
+CSS += """
+body{background:#f5f6f7;color:#15191c;font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.55}
+.top{background:#fff;color:#15191c;border-bottom:1px solid #e1e4e6;padding:20px 0}
+.topin{max-width:1180px;margin:auto;padding:0 32px;gap:20px;display:flex;align-items:center;justify-content:space-between}
+.sub{color:#72797f;font-size:10px;letter-spacing:2px;text-transform:uppercase;margin:7px 0 0}
+.appnav{display:flex;align-items:center;gap:24px}.appnav a{color:#525a61;text-decoration:none;font-size:13px;font-weight:600}.appnav a:hover{color:#e30613}.appnav span{color:#879096}
+.wrap{max-width:1180px;padding:36px 32px 70px;margin:auto}
+.card{background:#fff;border:1px solid #e2e5e7;border-radius:12px;padding:30px;box-shadow:none;margin-bottom:22px}
+.hero{padding:44px;background:white;border-top:3px solid #e30613}
+.hero h1{max-width:780px;font-size:36px;line-height:1.16;letter-spacing:-1.1px;font-weight:650;margin:14px 0 20px}
+.hero p{max-width:760px;color:#626a70;font-size:16px;line-height:1.7;margin-bottom:26px}
+h1{font-size:30px;letter-spacing:-.7px;line-height:1.2}h2{font-size:22px;letter-spacing:-.35px;margin:0 0 18px}
+.eyebrow{color:#e30613;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:650}
+.btn{border-radius:6px;padding:11px 18px;background:#e30613;color:white;font-size:13px;box-shadow:none;margin:6px 8px 0 0;display:inline-block;text-decoration:none}.btn.light{background:#fff;color:#343c43;border:1px solid #dbe0e3}.btn.dark{background:#15191c}
+.grid{gap:22px}.metric{background:#fff;border:1px solid #e1e4e6;border-radius:10px;padding:24px}.metric.green{background:#eff8f2;border-color:#d5e9dc;color:#0d7d3b}.metric .label{font-size:10px;letter-spacing:1px;color:#72797f}.metric .value{font-size:30px;letter-spacing:-.5px;margin:7px 0}
+th{background:#f6f7f8;color:#697178;font-size:10px;letter-spacing:.65px}td,th{padding:15px 12px;border-bottom:1px solid #e6e9eb}tbody tr:hover{background:#fafbfb}
+input,textarea,select{border:1px solid #d9dee1;border-radius:6px;background:#fff;padding:12px;color:#15191c}input:focus,textarea:focus,select:focus{outline:2px solid #f3bbc0;outline-offset:1px}
+.check{background:#f0f8f3;border:1px solid #e0eee5;border-radius:6px;padding:16px}.back{font-size:13px;margin-bottom:22px}.muted{color:#72797f}
+@media(max-width:700px){.topin{padding:0 18px;flex-wrap:wrap}.appnav{gap:18px;flex-wrap:wrap}.wrap{padding:22px 14px}.hero,.card{padding:24px}.hero h1{font-size:29px}.grid{grid-template-columns:1fr}.card:has(table){overflow-x:auto}table{min-width:540px}}
+"""
 
 TYPES={
  "Videoüberwachung":("Professionelle Videoüberwachung für Ihr Objekt","Moderne IP-Videoüberwachung mit professioneller Aufzeichnung und Fernzugriff.","Auf Ihr Objekt abgestimmte Videoüberwachung inklusive Montage, Konfiguration, Prüfung und Einweisung.",["Hochauflösende Kameras","Intelligente Erkennung","Professionelle Aufzeichnung","Fernzugriff per App"]),
@@ -150,7 +171,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:340px;max-width:65vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><div class="small">v{APP_VERSION}</div></div></div><main class="wrap">{body}</main></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:245px;max-width:55vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -222,79 +243,8 @@ def footer(canvas,doc):
     canvas.setStrokeColor(BORDER); canvas.line(18*mm,13*mm,w-18*mm,13*mm); canvas.restoreState()
 
 def make_pdf(o):
-    styles=getSampleStyleSheet()
-    body=ParagraphStyle("body",parent=styles["BodyText"],fontSize=9.1,leading=12.6,textColor=TEXT)
-    small=ParagraphStyle("small",parent=body,fontSize=7.2,leading=9.1,textColor=MUTED)
-    table_head=ParagraphStyle("table_head",parent=small,textColor=WHITE)
-    h1=ParagraphStyle("h1",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=23,leading=27,textColor=DARK)
-    h2=ParagraphStyle("h2",parent=styles["Heading2"],fontSize=15,leading=18,textColor=DARK)
-    red=ParagraphStyle("red",parent=small,fontName="Helvetica-Bold",textColor=RED)
-    right=ParagraphStyle("right",parent=body,alignment=TA_RIGHT)
-    brand=ParagraphStyle("brand",parent=body,fontName="Helvetica-Bold",fontSize=15,textColor=WHITE)
-    green=ParagraphStyle("green",parent=body,fontName="Helvetica-Bold",fontSize=17,textColor=GREEN)
-    o=normalize(o); c=o["client"]; buf=io.BytesIO()
-    doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=18*mm,rightMargin=18*mm,topMargin=16*mm,bottomMargin=19*mm); story=[]
-
-    if o.get("logo_path"):
-        logo = Image(o["logo_path"])
-        logo._restrictSize(135*mm, 28*mm)
-        logo.hAlign = "LEFT"
-        story.extend([logo, Spacer(1, 3*mm)])
-    header=Table([[Paragraph("FT SICHERHEITSTECHNIK",brand),""]],colWidths=[120*mm,50*mm])
-    header.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),DARK),("BOTTOMPADDING",(0,0),(-1,-1),6*mm),("TOPPADDING",(0,0),(-1,-1),6*mm),("LINEBELOW",(0,0),(-1,0),3*mm,RED)]))
-    story += [header,Spacer(1,7*mm),Paragraph("IHR PERSÖNLICHES ANGEBOT",red),Paragraph(clean(o.get("customer_title") or o.get("title") or "Individuelle Sicherheitslösung"),h1),Paragraph(clean(o.get("customer_intro") or "Professionelle Sicherheitstechnik."),body),Spacer(1,5*mm)]
-
-    customer=Table([[Paragraph("KUNDE",red),Paragraph("ANGEBOT",red)],[Paragraph(f"<b>{clean(cname(c))}</b><br/>{clean(c.get('street',''))}<br/>{clean(c.get('zip',''))} {clean(c.get('city',''))}",body),Paragraph(f"<b>Nr. {clean(o.get('offer_number') or o.get('number'))}</b><br/>Datum: {date_de(o.get('date'))}<br/>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}",body)]],colWidths=[82*mm,88*mm])
-    customer.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("INNERGRID",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),3.5*mm),("BOTTOMPADDING",(0,0),(-1,-1),3.5*mm)]))
-    story += [customer,Spacer(1,5*mm)]
-
-    stats=Table([[Paragraph("NETTO",red),Paragraph("MWST.",red),Paragraph("IHR FESTPREIS",red)],[Paragraph(money(o.get("total_net")),body),Paragraph(money(o.get("tax_amount")),body),Paragraph(money(o.get("total_gross")),green)]],colWidths=[56*mm,56*mm,58*mm])
-    stats.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),LIGHT),("BACKGROUND",(2,0),(2,1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)]))
-    story += [stats,Spacer(1,7*mm),Paragraph("01 · IHR PROJEKT AUF EINEN BLICK",red),Paragraph("Die passende Lösung für Ihr Objekt.",h2),Paragraph(clean(o.get("project_summary")),body),Spacer(1,4*mm)]
-
-    benefits=o.get("benefits",[])[:4]; benefit_rows=[]
-    for i,x in enumerate(benefits):
-        if i%2==0: benefit_rows.append([])
-        benefit_rows[-1].append(Paragraph("+ "+clean(x),body))
-    if benefit_rows:
-        if len(benefit_rows[-1])<2: benefit_rows[-1].append("")
-        bt=Table(benefit_rows,colWidths=[85*mm,85*mm])
-        bt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#B9DFC5")),("INNERGRID",(0,0),(-1,-1),0.3,WHITE),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)])); story += [bt,Spacer(1,4*mm)]
-    story += [Paragraph("Alles aus einer Hand – von der Planung bis zur betriebsbereiten Übergabe.",body),PageBreak()]
-
-    story += [Paragraph("02 · IHRE FESTPREIS-LEISTUNG",red),Paragraph("Ein Preis. Die passende Lösung. Klar dargestellt.",h1),Paragraph("Die folgenden Positionen bilden die technische Grundlage Ihres Angebots.",body),Spacer(1,4*mm)]
-    rows=[[Paragraph("POS.",table_head),Paragraph("LEISTUNG / ARTIKEL",table_head),Paragraph("MENGE",table_head),Paragraph("PREIS",table_head),Paragraph("NETTO",table_head)]]
-    for i in o["items"]:
-        desc=compact(i["description"],175); desc_html=f"<br/><font color='#6F6F6F'>{clean(desc)}</font>" if desc else ""
-        rows.append([Paragraph(str(i["position"]),small),Paragraph(f"<b>{clean(i['title'])}</b>{desc_html}",small),Paragraph(f"{clean(i['quantity'])} {clean(i['unit'])}",small),Paragraph(money(i["unit_price"]),right),Paragraph(money(i["total_net"]),right)])
-    tbl=Table(rows,colWidths=[11*mm,82*mm,20*mm,25*mm,32*mm],repeatRows=1)
-    tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),DARK),("TEXTCOLOR",(0,0),(-1,0),WHITE),("GRID",(0,0),(-1,-1),0.3,BORDER),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),2.1*mm),("RIGHTPADDING",(0,0),(-1,-1),2.1*mm),("TOPPADDING",(0,0),(-1,-1),2.4*mm),("BOTTOMPADDING",(0,0),(-1,-1),2.4*mm)]))
-    story += [tbl,Spacer(1,6*mm)]
-
-    included="Lieferung und Bereitstellung der aufgeführten Komponenten · Montage und Einrichtung gemäß Angebot · Konfiguration und Funktionsprüfung · Übergabe und Einweisung"
-    inc=Table([[Paragraph("IM LEISTUNGSUMFANG ENTHALTEN",red)],[Paragraph(included,small)]],colWidths=[170*mm])
-    inc.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)])); story += [inc,Spacer(1,5*mm)]
-
-    totals=Table([[Paragraph("NETTO",red),Paragraph("MWST.",red),Paragraph("GESAMT",red)],[Paragraph(money(o.get("total_net")),body),Paragraph(money(o.get("tax_amount")),body),Paragraph(money(o.get("total_gross")),green)]],colWidths=[56*mm,56*mm,58*mm])
-    totals.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),LIGHT),("BACKGROUND",(2,0),(2,1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)])); story += [totals,PageBreak()]
-
-    story += [Paragraph("03 · IHRE VORTEILE",red),Paragraph("Professionell geplant. Sauber umgesetzt.",h1),Paragraph("Ihr Vorteil liegt nicht nur in einzelnen Komponenten, sondern in der abgestimmten Gesamtlösung.",body),Spacer(1,5*mm)]
-    benefit_cards=[[Paragraph("+",green),Paragraph(f"<b>{clean(x)}</b>",body)] for x in o.get("benefits",[])[:6]]
-    if benefit_cards:
-        bt=Table(benefit_cards,colWidths=[12*mm,158*mm])
-        bt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREEN_LIGHT),("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#B9DFC5")),("INNERGRID",(0,0),(-1,-1),0.3,WHITE),("LEFTPADDING",(0,0),(-1,-1),3*mm),("RIGHTPADDING",(0,0),(-1,-1),3*mm),("TOPPADDING",(0,0),(-1,-1),3*mm),("BOTTOMPADDING",(0,0),(-1,-1),3*mm)])); story += [bt,Spacer(1,7*mm)]
-
-    story += [Paragraph("04 · NÄCHSTE SCHRITTE",red),Paragraph("So geht es nach Ihrer Entscheidung weiter.",h2)]
-    step_rows=[[Paragraph(f"<b>{n}</b>",green),Paragraph(clean(x),body)] for n,x in enumerate(o.get("next_steps",[])[:5],1)]
-    if step_rows:
-        st=Table(step_rows,colWidths=[12*mm,158*mm]); st.setStyle(TableStyle([("LINEBELOW",(0,0),(-1,-1),0.4,BORDER),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("TOPPADDING",(0,0),(-1,-1),4*mm),("BOTTOMPADDING",(0,0),(-1,-1),4*mm)])); story += [st,Spacer(1,8*mm)]
-
-    closing=Table([[Paragraph("IHR FESTPREIS",red),Paragraph("VIELEN DANK FÜR IHR VERTRAUEN",red)],[Paragraph(money(o.get("total_gross")),green),Paragraph("Wir freuen uns auf die Umsetzung Ihres Projekts.",body)]],colWidths=[75*mm,95*mm])
-    closing.setStyle(TableStyle([("BACKGROUND",(0,0),(0,1),GREEN_LIGHT),("BACKGROUND",(1,0),(1,1),LIGHT),("BOX",(0,0),(-1,-1),0.5,BORDER),("INNERGRID",(0,0),(-1,-1),0.5,BORDER),("LEFTPADDING",(0,0),(-1,-1),4*mm),("RIGHTPADDING",(0,0),(-1,-1),4*mm),("TOPPADDING",(0,0),(-1,-1),5*mm),("BOTTOMPADDING",(0,0),(-1,-1),5*mm)]))
-    story += [closing,Spacer(1,4*mm),Paragraph("Hinweis: Maßgeblich für Preise, Mengen und Abrechnung bleiben die in Billomat hinterlegten Angebotspositionen.",small)]
-
-    materials.pdf_materials(story, o, styles, clean)
-    doc.build(story,onFirstPage=footer,onLaterPages=footer); buf.seek(0); return buf
+    from offer_design import build
+    return build(normalize(o), clean, money, date_de, cname)
 
 @app.get("/offer/<oid>/pdf")
 def offer_pdf(oid):

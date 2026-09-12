@@ -19,7 +19,7 @@ def test_baseline_type_and_pdf(raw):
     offer = module.apply_source(raw, {})
     assert offer['offer_type'] == 'Rauchmeldeanlage'
     pdf = PdfReader(module.make_pdf(offer))
-    assert len(pdf.pages) == 3
+    assert len(pdf.pages) == 4
     assert all(abs(float(p.mediabox.width) - 595.276) < 1 for p in pdf.pages)
     text = '\n'.join(p.extract_text() for p in pdf.pages)
     assert 'Test Kunde' in text
@@ -36,4 +36,4 @@ def test_baseline_routes(raw, monkeypatch):
         assert client.get(url).status_code == 200
     response = client.get('/offer/42/pdf')
     assert response.status_code == 200
-    assert len(PdfReader(BytesIO(response.data)).pages) == 3
+    assert len(PdfReader(BytesIO(response.data)).pages) == 4

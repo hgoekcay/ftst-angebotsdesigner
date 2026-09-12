@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.3.1
+
+- PDF-Redesign anhand „FT Angebot — Muster (final).pdf“: Titelblatt, große linksbündige Typografie, ruhiger Briefkopf, grüner Preisbereich und nummerierte Abschlussseite.
+- Referenzen nach Bereich gruppiert, bis zu vier Bilder je Seite; Kameradrehung wird bei der PDF-Ausgabe berücksichtigt.
+- Artikelbeschreibungen vollständig statt gekürzt, wiederholte Tabellenköpfe und mehrseitige Positionen.
+- App mit heller Navigation und angepasstem Desktop-/Handy-Layout.
+- 58 Tests, PDF-Sichtprüfung und Browserprüfung bei 1440 und 390 Pixeln.
+- Keine Änderung an Billomat-Daten oder Speicherung.
+
 ## 0.3.0
 
 - Lokaler Angebotsentwurf aus Projektnotizen, auch ohne KI-Zugang.

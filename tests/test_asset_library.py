@@ -44,7 +44,7 @@ def test_builtin_selection_persists_and_pdf_labels_stock(client):
     pdf = PdfReader(BytesIO(fresh.get('/offer/42/pdf').data))
     assert any('Symbolfoto' in page.extract_text() for page in pdf.pages)
     assert len(pdf.pages[0].images) >= 1
-    assert len(pdf.pages[-1].images) == 1
+    assert any(len(page.images) >= 2 for page in pdf.pages[1:])
     assert client.post('/offer/42/references', data={}).status_code == 302
     assert materials.enrich({'id': '42'}, module.offer_store())['reference_images'] == []
 
