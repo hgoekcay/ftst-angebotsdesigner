@@ -7,11 +7,23 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from billomat_client import BillomatClient
+from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.1.18"
+APP_VERSION = "0.1.19"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
+app.config['FTST_DATA_DIR'] = str(data_directory())
+
+
+def offer_store():
+    return OfferStore(app.config['FTST_DATA_DIR'])
+
+
+@app.errorhandler(StorageError)
+def storage_error(error):
+    log.error('Persistent storage unavailable: %s', error)
+    return base('Speicherung nicht verfügbar', '<div class="card"><h1>Speicherung nicht verfügbar</h1><p>' + clean(error) + '</p><p>Bitte über die Zurück-Funktion des Browsers zu Ihren Eingaben zurückkehren.</p></div>'), 503
 
 RED=colors.HexColor("#D71920"); DARK=colors.HexColor("#111111"); TEXT=colors.HexColor("#202020")
 MUTED=colors.HexColor("#6F6F6F"); LIGHT=colors.HexColor("#F4F4F4"); BORDER=colors.HexColor("#DCDCDC")
@@ -84,8 +96,8 @@ def detect_offer_type(o):
     item_texts=[(str(i.get("title") or "")+" "+str(i.get("description") or "")).lower() for i in o.get("items",[])]
     all_text=" ".join([title_text]+item_texts)
 
-    if _contains_any(all_text,["brandwarnanlage","brandwarnsystem","bwa "]): return "Brandwarnanlage"
-    if _contains_any(all_text,["rauchmeldeanlage","rauchwarnanlage","rauchwarnsystem"]): return "Rauchmeldeanlage"
+    if _contains_any(all_text,["brandwarnanlage","brandwarnsystem"]) or re.search(r"\bbwa\b", all_text): return "Brandwarnanlage"
+    kinds = set()
 
     for kind,words in {
       "Videoüberwachung":["videoüberwachung","überwachungskamera","ip-kamera","ip kamera","domekamera","bulletkamera","netzwerkkamera","nvr","videorekorder","guard live","guard station","uniview"],
@@ -93,18 +105,20 @@ def detect_offer_type(o):
       "Türsprechanlage":["türsprechanlage","video-türsprechanlage","videosprechanlage","intercom","türstation","innenstation"],
       "Smart Home":["smart home","smarthome","knx","gebäudeautomation","hausautomation"],
     }.items():
-        if _contains_any(all_text,words): return kind
+        if _contains_any(all_text,words): kinds.add(kind)
 
     intrusion=["motionprotect","doorprotect","glassprotect","homesiren","streetsiren","spacecontrol","keypad","bewegungsmelder","öffnungsmelder","glasbruch","einbruch","außensirene","innensirene"]
-    fire=["fireprotect","rauchmelder","rauchwarnmelder","rauchwarn","hitzemelder","wärmemelder","co-sensor","kohlenmonoxid","co melder","heat detector","smoke detector"]
+    fire=["fireprotect","rauchmelder","rauchwarnmelder","rauchwarn","hitzemelder","wärmemelder","co-sensor","kohlenmonoxid","co melder","co-melder","heat detector","smoke detector"]
     hubs=["hub/alarmzentrale","ajax hub","hub 2","hub plus","alarmzentrale","hub/zentrale","hub"]
 
     intrusion_hits=sum(1 for t in item_texts if _contains_any(t,intrusion))
     fire_hits=sum(1 for t in item_texts if _contains_any(t,fire))
     hub_hits=sum(1 for t in item_texts if _contains_any(t,hubs))
 
-    if fire_hits>0 and intrusion_hits==0: return "Rauchmeldeanlage"
-    if intrusion_hits>0: return "Alarmanlage"
+    if intrusion_hits>0: kinds.add("Alarmanlage")
+    elif fire_hits>0 or _contains_any(all_text,["rauchmeldeanlage","rauchwarnanlage","rauchwarnsystem"]): kinds.add("Rauchmeldeanlage")
+    if len(kinds)>1: return "Kombination"
+    if kinds: return next(iter(kinds))
     if hub_hits>0: return "Kombination"
 
     scores={
@@ -121,7 +135,7 @@ def detect_offer_type(o):
 
 def apply_source(raw,src):
     o=normalize(raw); manual_kind=str(src.get("offer_type") or "").strip()
-    if manual_kind=="Brandmeldeanlage": manual_kind=""
+    if manual_kind not in TYPES: manual_kind=""
     kind=manual_kind or detect_offer_type(o) or "Kombination"; p=TYPES.get(kind,TYPES["Kombination"])
     o["offer_type"]=kind; o["offer_type_auto"]=not bool(manual_kind)
     o["customer_title"]=src.get("customer_title") or p[0]
@@ -137,10 +151,19 @@ def base(title,body):
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
     if not bid or not key: abort(503)
-    return apply_source(BillomatClient(bid,key).get_full_offer(oid),session.get("ftst_"+oid,{}))
+    raw = BillomatClient(bid,key).get_full_offer(oid)
+    legacy_key = 'ftst_' + oid
+    source = offer_store().load(bid.strip().lower(), oid, session.get(legacy_key))
+    session.pop(legacy_key, None)
+    return apply_source(raw, source)
 
 @app.get("/health")
-def health(): return {"ok":True,"version":APP_VERSION}
+def health():
+    try:
+        offer_store().check()
+        return {"ok":True,"version":APP_VERSION,"storage":"ok"}
+    except StorageError:
+        return {"ok":False,"version":APP_VERSION,"storage":"unavailable"}, 503
 
 @app.get("/")
 def index():
@@ -166,9 +189,13 @@ def edit(oid):
     o=get_offer(oid)
     if request.method=="POST":
         src={k:request.form.get(k,"") for k in ("offer_type","customer_title","customer_intro","project_summary","benefits","next_steps")}
-        session["ftst_"+oid]=src; session.modified=True
+        if src['offer_type'] and src['offer_type'] not in TYPES:
+            abort(400, 'Unbekannter Angebotstyp')
+        offer_store().save(os.environ['BILLOMAT_ID'].strip().lower(), oid, src)
+        session.pop('ftst_' + oid, None)
         return redirect(ingress("offer/"+oid)+"?saved=1")
-    options="".join(f'<option {"selected" if o.get("offer_type")==k else ""}>{k}</option>' for k in TYPES)
+    options='<option value="" ' + ('selected' if o.get('offer_type_auto') else '') + '>Automatisch erkennen</option>'
+    options+="".join(f'<option {"selected" if not o.get("offer_type_auto") and o.get("offer_type")==k else ""}>{k}</option>' for k in TYPES)
     benefits="\n".join(o.get("benefits",[])); steps="\n".join(o.get("next_steps",[]))
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
     body=f'''<div class="back"><a href="{ingress('offer/'+oid)}">← Zurück zum Angebot</a></div><div class="card"><div class="eyebrow">Angebot bearbeiten {auto_hint}</div><h1>Kundendarstellung</h1><p class="muted">Billomat-Preise und Positionen bleiben unverändert. Der Angebotstyp wird aus der Zusammensetzung der Positionen erkannt. Ihre manuelle Auswahl hat immer Vorrang.</p><form method="post"><div class="field"><label>Angebotstyp</label><select name="offer_type">{options}</select></div><div class="field"><label>Kundentitel</label><input name="customer_title" value="{clean(o.get('customer_title'))}"></div><div class="field"><label>Einleitung</label><textarea name="customer_intro">{clean(o.get('customer_intro'))}</textarea></div><div class="field"><label>Projekt auf einen Blick</label><textarea name="project_summary">{clean(o.get('project_summary'))}</textarea></div><div class="field"><label>Ihre Vorteile · ein Vorteil pro Zeile</label><textarea name="benefits">{clean(benefits)}</textarea></div><div class="field"><label>Nächste Schritte · ein Schritt pro Zeile</label><textarea name="next_steps">{clean(steps)}</textarea></div><button class="btn" type="submit">Speichern</button><a class="btn light" href="{ingress('offer/'+oid)}">Abbrechen</a></form></div>'''
@@ -180,7 +207,7 @@ def detail(o):
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
-    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
+    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
@@ -261,6 +288,8 @@ def make_pdf(o):
 @app.get("/offer/<oid>/pdf")
 def offer_pdf(oid):
     try:return send_file(make_pdf(get_offer(oid)),mimetype="application/pdf",as_attachment=False,download_name=f"FTST-Angebot-{oid}.pdf")
+    except StorageError:
+        raise
     except Exception as e:
         log.exception("PDF generation failed")
         return base("PDF Fehler",f'<div class="back"><a href="{ingress("offer/"+oid)}">← Zurück zum Angebot</a></div><div class="card"><h1>PDF konnte nicht erstellt werden</h1><p>{clean(e)}</p></div>'),500
