@@ -8,7 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from billomat_client import BillomatClient
 
-APP_VERSION = "0.1.16"
+APP_VERSION = "0.1.17"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -23,7 +23,7 @@ GREEN = colors.HexColor("#218838")
 GREEN_LIGHT = colors.HexColor("#EAF6EE")
 WHITE = colors.white
 
-CSS = 'body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;color:#222}.top{background:#111;color:#fff;border-bottom:5px solid #d71920}.topin{max-width:1180px;margin:auto;padding:22px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:22px;font-weight:800}.sub,.small{font-size:12px;opacity:.75}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 5px 20px #00000012}.hero h1{font-size:34px;margin:8px 0}.eyebrow{color:#d71920;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f4f4f4;padding:18px;border-radius:12px}.metric.green{background:#eaf6ee}.metric .label{font-size:11px;color:#707070;text-transform:uppercase}.metric .value{font-size:22px;font-weight:800;margin-top:4px}.metric.green .value{color:#218838}.btn{display:inline-block;background:#d71920;color:#fff;text-decoration:none;padding:11px 17px;border-radius:8px;font-weight:700;margin-right:6px;border:0;cursor:pointer}.btn.dark{background:#111}.btn.light{background:#eee;color:#111}label{display:block;font-size:11px;color:#707070;text-transform:uppercase;font-weight:700;margin:0 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #d5d5d5;border-radius:8px;font:inherit}.field{margin-bottom:16px}textarea{min-height:110px}table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}th{font-size:11px;color:#707070;text-transform:uppercase}.money{text-align:right;font-weight:800}.muted{color:#707070}.small{font-size:12px}.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.check{background:#eaf6ee;color:#218838;padding:10px;border-radius:8px;font-weight:700;font-size:12px}.back{margin-bottom:16px}.back a{color:#111;text-decoration:none;font-weight:700}.back a:hover{color:#d71920}.success{background:#eaf6ee;color:#218838;border:1px solid #b9dfc5;padding:13px 16px;border-radius:10px;font-weight:700;margin-bottom:18px}.success span{color:#17682b;font-weight:800}'
+CSS = 'body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;color:#222}.top{background:#111;color:#fff;border-bottom:5px solid #d71920}.topin{max-width:1180px;margin:auto;padding:22px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:22px;font-weight:800}.sub,.small{font-size:12px;opacity:.75}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 5px 20px #00000012}.hero h1{font-size:34px;margin:8px 0}.eyebrow{color:#d71920;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f4f4f4;padding:18px;border-radius:12px}.metric.green{background:#eaf6ee}.metric .label{font-size:11px;color:#707070;text-transform:uppercase}.metric .value{font-size:22px;font-weight:800;margin-top:4px}.metric.green .value{color:#218838}.btn{display:inline-block;background:#d71920;color:#fff;text-decoration:none;padding:11px 17px;border-radius:8px;font-weight:700;margin-right:6px;border:0;cursor:pointer}.btn.dark{background:#111}.btn.light{background:#eee;color:#111}label{display:block;font-size:11px;color:#707070;text-transform:uppercase;font-weight:700;margin:0 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #d5d5d5;border-radius:8px;font:inherit}.field{margin-bottom:16px}textarea{min-height:110px}table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}th{font-size:11px;color:#707070;text-transform:uppercase}.money{text-align:right;font-weight:800}.muted{color:#707070}.small{font-size:12px}.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.check{background:#eaf6ee;color:#218838;padding:10px;border-radius:8px;font-weight:700;font-size:12px}.back{margin-bottom:16px}.back a{color:#111;text-decoration:none;font-weight:700}.back a:hover{color:#d71920}.success{background:#eaf6ee;color:#218838;border:1px solid #b9dfc5;padding:13px 16px;border-radius:10px;font-weight:700;margin-bottom:18px}.success span{color:#17682b;font-weight:800}.auto{display:inline-block;background:#eef3f7;color:#425466;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;margin-left:8px}'
 
 TYPES = {
  "Videoüberwachung": ("Professionelle Videoüberwachung für Ihr Objekt","Moderne IP-Videoüberwachung mit professioneller Aufzeichnung und Fernzugriff.","Auf Ihr Objekt abgestimmte Videoüberwachung inklusive Montage, Konfiguration, Prüfung und Einweisung.",["Hochauflösende Kameras","Intelligente Erkennung","Professionelle Aufzeichnung","Fernzugriff per App"]),
@@ -88,11 +88,50 @@ def normalize(o):
     o["tax_amount"] = sum(float(t.get("amount") or t.get("tax_amount") or 0) for t in one_list(o.get("taxes")) if isinstance(t,dict))
     return o
 
+def detect_offer_type(o):
+    parts=[str(o.get("title") or ""),str(o.get("label") or ""),str(o.get("intro") or "")]
+    for item in o.get("items",[]):
+        parts.extend([str(item.get("title") or ""),str(item.get("description") or "")])
+    text=" ".join(parts).lower()
+
+    # Eindeutige Produkt-/Systemmerkmale zuerst. Rauchmelder innerhalb einer Ajax-Anlage
+    # sollen z. B. nicht fälschlich als eigenständige Brandmeldeanlage gelten.
+    strong_rules=[
+        ("Alarmanlage", ["alarmzentrale","ajax hub","hub/alarmzentrale","motionprotect","doorprotect","glassprotect","homesiren","streetsiren","spacecontrol","keypad ajax","ajax system"]),
+        ("Videoüberwachung", ["videoüberwachung","überwachungskamera","ip-kamera","ip kamera","domekamera","bulletkamera","netzwerkkamera","nvr","videorekorder","guard live","guard station","uniview"]),
+        ("Zutrittskontrolle", ["zutrittskontrolle","zutrittsleser","kartenleser","rfid-leser","rfid leser","türcontroller","access control","transponderleser"]),
+        ("Türsprechanlage", ["türsprechanlage","video-türsprechanlage","videosprechanlage","intercom","türstation","innenstation"]),
+        ("Brandmeldeanlage", ["brandmeldeanlage","brandmeldezentrale","bma ","feueralarmzentrale","fire alarm panel"]),
+        ("Smart Home", ["smart home","smarthome","knx","gebäudeautomation","hausautomation"]),
+    ]
+    for kind, keywords in strong_rules:
+        if any(k in text for k in keywords):
+            return kind
+
+    scores={k:0 for k in TYPES if k != "Kombination"}
+    keyword_groups={
+        "Alarmanlage": ["alarm","einbruch","melder","sirene","ajax","bewegungsmelder","öffnungsmelder"],
+        "Videoüberwachung": ["kamera","video","aufzeichnung","rekorder","personenerkennung","objekterkennung"],
+        "Zutrittskontrolle": ["zutritt","rfid","transponder","leser","schließsystem","zugangsrecht"],
+        "Türsprechanlage": ["sprechstelle","türklingel","klingel","türkommunikation","videotür"],
+        "Brandmeldeanlage": ["brandmelder","rauchmelder","rauchwarnmelder","fireprotect","co-sensor","hitzemelder"],
+        "Smart Home": ["automation","automatisierung","smart","szene","aktor","sensorik"],
+    }
+    for kind, keywords in keyword_groups.items():
+        scores[kind]=sum(text.count(k) for k in keywords)
+    ranked=sorted(scores.items(),key=lambda x:x[1],reverse=True)
+    if ranked and ranked[0][1] >= 2:
+        return ranked[0][0]
+    return "Kombination"
+
 def apply_source(raw,src):
     o=normalize(raw)
-    kind=src.get("offer_type") or "Kombination"
+    manual_kind=str(src.get("offer_type") or "").strip()
+    detected_kind=detect_offer_type(o)
+    kind=manual_kind or detected_kind or "Kombination"
     p=TYPES.get(kind,TYPES["Kombination"])
     o["offer_type"]=kind
+    o["offer_type_auto"]=not bool(manual_kind)
     o["customer_title"]=src.get("customer_title") or p[0]
     o["customer_intro"]=src.get("customer_intro") or p[1]
     o["project_summary"]=src.get("project_summary") or p[2]
@@ -140,7 +179,8 @@ def edit(oid):
         return redirect(ingress("offer/"+oid)+"?saved=1")
     options="".join(f'<option {"selected" if o.get("offer_type")==k else ""}>{k}</option>' for k in TYPES)
     benefits="\n".join(o.get("benefits",[])); steps="\n".join(o.get("next_steps",[]))
-    body=f"""<div class="back"><a href="{ingress('offer/'+oid)}">← Zurück zum Angebot</a></div><div class="card"><div class="eyebrow">Angebot bearbeiten</div><h1>Kundendarstellung</h1><p class="muted">Billomat-Preise und Positionen bleiben unverändert. Hier bearbeiten Sie nur die Präsentation.</p><form method="post"><div class="field"><label>Angebotstyp</label><select name="offer_type">{options}</select></div><div class="field"><label>Kundentitel</label><input name="customer_title" value="{clean(o.get('customer_title'))}"></div><div class="field"><label>Einleitung</label><textarea name="customer_intro">{clean(o.get('customer_intro'))}</textarea></div><div class="field"><label>Projekt auf einen Blick</label><textarea name="project_summary">{clean(o.get('project_summary'))}</textarea></div><div class="field"><label>Ihre Vorteile · ein Vorteil pro Zeile</label><textarea name="benefits">{clean(benefits)}</textarea></div><div class="field"><label>Nächste Schritte · ein Schritt pro Zeile</label><textarea name="next_steps">{clean(steps)}</textarea></div><button class="btn" type="submit">Speichern</button><a class="btn light" href="{ingress('offer/'+oid)}">Abbrechen</a></form></div>"""
+    auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ''
+    body=f"""<div class="back"><a href="{ingress('offer/'+oid)}">← Zurück zum Angebot</a></div><div class="card"><div class="eyebrow">Angebot bearbeiten {auto_hint}</div><h1>Kundendarstellung</h1><p class="muted">Billomat-Preise und Positionen bleiben unverändert. Der Angebotstyp wird automatisch aus den Positionen erkannt. Ihre manuelle Auswahl hat immer Vorrang.</p><form method="post"><div class="field"><label>Angebotstyp</label><select name="offer_type">{options}</select></div><div class="field"><label>Kundentitel</label><input name="customer_title" value="{clean(o.get('customer_title'))}"></div><div class="field"><label>Einleitung</label><textarea name="customer_intro">{clean(o.get('customer_intro'))}</textarea></div><div class="field"><label>Projekt auf einen Blick</label><textarea name="project_summary">{clean(o.get('project_summary'))}</textarea></div><div class="field"><label>Ihre Vorteile · ein Vorteil pro Zeile</label><textarea name="benefits">{clean(benefits)}</textarea></div><div class="field"><label>Nächste Schritte · ein Schritt pro Zeile</label><textarea name="next_steps">{clean(steps)}</textarea></div><button class="btn" type="submit">Speichern</button><a class="btn light" href="{ingress('offer/'+oid)}">Abbrechen</a></form></div>"""
     return base("Angebot bearbeiten",body)
 
 def detail(o):
@@ -149,7 +189,8 @@ def detail(o):
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[]))
     c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
-    body=f"""<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>"""
+    auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ''
+    body=f"""<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>"""
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
