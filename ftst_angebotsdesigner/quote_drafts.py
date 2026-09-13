@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from flask import abort, redirect, request
+from flask import abort, redirect, request, send_file
 from billomat_client import BillomatClient
 from materials import account
 from storage import StorageError, RecordConflict
@@ -155,6 +155,31 @@ def calculate(draft):
 
 
 def register(app, base, ingress, escape, get_store):
+    @app.get('/projects/<key>/quote/pdf')
+    def quote_pdf(key):
+        store = get_store()
+        identity = account()
+        project = store.record(identity, 'project', key)
+        draft = store.record(identity, 'quote', key)
+        if project is None or draft is None:
+            abort(404)
+        if not draft.get('revision') or request.args.get('revision') != draft['revision']:
+            abort(409, 'Der Entwurf wurde geändert. Bitte den aktuellen Stand neu öffnen.')
+        result = calculate(draft)
+        if draft.get('source') != fingerprint(project) or not draft.get('reviewed') or result['total'] is None:
+            abort(409, 'Bitte aktuelle Anforderungen, Positionen und Kalkulation zuerst vollständig prüfen und speichern.')
+        from quote_export import build
+        document = build(dict(project, id=key), draft, result, store)
+        # A concurrent edit must not silently produce an obsolete review document.
+        current_project = store.record(identity, 'project', key)
+        current_draft = store.record(identity, 'quote', key)
+        if current_project != project or current_draft != draft:
+            abort(409, 'Die Daten wurden während des Exports geändert. Bitte neu laden.')
+        response = send_file(document, mimetype='application/pdf', as_attachment=False,
+                             download_name='FTST-Angebotsentwurf.pdf')
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
     @app.route('/projects/<key>/quote', methods=['GET','POST'])
     def quote_draft(key):
         store = get_store()
@@ -245,8 +270,11 @@ def register(app, base, ingress, escape, get_store):
         total = result['total']
         totals = f'<div class="success">Entwurf: Netto {display_money(total["net"])} · Steuer {display_money(total["tax"])} · Brutto {display_money(total["gross"])} {escape(result.get("currency"))}</div>' if total else '<p>Gesamtsumme offen, bis alle Angaben eindeutig sind.</p>'
         revision = f'<input type="hidden" name="revision" value="{escape(draft["revision"])}">'
+        export = '<p>PDF-Entwurf verfügbar, sobald alle Angaben geprüft und gespeichert sind.</p>'
+        if total is not None and draft.get('reviewed') and draft.get('revision'):
+            export = f'<p><a class="btn dark" target="_blank" rel="noopener" href="{ingress("projects/"+key+"/quote/pdf")}?revision={escape(draft["revision"])}">PDF-Entwurf öffnen</a></p><p class="muted">Zur internen Prüfung; noch keine Freigabe und kein Versand.</p>'
         saved = '<p class="success">Entwurf gespeichert.</p>' if request.args.get('saved') else ''
         body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
         <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><label><input style="width:auto" type="checkbox" name="tax_confirmed" value="yes" {'checked' if draft.get('tax_confirmed')=='yes' else ''}> Bei länderabhängiger Steuerregel: Die Artikelsteuersätze gelten für diesen Auftrag.</label></p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
         <div class="card"><h2>Kalkulation zur Prüfung</h2><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
-        return base('Angebotsentwurf', body), status
+        return base('Angebotsentwurf', body + '<div class="card">' + export + '</div>'), status

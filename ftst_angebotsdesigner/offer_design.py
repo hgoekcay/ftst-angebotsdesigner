@@ -63,6 +63,7 @@ class NumberedCanvas(Canvas):
 
 def build(offer, escape, money, date_de, cname):
     o = offer
+    is_draft = bool(o.get('is_draft'))
     profile = o.get('company_profile', {})
     customer = o['client']
     number = str(o.get('offer_number') or o.get('number') or o.get('id', ''))
@@ -114,10 +115,10 @@ def build(offer, escape, money, date_de, cname):
             canvas.roundRect(128*mm, 271*mm, 62*mm, 9*mm, 4.5*mm, fill=0)
             canvas.setFillColor(RED)
             canvas.setFont(font, 8)
-            canvas.drawCentredString(159*mm, 274.3*mm, 'IHR PERSÖNLICHES ANGEBOT')
-            labels = [('AUSGESTELLT AM', date_de(o.get('date'))),
-                      ('GÜLTIGKEIT', date_de(o.get('validity_date')) if o.get('validity_date') else (str(o['validity_days'])+' Tage' if o.get('validity_days') else 'Gemäß Angebot')),
-                      ('IHR FESTPREIS', money(o.get('total_gross')))]
+            canvas.drawCentredString(159*mm, 274.3*mm, 'ENTWURF / NICHT FREIGEGEBEN' if is_draft else 'IHR PERSÖNLICHES ANGEBOT')
+            labels = [('DATENSTAND' if is_draft else 'AUSGESTELLT AM', date_de(str(o.get('catalog_at') or '')[:10]) if is_draft else date_de(o.get('date'))),
+                      ('STATUS' if is_draft else 'GÜLTIGKEIT', 'Nicht freigegeben' if is_draft else (date_de(o.get('validity_date')) if o.get('validity_date') else (str(o['validity_days'])+' Tage' if o.get('validity_days') else 'Gemäß Angebot'))),
+                      ('ENTWURFSPREIS' if is_draft else 'IHR FESTPREIS', money(o.get('total_gross')))]
             for x, (label, value) in zip((20, 78, 136), labels):
                 p(label, 'small').wrapOn(canvas, 53*mm, 12*mm)
                 label_p = p(label, 'small')
@@ -127,7 +128,7 @@ def build(offer, escape, money, date_de, cname):
                 _, height = value_p.wrapOn(canvas, 53*mm, 20*mm)
                 value_p.drawOn(canvas, x*mm, 37*mm-height)
         else:
-            info = p(f'Angebot {number[:35]} · {cname(customer)[:75]}', 'small')
+            info = p('ENTWURF / NICHT FREIGEGEBEN' if is_draft else f'Angebot {number[:35]} · {cname(customer)[:75]}', 'small')
             info.wrapOn(canvas, 92*mm, 20*mm)
             info.drawOn(canvas, 98*mm, 274*mm)
             canvas.setStrokeColor(LINE)
@@ -144,7 +145,7 @@ def build(offer, escape, money, date_de, cname):
         canvas.restoreState()
 
     buffer = io.BytesIO()
-    doc = BaseDocTemplate(buffer, pagesize=(210*mm, 297*mm), title=f'FTST Angebot {number}', author=profile.get('company') or 'FT Sicherheitstechnik')
+    doc = BaseDocTemplate(buffer, pagesize=(210*mm, 297*mm), title=f'FTST Angebotsentwurf {number}' if is_draft else f'FTST Angebot {number}', author=profile.get('company') or 'FT Sicherheitstechnik')
     doc.addPageTemplates([
         PageTemplate('cover', [Frame(20*mm, 58*mm, WIDTH, 144*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
         PageTemplate('content', [Frame(20*mm, 26*mm, WIDTH, 232*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
@@ -162,7 +163,7 @@ def build(offer, escape, money, date_de, cname):
     address = ' · '.join(x for x in [customer.get('street'), ' '.join(str(customer.get(k) or '') for k in ('zip','city')).strip()] if x)
     if address:
         details.append(p(address, 'small'))
-    story = [NextPageTemplate('content'), p('ANGEBOT · '+number, 'label'), Paragraph(title_html, styles['cover']),
+    story = [NextPageTemplate('content'), p('ANGEBOTSENTWURF' if is_draft else 'ANGEBOT · '+number, 'label'), Paragraph(title_html, styles['cover']),
              p(o.get('customer_intro')), Spacer(1, 12*mm), box(details, width=128*mm, accent=True),
              NextPageTemplate('content'), PageBreak()]
 
@@ -172,13 +173,15 @@ def build(offer, escape, money, date_de, cname):
              box([p('IHRE SICHERHEITSLÖSUNG', 'small'), p(o.get('offer_type')), p(f'{len(o["items"])} Angebotspositionen', 'small')], width=82*mm)]
     grid = Table([[cards[0], '', cards[1]]], colWidths=[82*mm,6*mm,82*mm])
     grid.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),0)]))
-    story += [grid, Spacer(1, 12*mm), p('IHRE VORTEILE', 'label')]
+    story += [grid, Spacer(1, 12*mm)]
+    if o.get('benefits'):
+        story.append(p('IHRE VORTEILE', 'label'))
     for benefit in o.get('benefits', []):
         story += [Paragraph('<font color="#0d7d3b">+</font>  '+escape(benefit), styles['body']), Spacer(1,3*mm)]
     story += [PageBreak()]
 
-    story += section('02 · IHRE FESTPREIS-LEISTUNG', 'Ihre Leistung. Klar kalkuliert.')
-    story += [Spacer(1,4*mm), box([p('IHR ANGEBOTSPREIS', 'white'), p(money(o.get('total_gross')), 'price'),
+    story += section('02 · KALKULATION ZUR PRÜFUNG' if is_draft else '02 · IHRE FESTPREIS-LEISTUNG', 'Ihre Leistung. Klar kalkuliert.')
+    story += [Spacer(1,4*mm), box([p('ENTWURFSPREIS · NICHT FREIGEGEBEN' if is_draft else 'IHR ANGEBOTSPREIS', 'white'), p(money(o.get('total_gross')), 'price'),
                        p('Netto '+money(o.get('total_net'))+' · MwSt. '+money(o.get('tax_amount')), 'white')], background=GREEN), Spacer(1,8*mm)]
     rows = [[p(t, 'small') for t in ('POS.', 'LEISTUNG / ARTIKEL', 'MENGE', 'PREIS', 'NETTO')]]
     for item in o['items']:
@@ -191,7 +194,7 @@ def build(offer, escape, money, date_de, cname):
     table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),PALE),('LINEBELOW',(0,0),(-1,-1),0.4,LINE),
                               ('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),2*mm),
                               ('RIGHTPADDING',(0,0),(-1,-1),2*mm),('TOPPADDING',(0,0),(-1,-1),4*mm),('BOTTOMPADDING',(0,0),(-1,-1),4*mm)]))
-    story += [table, Spacer(1,6*mm), p('Maßgeblich sind die im Angebot aufgeführten Leistungen und Konditionen.', 'small')]
+    story += [table, Spacer(1,6*mm), p('Interner Kalkulationsentwurf. Keine Angebotsfreigabe, kein Kundenversand.' if is_draft else 'Maßgeblich sind die im Angebot aufgeführten Leistungen und Konditionen.', 'small')]
 
     groups = OrderedDict()
     for item in o.get('reference_images', []):
@@ -219,7 +222,7 @@ def build(offer, escape, money, date_de, cname):
             section_number += 1
 
     story += [PageBreak()] + section(f'{section_number:02d} · NÄCHSTE SCHRITTE', 'So geht es weiter.')
-    story += [p('Wir begleiten Sie von der Abstimmung bis zur Übergabe.'), Spacer(1,8*mm)]
+    story += [p('Prüfung und Freigabe stehen noch aus.' if is_draft else 'Wir begleiten Sie von der Abstimmung bis zur Übergabe.'), Spacer(1,8*mm)]
     for n, step in enumerate(o.get('next_steps', []),1):
         row = Table([[p(n,'step'), p(step)]], colWidths=[16*mm,154*mm], splitInRow=1)
         row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEBELOW',(0,0),(-1,-1),0.4,LINE),('TOPPADDING',(0,0),(-1,-1),5*mm),('BOTTOMPADDING',(0,0),(-1,-1),5*mm)]))

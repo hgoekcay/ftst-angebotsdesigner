@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.3.3
+
+- Gespeicherte, vollständig geprüfte Projektkalkulation als PDF-Entwurf im FTST-Design öffnen.
+- Entwurfstatus auf jeder Seite, transparente Rabatte und Steuern sowie gespeicherte Währung.
+- Export gesperrt bei offenen Positionen, veränderten Notizen, veralteter Revision oder Änderung während des Exports.
+- Kein Billomat-Schreibzugriff, keine Freigabe und kein Kundenversand.
+
 ## 0.3.2
 
 - Bildauswahl nach Bereichen mit Quellenlabels und gespeichertem/live aktualisiertem Auswahlzähler.
