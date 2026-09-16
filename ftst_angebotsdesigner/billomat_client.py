@@ -5,6 +5,10 @@ import requests
 log = logging.getLogger("ftst.billomat")
 
 
+class CustomerWriteUncertain(RuntimeError):
+    """The server may have committed. Never automatically retry this write."""
+
+
 class BillomatClient:
     def __init__(self, billomat_id, api_key):
         self.billomat_id = (billomat_id or "").strip()
@@ -65,6 +69,19 @@ class BillomatClient:
         if not client_id:
             return {}
         return self._unwrap(self._get(f"/clients/{client_id}", {"format": "json"}), "client")
+
+    def create_client(self, fields):
+        try:
+            response = requests.post(self.base + '/clients', headers=dict(self.headers, **{'Content-Type':'application/json'}),
+                                     json={'client': fields}, timeout=(10, 30), allow_redirects=False)
+            if response.status_code != 201:
+                raise CustomerWriteUncertain('Billomat hat die Anlage nicht eindeutig bestätigt. Kundenliste prüfen; nicht erneut anlegen.')
+            client = self._unwrap(response.json(), 'client')
+            if not isinstance(client, dict) or not str(client.get('id', '')).isdigit():
+                raise ValueError
+            return client
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            raise CustomerWriteUncertain('Ergebnis der Kundenanlage unklar. Vor jeder weiteren Anlage die Billomat-Kundenliste prüfen.') from exc
 
     def get_full_offer(self, offer_id):
         offer = self.get_offer(offer_id)
