@@ -4,7 +4,7 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.1.6**
+**0.3.3**
 
 Die App liest Angebote aus Billomat und stellt sie im FTST-Design dar. Angebote können als A4-PDF ausgegeben werden.
 

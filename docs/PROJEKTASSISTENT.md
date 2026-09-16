@@ -1,5 +1,13 @@
 # Projektassistent und weitere Fertigstellung
 
+## Erweiterung 0.3.3
+
+Gespeicherte Kalkulationen mit eindeutigem Kunden, vollständigen Positionen und geprüftem Leistungsumfang können als PDF-Entwurf geöffnet werden. Jede Seite trägt „ENTWURF / NICHT FREIGEGEBEN“. Export aus veralteten Browserständen oder bei geänderten Projektnotizen ist gesperrt. Die PDF verwendet den gespeicherten Katalogstand; kein erneuter Netzwerkabruf. Es wurde noch kein Angebot in Billomat angelegt und keine Versand-/Freigabeaktion implementiert.
+
+## Erweiterung 0.3.0
+
+Lokaler Angebotsentwurf mit Artikelvorschlägen, Kundenauswahl, Preisgruppe, Rabatt und prüfbarer Kalkulation: siehe [ANGEBOTSENTWURF.md](ANGEBOTSENTWURF.md). Texte funktionieren auch ohne KI-Zugang. Die folgenden Abschnitte beschreiben den ursprünglichen Stand 0.2.0 und die darüber hinausgehenden Ziele.
+
 ## In 0.2.0 nutzbar
 
 Projekte anlegen, Notizen speichern, Merkzettelfoto und Sprachnotiz hochladen. Daten bleiben lokal im persistenten App-Verzeichnis. Bilder werden normalisiert und Metadaten entfernt.
