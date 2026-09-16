@@ -10,6 +10,12 @@ class AIError(RuntimeError):
 
 
 def extract(notes, image=None, audio=None):
+    provider = os.getenv('AI_PROVIDER', 'openai').strip().lower()
+    if provider == 'ollama':
+        from local_ai import extract_local
+        return extract_local(notes, image, audio)
+    if provider != 'openai':
+        raise AIError('Unbekannter KI-Anbieter. App-Konfiguration prüfen; keine Daten übertragen.')
     key = os.environ.get('OPENAI_API_KEY', '').strip()
     if not key:
         raise AIError('KI noch nicht eingerichtet. Ihre Projektangaben sind gespeichert. Bitte den OpenAI-API-Schlüssel in der App-Konfiguration hinterlegen.')

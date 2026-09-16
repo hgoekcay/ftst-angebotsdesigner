@@ -1,5 +1,6 @@
 #!/usr/bin/with-contenv bashio
 set -e
+export AI_PROVIDER="$(bashio::config 'ai_provider')"
 export BILLOMAT_ID="$(bashio::config 'billomat_id')"
 export BILLOMAT_API_KEY="$(bashio::config 'billomat_api_key')"
 export FLASK_SECRET="$(bashio::config 'flask_secret')"

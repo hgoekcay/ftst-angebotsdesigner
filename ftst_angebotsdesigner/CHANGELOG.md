@@ -1,3 +1,11 @@
+# 0.6.0
+
+- Lokale Textanalyse mit separater FTST Lokale KI App (Ollama): keine automatische Cloud-Ausweichverarbeitung.
+- Nur eine lokale Analyse gleichzeitig, begrenzte Eingabe und Ausgabe, validierte Quellenbelege.
+- Gespeicherte lokale Ergebnisse bei unveränderten Eingaben wiederverwenden; bewusste Neuanalyse möglich.
+- KI-Status und Funktionstest mit Beispieldaten. Gleichzeitige Projektänderungen werden nicht von Analyseergebnissen überschrieben.
+- Lokaler Pilot unterstützt zunächst Text. Anhänge werden nicht stillschweigend ausgelassen. Web-Firmensuche bleibt eine separate Online-Funktion.
+
 # 0.5.0
 
 - Kundenassistent: bestehende Billomat-Kunden suchen, öffentliche Firmen mit Quellen recherchieren und Kundendaten vor der Anlage prüfen.
