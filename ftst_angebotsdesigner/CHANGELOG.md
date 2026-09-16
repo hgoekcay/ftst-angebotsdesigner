@@ -1,3 +1,9 @@
+# 0.8.0
+
+- Mail-Arbeitsliste mit Mehrfachkategorien, Verantwortlichem, Wiedervorlage und separatem Bearbeitungs-/Beleg-/Zahlungsstatus.
+- Begrenzter EML-Import: unverändertes Original und Anhänge, atomarer Duplikatschutz, sichtbare ungeprüfte Anhänge und Analysegrenzen.
+- Manuelle Belegangaben mit Originalbezug und Bestätigungsverlauf; kein Postfachzugriff, OCR, Versand oder Buchhaltungsexport.
+- Produktiver Ingress-Zugriffsschutz und Handyansichten; Datenbankschema 3 (Rollback benötigt Sicherung der Vorversion).
 # 0.7.0
 
 - Lokaler Antwortassistent für manuell eingefügte Kundenanfragen: belegte Textausschnitte, offene Angaben und bearbeitbare Antwortentwürfe.

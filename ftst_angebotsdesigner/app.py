@@ -18,11 +18,18 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.7.0"
+APP_VERSION = "0.8.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
 app.config['FTST_DATA_DIR'] = str(data_directory())
+
+
+@app.before_request
+def enforce_ingress_peer():
+    # Production is reachable only through HA Ingress. Forwarding headers are not authentication.
+    if os.getenv('FTST_REQUIRE_INGRESS') == '1' and request.remote_addr != '172.30.32.2':
+        abort(403)
 
 
 def offer_store():
