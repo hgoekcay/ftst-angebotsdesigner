@@ -17,7 +17,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.6.1"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -57,7 +57,22 @@ h1{font-size:30px;letter-spacing:-.7px;line-height:1.2}h2{font-size:22px;letter-
 th{background:#f6f7f8;color:#697178;font-size:10px;letter-spacing:.65px}td,th{padding:15px 12px;border-bottom:1px solid #e6e9eb}tbody tr:hover{background:#fafbfb}
 input,textarea,select{border:1px solid #d9dee1;border-radius:6px;background:#fff;padding:12px;color:#15191c}input:focus,textarea:focus,select:focus{outline:2px solid #f3bbc0;outline-offset:1px}
 .check{background:#f0f8f3;border:1px solid #e0eee5;border-radius:6px;padding:16px}.back{font-size:13px;margin-bottom:22px}.muted{color:#72797f}
-@media(max-width:700px){.topin{padding:0 18px;flex-wrap:wrap}.appnav{gap:18px;flex-wrap:wrap}.wrap{padding:22px 14px}.hero,.card{padding:24px}.hero h1{font-size:29px}.grid{grid-template-columns:1fr}.card:has(table){overflow-x:auto}table{min-width:540px}}
+*,*::before,*::after{box-sizing:border-box}
+.topin>*,.grid>*,.card,form{min-width:0}
+img,video,audio{max-width:100%}input,select,textarea{min-width:0;max-width:100%}
+.card{overflow-wrap:anywhere}input[type=checkbox],input[type=radio]{width:22px!important;height:22px;vertical-align:middle;margin:0 8px 0 0;flex-shrink:0}
+@media screen and (max-width:700px){
+ .topin{padding:0 16px;flex-wrap:wrap;gap:14px}.appnav{width:100%;gap:4px 16px;flex-wrap:wrap}.appnav a{min-height:44px;display:flex;align-items:center;font-size:14px}
+ .wrap{padding:18px 12px 36px}.hero,.card{padding:18px}.hero h1{font-size:28px}h1{font-size:26px}h2{font-size:22px}.grid,.checks{grid-template-columns:minmax(0,1fr)}
+ .btn{display:block;width:100%;min-height:46px;margin:10px 0 0;text-align:center;white-space:normal;overflow-wrap:anywhere;font-size:16px;line-height:1.4}
+ input,select,textarea{font-size:16px;min-height:46px}input[type=checkbox],input[type=radio]{min-height:22px}label{font-size:12px;line-height:1.6}label:has(input[type=checkbox]),label:has(input[type=radio]){padding:10px 0;min-height:44px}
+ table,thead,tbody,tfoot,tr,td,th{display:block;width:100%;min-width:0;max-width:100%}
+ thead,tr:has(>th):not(:has(>td)){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ tr{border:1px solid #dfe4e7;border-radius:8px;margin:14px 0;padding:8px 12px}td,th{padding:9px 0;border:0;text-align:left;white-space:normal}
+ td+td{border-top:1px solid #eef0f2}td[data-label]::before{content:attr(data-label);display:block;color:#697178;font-size:12px;font-weight:700;letter-spacing:.3px;margin-bottom:4px}
+ td.money{text-align:left}td label{margin-bottom:6px}.card ul,.card ol{padding-left:22px}.metric{padding:18px}
+ .material-grid{grid-template-columns:minmax(0,1fr)!important}.material-actions{position:static!important}
+}
 """
 
 TYPES={
@@ -205,7 +220,7 @@ def offers():
         if not bid or not key:return base("Billomat",'<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
         data=BillomatClient(bid,key).list_offers(request.args.get("search",""))
         data=sorted(data,key=lambda x:str(x.get("date","") if isinstance(x,dict) else ""),reverse=True)
-        rows="".join(f'<tr><td><b>{clean(o.get("offer_number") or o.get("number") or "-")}</b></td><td>{date_de(o.get("date"))}</td><td>{clean(o.get("title") or "-")}</td><td class="money">{money(o.get("total_gross"))}</td><td><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
+        rows="".join(f'<tr><td data-label="Nr."><b>{clean(o.get("offer_number") or o.get("number") or "-")}</b></td><td data-label="Datum">{date_de(o.get("date"))}</td><td data-label="Titel">{clean(o.get("title") or "-")}</td><td data-label="Brutto" class="money">{money(o.get("total_gross"))}</td><td data-label="Aktion"><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
         return base("Angebote",f'<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">{len(data)} Angebote · neueste zuerst</p><table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>')
     except Exception as e:
         log.exception("Offer list failed"); return base("Fehler",f'<div class="card"><h1>Fehler</h1><p>{clean(e)}</p></div>'),502
@@ -234,7 +249,7 @@ def detail(o):
     def pricing_note(item):
         return '<br>'.join(clean(note) for note in item_notes(item, o.get('currency_code') or 'EUR'))
     price_summary = ''.join('<p>' + clean(note) + '</p>' for note in offer_notes(o))
-    rows="".join(f'<tr><td>{clean(i["position"])}</td><td><b>{clean(i["title"])}</b><br>{pricing_note(i)}<br><span class="muted small">{clean(i["description"])}</span></td><td>{clean(i["quantity"])} {clean(i["unit"])}</td><td class="money">{money(i["unit_price"])}</td><td class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
+    rows="".join(f'<tr><td data-label="Pos.">{clean(i["position"])}</td><td data-label="Leistung / Artikel"><b>{clean(i["title"])}</b><br>{pricing_note(i)}<br><span class="muted small">{clean(i["description"])}</span></td><td data-label="Menge">{clean(i["quantity"])} {clean(i["unit"])}</td><td data-label="{clean(unit_price_heading(o))}" class="money">{money(i["unit_price"])}</td><td data-label="Netto" class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
     checks="".join(f'<span class="check">✓ {clean(x)}</span>' for x in o.get("benefits",[]))
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
