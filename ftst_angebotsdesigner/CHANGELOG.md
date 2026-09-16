@@ -1,3 +1,12 @@
+# 0.4.0
+
+- Hauptlager mit unbekannten/gezählten Beständen, Eingängen, Auftragsentnahmen, Rückgaben, Korrekturen und nachvollziehbaren Gegenbuchungen.
+- Materialreservierung aus tatsächlich beauftragten, geprüften Projektentwürfen; Schutz gegen Doppelbuchungen, fremde Reservierungen und veraltete Formulare.
+- Einkaufsprüfliste mit getrennten physischen Fehlmengen, offenen externen Bestellungen und verbleibendem Beschaffungsbedarf.
+- Erfassung vorhandener Lieferantenbestellungen, Teillieferungen und bestätigter Reststornierungen. Kein externer Bestellversand.
+- Interne Terminvorschläge anhand gedeckten Materials, geprüfter freier Zeiten, Teamgröße, Fähigkeiten sowie Fahrt-/Rüstpuffer. Keine verbindliche Kalenderbuchung.
+- 104 Tests erfolgreich; lokale Browserprüfung von Lager, Reservierung, Planung, Bestellerfassung und Teillieferung.
+
 # 0.3.4
 
 - Optionale Billomat-Positionen in Angebotsansicht und PDF ausdrücklich als nicht im Gesamtpreis enthalten kennzeichnen.
