@@ -10,10 +10,11 @@ from billomat_client import BillomatClient
 import materials
 import projects
 import quote_drafts
+from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.3.3"
+APP_VERSION = "0.3.4"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -109,7 +110,7 @@ def normalize(o):
     items=[]
     for n,x in enumerate(one_list(o.get("items")),1):
         if isinstance(x,dict):
-            items.append({"position":x.get("position") or n,"title":x.get("title") or "Leistung","description":x.get("description") or "","quantity":x.get("quantity") or 0,"unit":x.get("unit") or "","unit_price":x.get("unit_price") or 0,"total_net":x.get("total_net") or 0})
+            items.append({"position":x.get("position") or n,"title":x.get("title") or "Leistung","description":x.get("description") or "","quantity":x.get("quantity") or 0,"unit":x.get("unit") or "","unit_price":x.get("unit_price") or 0,"total_net":x.get("total_net") or 0,"optional":x.get("optional", 0),"reduction":x.get("reduction", "")})
     o["items"]=items
     o["tax_amount"]=sum(float(t.get("amount") or t.get("tax_amount") or 0) for t in one_list(o.get("taxes")) if isinstance(t,dict))
     return o
@@ -227,12 +228,15 @@ def edit(oid):
     return base("Angebot bearbeiten",body)
 
 def detail(o):
-    rows="".join(f'<tr><td>{clean(i["position"])}</td><td><b>{clean(i["title"])}</b><br><span class="muted small">{clean(i["description"])}</span></td><td>{clean(i["quantity"])} {clean(i["unit"])}</td><td class="money">{money(i["unit_price"])}</td><td class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
+    def pricing_note(item):
+        return '<br>'.join(clean(note) for note in item_notes(item, o.get('currency_code') or 'EUR'))
+    price_summary = ''.join('<p>' + clean(note) + '</p>' for note in offer_notes(o))
+    rows="".join(f'<tr><td>{clean(i["position"])}</td><td><b>{clean(i["title"])}</b><br>{pricing_note(i)}<br><span class="muted small">{clean(i["description"])}</span></td><td>{clean(i["quantity"])} {clean(i["unit"])}</td><td class="money">{money(i["unit_price"])}</td><td class="money">{money(i["total_net"])}</td></tr>' for i in o["items"])
     checks="".join(f'<span class="check">✓ {clean(x)}</span>' for x in o.get("benefits",[]))
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
-    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2><table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>Einzelpreis</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2><div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
+    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2>{price_summary}<table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>{clean(unit_price_heading(o))}</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2>{price_summary}<div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
