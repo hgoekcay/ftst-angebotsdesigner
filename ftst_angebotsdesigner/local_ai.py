@@ -74,6 +74,11 @@ def validate(value, notes):
 def extract_local(notes,image=None,audio=None):
     if image or audio:
         raise AIError('Lokale KI verarbeitet zunächst nur Text. Für dieses Projekt liegen Bild/Audio vor; diese werden nicht stillschweigend ausgelassen. Text in einem eigenen Projekt auswerten. Kein Cloud-Aufruf erfolgt.')
+    return request_local(notes, PROMPT, SCHEMA, validate)
+
+
+def request_local(notes, prompt, schema, validator):
+    """Shared bounded transport and concurrency gate for local text tasks."""
     if not isinstance(notes,str) or not notes.strip() or len(notes)>4000:
         raise AIError('Für die lokale Analyse bitte 1 bis 4000 Zeichen Text verwenden. Eingaben bleiben gespeichert.')
     url=endpoint()
@@ -81,15 +86,15 @@ def extract_local(notes,image=None,audio=None):
         raise AIError('Die lokale KI bearbeitet bereits eine Anfrage. Bitte später erneut versuchen.')
     try:
         response=_http.post(url+'/api/chat',json={'model':MODEL,'stream':False,'think':False,'keep_alive':'60s',
-            'messages':[{'role':'system','content':PROMPT},{'role':'user','content':notes}],
-            'format':SCHEMA,'options':{'temperature':0,'num_ctx':4096,'num_predict':1200,'num_thread':2}},
+            'messages':[{'role':'system','content':prompt},{'role':'user','content':notes}],
+            'format':schema,'options':{'temperature':0,'num_ctx':4096,'num_predict':1200,'num_thread':2}},
             timeout=(5,120),allow_redirects=False)
         if response.status_code!=200:
             raise AIError('Lokale KI nicht verfügbar. Dienst und Modell prüfen. Kein Cloud-Aufruf erfolgt.')
         result=response.json()
         if result.get('done') is not True or result.get('done_reason')!='stop' or result.get('message',{}).get('tool_calls'):
             raise ValueError('Incomplete response')
-        return validate(json.loads(result['message']['content']),notes)
+        return validator(json.loads(result['message']['content']),notes)
     except (requests.RequestException, ValueError, TypeError, KeyError, AttributeError) as exc:
         raise AIError('Lokale KI-Antwort fehlt, ist unvollständig oder nicht ausreichend belegt. Eingaben bleiben gespeichert; kein Cloud-Aufruf erfolgt.') from exc
     finally:

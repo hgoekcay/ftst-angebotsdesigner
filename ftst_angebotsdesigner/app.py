@@ -13,11 +13,12 @@ import quote_drafts
 import inventory_views
 import customers
 import ai_status
+import mail_assistant
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.6.1"
+APP_VERSION = "0.7.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -211,7 +212,7 @@ def health():
 
 @app.get("/")
 def index():
-    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("projects")}">Projekte & Assistent</a><a class="btn light" href="{ingress("customers")}">Kunden finden & anlegen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a><a class="btn light" href="{ingress("ai")}">Lokale KI prüfen</a></div>')
+    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("projects")}">Projekte & Assistent</a><a class="btn light" href="{ingress("customers")}">Kunden finden & anlegen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a><a class="btn light" href="{ingress("ai")}">Lokale KI prüfen</a><a class="btn light" href="{ingress("mail")}">Antwortassistent</a></div>')
 
 @app.get("/offers")
 def offers():
@@ -283,6 +284,7 @@ quote_drafts.register(app, base, ingress, clean, offer_store)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)
+mail_assistant.register(app, base, ingress, clean, offer_store)
 
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))

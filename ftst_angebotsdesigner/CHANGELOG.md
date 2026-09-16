@@ -1,3 +1,10 @@
+# 0.7.0
+
+- Lokaler Antwortassistent für manuell eingefügte Kundenanfragen: belegte Textausschnitte, offene Angaben und bearbeitbare Antwortentwürfe.
+- Feste Antwortbausteine ohne Preis-, Verfügbarkeits- oder Terminzusagen; Kopieren statt Versand.
+- Persistente Entwürfe, Wiederverwendung unveränderter Auswertungen, Schutz manueller und paralleler Änderungen; Handyansicht.
+- Noch kein Postfachzugriff, EML-Import oder Belegworkflow.
+
 # 0.6.1
 
 - Handyansichten ohne seitliches Scrollen: Tabellen werden als beschriftete Positionen untereinander angezeigt.
