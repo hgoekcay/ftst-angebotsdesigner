@@ -5,7 +5,7 @@ Only the pilot main warehouse is supported. No external writes take place.
 """
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from storage import RecordConflict, StorageError
 
@@ -53,8 +53,51 @@ def reserve(state, order):
         order['reserved'][aid] = min(open_need(order, aid), available)
 
 
+def incoming(state, order, article):
+    return sum(p['quantity'] - p['received'] - p['cancelled'] for p in state['purchases'].values()
+               if p['order'] == order and p['article'] == article)
+
+
 def apply(state, action, p):
     """Deterministic projection; only validated journal commands are persisted."""
+    if action == 'purchase':
+        pid = required(p.get('id'), 'Bestellvorgang', 100)
+        oid, aid = str(p.get('order', '')), str(p.get('article', ''))
+        if pid in state['purchases']:
+            raise InventoryError('Bestellvorgang bereits erfasst.')
+        order = state['orders'].get(oid)
+        if not order or not order['active'] or aid not in order['needs'] or not order['needs'][aid]:
+            raise InventoryError('Aktiven Auftrag und benötigten Materialartikel auswählen.')
+        supplier = required(p.get('supplier'), 'Lieferant')
+        reference = required(p.get('reference'), 'Externe Bestellnummer / eindeutige Bestellposition')
+        if p.get('ordered') != 'yes':
+            raise InventoryError('Nur eine tatsächlich extern aufgegebene Bestellung erfassen.')
+        if any(x['supplier'].casefold() == supplier.casefold() and x['reference'].casefold() == reference.casefold()
+               and x['article'] == aid for x in state['purchases'].values()):
+            raise InventoryError('Diese Lieferanten-Bestellposition ist bereits erfasst. Bei Aufteilung eine eindeutige Teilposition verwenden.')
+        delivery = str(p.get('delivery', '')).strip()
+        if delivery:
+            try:
+                date.fromisoformat(delivery)
+            except ValueError:
+                raise InventoryError('Lieferdatum muss ein gültiges Datum sein.') from None
+        state['purchases'][pid] = dict(id=pid, order=oid, article=aid, supplier=supplier, reference=reference,
+                                       quantity=quantity(p.get('quantity'), state['articles'][aid]['unit']),
+                                       received=0, cancelled=0, delivery=delivery,
+                                       confirmed=p.get('confirmed') == 'yes', note=str(p.get('note', ''))[:300])
+        return
+    if action == 'purchase_cancel':
+        purchase = state['purchases'].get(str(p.get('purchase', '')))
+        if not purchase:
+            raise InventoryError('Bestellvorgang fehlt.')
+        required(p.get('note'), 'Nachweis der extern bestätigten Stornierung')
+        if p.get('confirmed') != 'yes':
+            raise InventoryError('Restmenge erst nach tatsächlicher externer Stornierung ausbuchen.')
+        remaining = purchase['quantity'] - purchase['received'] - purchase['cancelled']
+        if remaining <= 0:
+            raise InventoryError('Keine offene Restmenge vorhanden.')
+        purchase['cancelled'] += remaining
+        return
     if action == 'reverse':
         required(p.get('note'), 'Stornobegründung')
         event = next((e for e in state['events'] if e['id'] == p.get('event')), None)
@@ -71,6 +114,8 @@ def apply(state, action, p):
             if a['stock'] - n < reserved(state, aid):
                 raise InventoryError('Gegenbuchung würde verfügbare/reservierte Mengen unterschreiten. Folgebewegungen zuerst prüfen.')
             a['stock'] -= n
+            if original.get('purchase'):
+                state['purchases'][original['purchase']]['received'] -= n
         elif event['action'] == 'issue':
             if order['issued'].get(aid, 0) < n:
                 raise InventoryError('Entnahme wurde bereits zurückgegeben. Folgebewegungen zuerst prüfen.')
@@ -146,6 +191,13 @@ def apply(state, action, p):
     elif not a['known']:
         raise InventoryError('Bestand unbekannt. Zuerst tatsächlich zählen und Anfangsbestand erfassen.')
     elif action == 'receive':
+        if p.get('purchase'):
+            purchase = state['purchases'].get(p['purchase'])
+            if not purchase or purchase['article'] != aid:
+                raise InventoryError('Bestellvorgang passt nicht zum Artikel.')
+            if n > purchase['quantity'] - purchase['received'] - purchase['cancelled']:
+                raise InventoryError('Wareneingang überschreitet die offene Bestellmenge.')
+            purchase['received'] += n
         a['stock'] += n
     elif action == 'count':
         required(p.get('note'), 'Begründung')
@@ -178,7 +230,7 @@ def project(journal):
         journal = {'version': 1, 'events': []}
     if journal.get('version') != 1 or not isinstance(journal.get('events'), list):
         raise StorageError('Unbekannte Lagerdatenversion.')
-    state = {'articles': {}, 'orders': {}, 'events': [], 'revision': len(journal['events'])}
+    state = {'articles': {}, 'orders': {}, 'purchases': {}, 'events': [], 'revision': len(journal['events'])}
     try:
         for event in journal['events']:
             apply(state, event['action'], event['payload'])
@@ -226,7 +278,9 @@ def procurement(state, order_id):
         a = state['articles'][aid]
         missing = max(0, open_need(order, aid) - order['reserved'].get(aid, 0))
         if missing:
+            ordered = incoming(state, order_id, aid)
             result.append(dict(article=aid, title=a['title'], unit=a['unit'], quantity=missing,
+                               incoming=ordered, to_buy=max(0, missing-ordered),
                                status='Beschaffung prüfen' if a['known'] else 'Zuerst Bestand zählen',
                                stock_known=a['known']))
     return result

@@ -90,7 +90,7 @@ def register(app, base, ingress, escape, get_store):
         article_options = ''.join(f'<option value="{escape(aid)}">{escape(a["title"])} ({a["unit"]})</option>' for aid, a in state['articles'].items())
         catalog_options = ''.join(f'<option value="{escape(aid)}">{escape(a.get("title"))} · {escape(a.get("article_number") or aid)}</option>' for aid, a in catalog(store).items() if aid not in state['articles'])
         orders = ''.join(f'<option value="{escape(oid)}">{escape(o["title"])}{" (storniert, nur Rückgabe)" if not o["active"] else ""}</option>' for oid, o in state['orders'].items())
-        labels = dict(article='Artikel aufgenommen', order='Auftrag erfasst', opening='Anfangszählung', receive='Wareneingang', issue='Entnahme', return_='Rückgabe', count='Zählkorrektur', reserve='Reservierung', release='Reservierung freigegeben', cancel='Auftrag storniert', need='Bedarf geändert', reverse='Gegenbuchung')
+        labels = dict(article='Artikel aufgenommen', order='Auftrag erfasst', opening='Anfangszählung', receive='Wareneingang', issue='Entnahme', return_='Rückgabe', count='Zählkorrektur', reserve='Reservierung', release='Reservierung freigegeben', cancel='Auftrag storniert', need='Bedarf geändert', reverse='Gegenbuchung', purchase='Externe Bestellung erfasst', purchase_cancel='Externe Reststornierung erfasst')
         labels['return'] = labels.pop('return_')
         def event_details(event):
             p = event['payload']
@@ -106,7 +106,10 @@ def register(app, base, ingress, escape, get_store):
                 details.extend(str(r['quantity']) + ' × ' + state['articles'].get(str(r['article_id']), {}).get('title', str(r['article_id'])) for r in p['lines'])
             if p.get('event'):
                 details.append('Gegenbuchung zu ' + p['event'])
-            details.extend(str(p[k]) for k in ('reference', 'note') if p.get(k))
+            if p.get('purchase'):
+                purchase = state['purchases'].get(p['purchase'], {})
+                details.append('Bestellung: ' + str(purchase.get('reference', p['purchase'])))
+            details.extend(str(p[k]) for k in ('supplier', 'reference', 'delivery', 'note') if p.get(k))
             return '<br>'.join(escape(d) for d in details if d)
         history = ''.join(f'<tr><td>{datetime.fromisoformat(e["at"]).astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y %H:%M")}<br><small>Vorgang {escape(e["id"])}</small></td><td>{escape(e["actor"])}</td><td>{escape(labels.get(e["action"], e["action"]))}</td><td>{event_details(e)}</td></tr>' for e in reversed(state['events'][-100:]))
         actions = ''.join(f'<option value="{key}">{label}</option>' for key, label in [('opening','Anfangsbestand gezählt'),('receive','Ware erhalten'),('issue','Für Auftrag entnehmen'),('return','Verwendbare Ware zurückgeben'),('count','Gezählten Bestand korrigieren')])
@@ -154,6 +157,19 @@ def register(app, base, ingress, escape, get_store):
                     run(action, payload, verify)
                 elif action in ('reserve', 'release', 'cancel', 'need'):
                     run(action, dict(order=key, article=request.form.get('article'), quantity=request.form.get('quantity'), note=request.form.get('note')))
+                elif action == 'purchase':
+                    payload = {k: request.form.get(k, '').strip() for k in ('article', 'quantity', 'supplier', 'reference', 'delivery', 'confirmed', 'ordered', 'note')}
+                    payload.update(id=request.form.get('operation'), order=key)
+                    run(action, payload)
+                elif action in ('purchase_receive', 'purchase_cancel'):
+                    pid = request.form.get('purchase', '')
+                    purchase = state['purchases'].get(pid)
+                    if not purchase or purchase['order'] != key:
+                        raise InventoryError('Bestellung gehört nicht zu diesem Auftrag.')
+                    payload = dict(purchase=pid, note=request.form.get('note', ''), confirmed=request.form.get('confirmed'))
+                    if action == 'purchase_receive':
+                        payload.update(article=purchase['article'], quantity=request.form.get('quantity'), order=key)
+                    run('receive' if action == 'purchase_receive' else 'purchase_cancel', payload)
                 elif action == 'plan':
                     if not order:
                         raise InventoryError('Zuerst Beauftragung dokumentieren.')
@@ -178,7 +194,7 @@ def register(app, base, ingress, escape, get_store):
             return page('Beauftragung', title + f'<div class="card"><h2>Beauftragung dokumentieren</h2><p>Nur tatsächlich beauftragte Materialpositionen markieren. Vorher deren Billomat-Artikel im Lager aufnehmen. Dienstleistungen nicht reservieren.</p><form method="post">{fields(state)}<input type="hidden" name="action" value="order"><input type="hidden" name="quote_revision" value="{escape(draft.get("revision"))}">{materials}<label>Auftragsnachweis / Billomat- oder Craftnote-Referenz<input name="reference" required maxlength="300"></label>{actor_field()}<label><input type="checkbox" style="width:auto" name="confirmed" value="yes" required> Beauftragung liegt vor; Materialauswahl und Lagereinheiten stimmen mit dem geprüften Entwurf überein.</label><button class="btn">Auftrag erfassen und verfügbares Material reservieren</button></form></div>')
         rows = ''.join(f'<tr><td>{escape(state["articles"][aid]["title"])} ({state["articles"][aid]["unit"]})</td><td>{fmt(n)}</td><td>{fmt(order["issued"].get(aid,0))}</td><td>{fmt(order["reserved"].get(aid,0))}</td><td>{fmt(max(0,open_need(order,aid)-order["reserved"].get(aid,0)))}</td></tr>' for aid, n in order['needs'].items())
         missing = procurement(state, key)
-        missing_rows = ''.join(f'<tr><td>{escape(r["title"])}</td><td>{fmt(r["quantity"])} {r["unit"]}</td><td>{r["status"]}</td><td>Offen</td></tr>' for r in missing)
+        missing_rows = ''.join(f'<tr><td>{escape(r["title"])}</td><td>{fmt(r["quantity"])} {r["unit"]}</td><td>{fmt(r["incoming"])}</td><td>{fmt(r["to_buy"])}</td><td>{r["status"]}</td></tr>' for r in missing)
         options = ''.join(f'<option value="{escape(aid)}">{escape(a["title"])}</option>' for aid, a in state['articles'].items())
         controls = ''
         if order['active']:
@@ -192,9 +208,9 @@ def register(app, base, ingress, escape, get_store):
         if request.args.get('saved'):
             title += '<p class="success">Auftragsänderung dauerhaft gespeichert.</p>'
         if not missing and order['active']:
-            missing_rows = '<tr><td colspan="4">Materialbedarf durch Reservierungen und Entnahmen gedeckt.</td></tr>'
+            missing_rows = '<tr><td colspan="5">Materialbedarf durch Reservierungen und Entnahmen gedeckt.</td></tr>'
         return page('Materialplanung', title + f'''<div class="card"><h2>{'Beauftragtes Material' if order['active'] else 'Stornierter Auftrag'}</h2><p>Nachweis: {escape(order['reference'])} · Angebotsstand {escape(order['quote_revision'])}</p><table><tr><th>Artikel</th><th>Bedarf</th><th>Netto entnommen</th><th>Reserviert</th><th>Offen</th></tr>{rows}</table>{controls}</div>
-<div class="card"><h2>Einkauf vorbereiten</h2><p>Unbestellter Vorschlag. Lieferanten, Einkaufspreise, Liefertermine und bereits extern bestellte Mengen müssen geprüft werden. Unbekannter Bestand bedeutet zunächst zählen.</p><table><tr><th>Artikel</th><th>Ungedeckter Bedarf</th><th>Nächster Schritt</th><th>Lieferant / Preis / Lieferung</th></tr>{missing_rows}</table><a class="btn light" href="{ingress('projects/'+key+'/procurement.csv')}">Prüfliste als CSV</a></div>
+<div class="card"><h2>Einkauf vorbereiten</h2><p>Unbestellter Vorschlag. Erfasste offene Bestellungen sind berücksichtigt. Lieferant, Preis und weitere extern bestellte Mengen vor einer neuen Bestellung abgleichen. Unbekannter Bestand bedeutet zuerst zählen. Bestellte Ware ist erst nach Wareneingang verfügbar.</p><table><tr><th>Artikel</th><th>Physisch ungedeckt</th><th>Offen bestellt</th><th>Noch zu beschaffen</th><th>Nächster Schritt</th></tr>{missing_rows}</table><a class="btn light" href="{ingress('projects/'+key+'/procurement.csv')}">Prüfliste als CSV</a></div>{purchase_section(state, key)}
 {result}<div class="card"><h2>Vorläufige Termine ermitteln</h2><p>Freie Zeiten jedes Mitarbeiters nach Kalenderprüfung eintragen. Alle benötigten Personen müssen gleichzeitig verfügbar und für die angegebenen Fähigkeiten geeignet sein. Fahrt-/Rüstpuffer ist in der Gesamtbelegung enthalten. Keine Kalenderanbindung oder Buchung.</p><form method="post">{fields(state)}<input type="hidden" name="action" value="plan"><div class="grid"><label>Montagedauer (Minuten)<input name="minutes" type="number" min="1" max="720" required></label><label>Teamgröße<input name="crew" type="number" min="1" max="3" required></label><label>Fahrt und Rüsten insgesamt (Minuten)<input name="buffer" type="number" min="0" max="240" required></label></div><label>Benötigte Fähigkeiten (kommagetrennt)<input name="skills" required></label><label>Kalender zuletzt geprüft (Europe/Berlin)<input name="checked_at" type="datetime-local" required></label><label>Freie Zeitfenster, eine Zeile je Person und Zeitraum<textarea name="availability" placeholder="Name; Fähigkeiten; JJJJ-MM-TTTHH:MM; JJJJ-MM-TTTHH:MM" required></textarea></label><button class="btn">Interne Vorschläge prüfen</button></form></div>''')
 
     @app.get('/projects/<key>/procurement.csv')
@@ -202,8 +218,33 @@ def register(app, base, ingress, escape, get_store):
         state = load(get_store(), account())
         if key not in state['orders']:
             abort(404)
-        rows = [['Status', 'Auftrag', 'Artikel-ID', 'Artikel', 'Ungedeckter Bedarf', 'Einheit', 'Bestandsprüfung', 'Lieferant', 'Einkaufspreis', 'Liefertermin', 'Extern bestellt', 'Stand UTC']]
+        rows = [['Status', 'Auftrag', 'Artikel-ID', 'Artikel', 'Physisch ungedeckt', 'Einheit', 'Bestandsprüfung', 'Offen bestellt', 'Noch zu beschaffen', 'Lieferant', 'Einkaufspreis', 'Weitere externe Bestellungen', 'Stand UTC']]
         now = datetime.now(timezone.utc).isoformat()
         for r in procurement(state, key):
-            rows.append(['Unbestellter Prüfvorschlag', state['orders'][key]['title'], r['article'], r['title'], fmt(r['quantity']), r['unit'], r['status'], 'Offen', 'Offen', 'Offen – manuell prüfen', 'Offen – manuell prüfen', now])
+            rows.append(['Unbestellter Prüfvorschlag', state['orders'][key]['title'], r['article'], r['title'], fmt(r['quantity']), r['unit'], r['status'], fmt(r['incoming']), fmt(r['to_buy']), 'Prüfen', 'Offen', 'Manuell abgleichen', now])
         return csv_response('FTST-Einkaufspruefliste.csv', rows)
+
+    def purchase_section(state, key):
+        order = state['orders'][key]
+        cards = ''
+        for pid, purchase in state['purchases'].items():
+            if purchase['order'] != key:
+                continue
+            a = state['articles'][purchase['article']]
+            remaining = purchase['quantity'] - purchase['received'] - purchase['cancelled']
+            delivery = escape(purchase['delivery']) or 'Unbekannt'
+            delivery += ' · Lieferant bestätigt' if purchase['confirmed'] and purchase['delivery'] else ' · keine bestätigte Zusage'
+            warning = '<p class="success">Auftrag storniert: Diese Bestellung ist weiterhin extern zu prüfen.</p>' if remaining and not order['active'] else ''
+            if remaining and purchase['delivery'] and purchase['delivery'] < datetime.now(ZoneInfo('Europe/Berlin')).date().isoformat():
+                warning += '<p><strong>Lieferdatum überschritten:</strong> Offene Lieferung beim Lieferanten prüfen.</p>'
+            if remaining > max(0, open_need(order, purchase['article']) - order['reserved'].get(purchase['article'], 0)):
+                warning += '<p><strong>Bedarf prüfen:</strong> Die offene Bestellmenge übersteigt den noch ungedeckten Auftragsbedarf.</p>'
+            receive = ''
+            if remaining:
+                receive = f'''<form method="post">{fields(state)}<input type="hidden" name="action" value="purchase_receive"><input type="hidden" name="purchase" value="{escape(pid)}"><label>Tatsächlich geprüfte Liefermenge ({a['unit']})<input name="quantity" required inputmode="decimal"></label><label>Lieferschein / Notiz<input name="note" maxlength="300"></label>{actor_field()}<button class="btn">Wareneingang buchen</button></form>
+<details><summary>Extern bestätigte Reststornierung erfassen</summary><form method="post">{fields(state)}<input type="hidden" name="action" value="purchase_cancel"><input type="hidden" name="purchase" value="{escape(pid)}"><label>Stornonachweis<input name="note" required maxlength="300"></label>{actor_field()}<label><input style="width:auto" type="checkbox" name="confirmed" value="yes" required> Lieferant hat die Stornierung der offenen Restmenge bestätigt.</label><button class="btn light">Bestätigte Reststornierung dokumentieren</button></form></details>'''
+            cards += f'''<div class="card"><h3>{escape(a['title'])} · {escape(purchase['supplier'])}</h3><p>Bestellnachweis: {escape(purchase['reference'])}</p><p>Bestellt: {fmt(purchase['quantity'])} · Eingegangen: {fmt(purchase['received'])} · Storniert: {fmt(purchase['cancelled'])} · Noch offen: <strong>{fmt(remaining)} {a['unit']}</strong></p><p>Lieferdatum: {delivery}</p>{warning}{receive}</div>'''
+        if order['active']:
+            options = ''.join(f'<option value="{escape(aid)}">{escape(state["articles"][aid]["title"])} ({state["articles"][aid]["unit"]})</option>' for aid, n in order['needs'].items() if n)
+            cards += f'''<div class="card"><h2>Bestehende Bestellung erfassen</h2><p>Eine bereits außerhalb der App aufgegebene Bestellung dokumentieren. Dieses Formular sendet keine Bestellung an einen Lieferanten.</p><form method="post">{fields(state)}<input type="hidden" name="action" value="purchase"><label>Artikel<select name="article">{options}</select></label><label>Bestellte Menge<input name="quantity" required inputmode="decimal"></label><label>Lieferant<input name="supplier" required maxlength="300"></label><label>Eindeutige Bestellnummer / Teilposition<input name="reference" required maxlength="300"></label><label>Lieferdatum, falls bekannt<input type="date" name="delivery"></label><label><input type="checkbox" style="width:auto" name="confirmed" value="yes"> Lieferdatum vom Lieferanten bestätigt</label><label>Notiz<input name="note" maxlength="300"></label>{actor_field()}<label><input type="checkbox" style="width:auto" name="ordered" value="yes" required> Diese Menge wurde tatsächlich extern bestellt und hier noch nicht erfasst.</label><button class="btn light">Bestehende Bestellung dokumentieren</button></form></div>'''
+        return cards

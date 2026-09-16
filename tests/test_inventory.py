@@ -257,3 +257,103 @@ def test_unreviewed_quote_cannot_become_order(isolated_storage, monkeypatch, dra
     data = dict(form(client.get('/projects/p/operations')), action='order', quote_revision='r1', material='0', actor='Tester', confirmed='yes')
     assert client.post('/projects/p/operations', data=data).status_code == 409
     assert not load(store, 'test')['orders']
+
+
+def purchase(command, n='7', pid='buy1'):
+    return command('purchase', dict(id=pid, order='p', article='1', quantity=n, supplier='Testlieferant',
+                                   reference='Testbestellung-'+pid, ordered='yes', delivery='2026-09-20', confirmed='yes'))
+
+
+def test_open_purchase_reduces_shopping_list_but_never_material_gate(warehouse):
+    store, command = warehouse
+    move(command, 'opening', '0')
+    order(command)
+    state = purchase(command, '5')
+    row = procurement(state, 'p')[0]
+    assert (row['quantity'], row['incoming'], row['to_buy']) == (7000, 5000, 2000)
+    assert state['articles']['1']['stock'] == 0
+    assert state['orders']['p']['reserved']['1'] == 0
+    state = purchase(command, '2', 'buy2')
+    assert procurement(state,'p')[0]['to_buy'] == 0
+    plan = suggestions(state, 'p', 'A;Alarm;2026-09-21T08:00;2026-09-21T12:00',
+                       90, 1, 'Alarm', 30, '2026-09-16T09:00', datetime(2026,9,16,8,tzinfo=timezone.utc))
+    assert not plan['slots']
+
+
+def test_partial_delivery_reversal_and_remaining_cancellation(warehouse):
+    store, command = warehouse
+    move(command, 'opening', '0')
+    order(command)
+    purchase(command)
+    state = move(command, 'receive', '3', purchase='buy1')
+    event = state['events'][-1]
+    assert state['purchases']['buy1']['received'] == 3000
+    state = command('reserve', dict(order='p'))
+    row = procurement(state,'p')[0]
+    assert (row['quantity'], row['incoming'], row['to_buy']) == (4000,4000,0)
+    with pytest.raises(InventoryError):
+        move(command, 'receive', '5', purchase='buy1')
+    with pytest.raises(InventoryError):
+        command('reverse', dict(event=event['id'], note='Prüfen'))
+    command('release', dict(order='p', note='Prüfen'))
+    state = command('reverse', dict(event=event['id'], note='Fehleingang'))
+    assert state['purchases']['buy1']['received'] == 0
+    assert state['articles']['1']['stock'] == 0
+    state = command('purchase_cancel', dict(purchase='buy1', confirmed='yes', note='Lieferant bestätigt'))
+    assert state['purchases']['buy1']['cancelled'] == 7000
+    assert procurement(state,'p')[0]['to_buy'] == 7000
+    with pytest.raises(InventoryError):
+        move(command, 'receive', '1', purchase='buy1')
+
+
+def test_order_cancellation_does_not_cancel_supplier_purchase(warehouse):
+    store, command = warehouse
+    move(command, 'opening', '0')
+    order(command)
+    purchase(command)
+    state = command('cancel', dict(order='p'))
+    assert state['purchases']['buy1']['cancelled'] == 0
+    state = move(command, 'receive', '2', purchase='buy1')
+    assert state['articles']['1']['stock'] == 2000
+    assert not state['orders']['p']['reserved']
+
+
+def test_purchase_duplicate_confirmation_date_and_article_validation(warehouse):
+    store, command = warehouse
+    order(command)
+    p = dict(id='one', order='p', article='1', quantity='3', supplier='Test', reference='Same')
+    with pytest.raises(InventoryError):
+        command('purchase', p)
+    with pytest.raises(InventoryError):
+        command('purchase', dict(p, ordered='yes', delivery='2026-02-31'))
+    command('purchase', dict(p, ordered='yes'))
+    with pytest.raises(InventoryError, match='bereits erfasst'):
+        command('purchase', dict(p, id='two', ordered='yes'))
+    with pytest.raises(InventoryError):
+        command('purchase_cancel', dict(purchase='one', note='Noch nicht bestätigt'))
+    assert len(load(store,'test')['purchases']) == 1
+
+
+def test_purchase_ui_receipt_and_cancel_keep_real_stock_separate(warehouse, monkeypatch):
+    store, command = warehouse
+    monkeypatch.setenv('BILLOMAT_ID', 'test')
+    store.put_record('test','project','p',dict(title='Testauftrag', notes='Test'))
+    move(command,'opening','0')
+    order(command)
+    client = module.app.test_client()
+    data = dict(form(client.get('/projects/p/operations')), action='purchase', article='1', quantity='7',
+                supplier='Testlieferant', reference='Browser 1', ordered='yes', actor='Tester')
+    assert client.post('/projects/p/operations', data=data).status_code == 302
+    pid = data['operation']
+    html = client.get('/projects/p/operations')
+    assert 'Browser 1' in html.text and 'Noch offen: <strong>7 Stück' in html.text
+    data = dict(form(html), action='purchase_receive', purchase=pid, quantity='2', actor='Tester', note='Lieferschein 1')
+    assert client.post('/projects/p/operations', data=data).status_code == 302
+    assert load(store,'test')['articles']['1']['stock'] == 2000
+    assert load(store,'test')['purchases'][pid]['received'] == 2000
+    html = client.get('/projects/p/operations')
+    data = dict(form(html), action='purchase_cancel', purchase=pid, confirmed='yes', actor='Tester', note='Stornobestätigung')
+    assert client.post('/projects/p/operations', data=data).status_code == 302
+    state = load(store,'test')
+    assert state['purchases'][pid]['cancelled'] == 5000
+    assert state['articles']['1']['stock'] == 2000

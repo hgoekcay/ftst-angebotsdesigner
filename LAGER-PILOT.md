@@ -1,6 +1,6 @@
 # Lager, Einkauf und interne Terminplanung – erste Ausbaustufe
 
-Entwicklungszweig `codex/lager-planung`, noch nicht produktiv installiert. Die HA-Version bleibt 0.3.4, bis eine eigene Release-Abnahme erfolgt.
+Release 0.4.0: geprüfte erste Ausbaustufe für das Hauptlager. Die Installation allein legt keine Artikel, Bestände oder Aufträge an. Erst reale Artikel auswählen und tatsächlich zählen.
 
 ## Bedienung
 
@@ -11,7 +11,7 @@ Entwicklungszweig `codex/lager-planung`, noch nicht produktiv installiert. Die H
 5. Die Einkaufsliste zeigt ungedeckten Bedarf. Unbekannte Bestände müssen zuerst gezählt werden. Nach Wareneingang **Freies Material erneut zuordnen** betätigen; der Benutzer bestimmt damit die Auftragspriorität.
 6. Für interne Terminvorschläge Montagezeit, Teamgröße, Fahrt-/Rüstpuffer, erforderliche Fähigkeiten und je Mitarbeiter manuell geprüfte freie Zeitfenster eintragen. Kalenderprüfung darf höchstens 24 Stunden alt sein. Alle benötigten Personen müssen gleichzeitig frei sein und die angegebenen Fähigkeiten besitzen. Vorschläge setzen gedeckten Materialbedarf voraus.
 
-Die CSV-Einkaufsprüfliste ist **unbestellt**. Lieferant, Einkaufspreis, Liefertermin und extern bereits bestellte Mengen bleiben ausdrücklich offen. Vor einer Bestellung diese Angaben abgleichen. Die Funktion bestellt nichts und beansprucht keine Lieferfähigkeit. Google Kalender und Craftnote werden nicht angebunden oder verändert. Termine sind interne Vorschläge, keine Kundenbestätigungen und keine Kalenderreservierungen.
+Die CSV-Einkaufsprüfliste ist **unbestellt**. Bereits extern aufgegebene Bestellungen können mit Lieferant, eindeutiger Bestellposition, Menge und optionalem Lieferdatum dokumentiert werden. Offene Bestellmengen reduzieren den zusätzlichen Beschaffungsvorschlag, niemals den physischen Fehlbestand. Tatsächliche Teillieferungen einzeln buchen; nur diese erhöhen den Bestand. Extern bestätigte Stornierungen der Restmenge gesondert dokumentieren. Doppelte Lieferanten-Bestellpositionen werden abgewiesen. Lieferant, Einkaufspreis und nicht erfasste externe Bestellungen bleiben vor einer neuen Bestellung abzugleichen. Die Funktion bestellt nichts und beansprucht keine Lieferfähigkeit. Google Kalender und Craftnote werden nicht angebunden oder verändert. Termine sind interne Vorschläge, keine Kundenbestätigungen und keine Kalenderreservierungen.
 
 ## Buchungsregeln und Wiederherstellung
 
@@ -28,15 +28,18 @@ Die CSV-Einkaufsprüfliste ist **unbestellt**. Lieferant, Einkaufspreis, Liefert
 
 Das kontogetrennte, append-only Lagerjournal liegt in der vorhandenen `offers.sqlite3`, Datensatzart `inventory`, Schlüssel `main`. Der Bestand wird deterministisch aus dem Journal rekonstruiert. Validierung, Reservierungsänderung und Journaleintrag laufen unter derselben SQLite-Schreibtransaktion. Bei Auftragsübernahme werden Projekt und Angebotsrevision innerhalb dieser Transaktion erneut geprüft. Ein bestehendes HA-App-Backup enthält damit auch die Lagerdaten; kein zusätzlicher Speicherort ist notwendig.
 
-Für den kleinen Pilotbetrieb wird das gesamte Journal pro Zugriff projiziert. Vor großflächiger Nutzung sind normalisierte Tabellen bzw. überprüfbare Projektionen und Lasttests erforderlich. Es gibt noch keine Fahrzeuglager, Sperrlager, Seriennummern, Barcodekamera, Offlinebuchungen, Lieferantenkataloge, Bestellverwaltung, Lieferterminverwaltung oder automatische Kalenderabfragen. Stunden-/Dienstleistungspositionen sind nicht lagerfähig. Personal und Arbeitszeiten werden nicht vorausgefüllt oder erfunden.
+Für den kleinen Pilotbetrieb wird das gesamte Journal pro Zugriff projiziert. Vor großflächiger Nutzung sind normalisierte Tabellen bzw. überprüfbare Projektionen und Lasttests erforderlich. Es gibt noch keine Fahrzeuglager, Sperrlager, Seriennummern, Barcodekamera, Offlinebuchungen, Lieferantenkataloge, automatischen Bestellversand oder automatische Kalenderabfragen. Erfasste Lieferdaten sind manuelle Momentaufnahmen, keine laufende Lieferantenabfrage. Auftragsstorno storniert keine Lieferantenbestellung; offene Mengen bleiben sichtbar. Überfällige Lieferdaten und überschüssige offene Mengen werden in der Auftragsansicht markiert. Stunden-/Dienstleistungspositionen sind nicht lagerfähig. Personal und Arbeitszeiten werden nicht vorausgefüllt oder erfunden.
 
 Terminvorschläge nutzen `Europe/Berlin`; mehrdeutige oder nicht existierende Zeiten bei Sommerzeitwechsel benötigen einen expliziten Offset. Eine fehlende Materialfreigabe liefert eine konkrete Aufgabe statt eines vermeintlich gesicherten Termins. Jeder Vorschlag ist eine Momentaufnahme; vor externer Zusage erneut prüfen.
 
 ## Validierung
 
-- 99 Tests erfolgreich, einschließlich 21 neuer Lager-/Planungstests.
+- 104 Tests erfolgreich, einschließlich 26 neuer Lager-/Planungstests. Offene Bestellungen, Teillieferungen, Reststornierungen und Bestelleingangs-Gegenbuchungen zusätzlich geprüft.
 - Gleichzeitige letzte Entnahme, konkurrierende Reservierungen, Teilreservierungen, fremde Reservierungen, Rückgabe, Storno, Bedarfsänderung, Gegenbuchung, Wiederholung und Kontotrennung geprüft.
 - Unbekannte Bestände, Dezimalmengen, fehlerhafte Formulare, CSRF-Prüfung, veraltete Angebotsstände und CSV-Formelpräfixe geprüft.
 - Material-, Team-, Fähigkeits-, Puffer- und Aktualitätsregeln sowie Sommerzeitwechsel geprüft.
 - Browserablauf mit isolierten, eindeutig als Vorschau gekennzeichneten Daten: Eingang von zwei Stück, Zuordnung zum Auftrag, Fehlmenge von zwei auf null, gemeinsames Zeitfenster für zwei Personen. Keine Produktionsdaten dafür geändert.
 - Syntaxprüfung und kritische Ruff-Regeln erfolgreich.
+
+- Ergänzender Browsertest: externe Testbestellung mit 4 Stück dokumentiert; 1 Stück eingegangen, 3 offen; Bestand nur um 1 erhöht. Alle Daten ausschließlich im lokalen Vorschaubereich.
+- Journalprojektion mit 10.002 synthetischen Vorgängen: 0,038 Sekunden auf dem Entwicklungs-PC. Kein Ersatz für einen vollständigen Mehrbenutzer-Lasttest.
