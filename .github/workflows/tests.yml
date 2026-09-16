@@ -17,3 +17,27 @@ jobs:
       - run: python -m compileall -q ftst_angebotsdesigner
       - run: python -m ruff check --select E9,F63,F7,F82 ftst_angebotsdesigner tests
       - run: python -m pytest -q
+  local-ai-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned local service
+        run: docker build --build-arg BUILD_VERSION=0.1.0 --build-arg BUILD_ARCH=amd64 -t ftst-local-ai:test ftst_local_ai
+      - name: Check startup and shutdown without downloading a model
+        run: |
+          mkdir -p "$RUNNER_TEMP/ftst-local-ai"
+          printf '%s\n' '{"prepare_model":false,"download_attempt":1}' > "$RUNNER_TEMP/ftst-local-ai/options.json"
+          docker run -d --name ftst-local-ai-test --memory=4g --cpus=2 -p 127.0.0.1:11434:11434 -v "$RUNNER_TEMP/ftst-local-ai:/data" ftst-local-ai:test
+          trap 'docker logs ftst-local-ai-test; docker rm -f ftst-local-ai-test' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/tags > "$RUNNER_TEMP/ftst-models.json"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = 1
+          python -c 'import json,os; assert json.load(open(os.environ["RUNNER_TEMP"]+"/ftst-models.json"))["models"] == []'
+          docker stop -t 25 ftst-local-ai-test
+          test "$(docker inspect -f '{{.State.ExitCode}}' ftst-local-ai-test)" = 0
