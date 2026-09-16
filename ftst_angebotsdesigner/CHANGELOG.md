@@ -1,3 +1,10 @@
+# 0.5.0
+
+- Kundenassistent: bestehende Billomat-Kunden suchen, öffentliche Firmen mit Quellen recherchieren und Kundendaten vor der Anlage prüfen.
+- Neue Billomat-Kunden erst nach ausdrücklicher Bestätigung; Dublettenprüfung und dauerhafter Schutz gegen doppelte Übertragung.
+- Zentrale Billomat-Stammdaten laden, für neue Entwürfe und Lager verwenden.
+- Sichtbarer Hinweis, wenn der OpenAI-API-Schlüssel für Websuche fehlt.
+
 # 0.4.0
 
 - Hauptlager mit unbekannten/gezählten Beständen, Eingängen, Auftragsentnahmen, Rückgaben, Korrekturen und nachvollziehbaren Gegenbuchungen.
