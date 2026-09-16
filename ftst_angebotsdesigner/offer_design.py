@@ -1,5 +1,6 @@
 """A4 offer presentation based on the supplied FT offer reference."""
 import io
+from price_notes import item_notes, offer_notes, unit_price_heading
 from collections import OrderedDict
 from PIL import Image as PILImage, ImageOps
 
@@ -183,9 +184,13 @@ def build(offer, escape, money, date_de, cname):
     story += section('02 · KALKULATION ZUR PRÜFUNG' if is_draft else '02 · IHRE FESTPREIS-LEISTUNG', 'Ihre Leistung. Klar kalkuliert.')
     story += [Spacer(1,4*mm), box([p('ENTWURFSPREIS · NICHT FREIGEGEBEN' if is_draft else 'IHR ANGEBOTSPREIS', 'white'), p(money(o.get('total_gross')), 'price'),
                        p('Netto '+money(o.get('total_net'))+' · MwSt. '+money(o.get('tax_amount')), 'white')], background=GREEN), Spacer(1,8*mm)]
-    rows = [[p(t, 'small') for t in ('POS.', 'LEISTUNG / ARTIKEL', 'MENGE', 'PREIS', 'NETTO')]]
+    for note in offer_notes(o):
+        story += [p(note, 'small'), Spacer(1, 2*mm)]
+    rows = [[p(t, 'small') for t in ('POS.', 'LEISTUNG / ARTIKEL', 'MENGE', unit_price_heading(o), 'NETTO')]]
     for item in o['items']:
         description = [Paragraph('<b>'+escape(item['title'])+'</b>', styles['small'])]
+        for note in item_notes(item, o.get('currency_code') or 'EUR'):
+            description.append(p(note, 'small'))
         if item.get('description'):
             description.append(p(item['description'], 'small'))
         rows.append([p(item['position'], 'small'), description,

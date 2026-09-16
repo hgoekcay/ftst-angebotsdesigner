@@ -1,3 +1,9 @@
+# 0.3.4
+
+- Optionale Billomat-Positionen in Angebotsansicht und PDF ausdrücklich als nicht im Gesamtpreis enthalten kennzeichnen.
+- Positions- und Angebotsrabatte mit Prozent-/Betragsangabe darstellen; Originalbeträge bleiben unverändert.
+- Einzelpreise je nach Billomat-Preisbasis als netto oder brutto beschriften.
+
 # Änderungen
 
 ## 0.3.3
