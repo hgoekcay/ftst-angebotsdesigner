@@ -74,7 +74,7 @@ def register(app, base, ingress, escape, get_store):
             store.put_record(account(), 'project', key, value)
             return redirect(ingress('projects/'+key)+'?saved=1')
         result = value.get('analysis', {})
-        rows = ''.join(f'<tr><td>{escape(row.get("description"))}</td><td>{escape(row.get("quantity") if row.get("quantity") is not None else "Offen")}</td><td>{escape(row.get("evidence"))}</td></tr>' for row in result.get('components',[]))
+        rows = ''.join(f'<tr><td data-label="Komponente">{escape(row.get("description"))}</td><td data-label="Menge">{escape(row.get("quantity") if row.get("quantity") is not None else "Offen")}</td><td data-label="Beleg">{escape(row.get("evidence"))}</td></tr>' for row in result.get('components',[]))
         questions = ''.join(f'<li>{escape(q)}</li>' for q in result.get('questions',[]))
         summary = f'<div class="card"><h2>Anforderungsentwurf · bitte prüfen</h2><p>{escape(result.get("summary"))}</p><table><tr><th>Komponente</th><th>Menge</th><th>Beleg</th></tr>{rows}</table><h3>Offene Angaben</h3><ul>{questions}</ul><p>Artikelzuordnung und Preise müssen anschließend aus Billomat übernommen und geprüft werden.</p><a class="btn dark" target="_blank" rel="noopener" href="{ingress("projects/"+key+"/pdf")}">Projektentwurf als PDF</a></div>' if result else ''
         error = f'<p>{escape(value.get("error"))}</p>' if value.get('error') else ''

@@ -1,3 +1,9 @@
+# 0.6.1
+
+- Handyansichten ohne seitliches Scrollen: Tabellen werden als beschriftete Positionen untereinander angezeigt.
+- Größere Bedienelemente, umbrochene Schaltflächen und Navigation; Dezimaltastatur für Angebotsmengen.
+- Gilt für Angebotsentwürfe, Angebote, Projektanalyse, Lager und Materialplanung.
+
 # 0.6.0
 
 - Lokale Textanalyse mit separater FTST Lokale KI App (Ollama): keine automatische Cloud-Ausweichverarbeitung.
