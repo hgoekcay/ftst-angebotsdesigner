@@ -127,3 +127,19 @@ class OfferStore:
                            (account, kind, key, json.dumps(value, ensure_ascii=False)))
         except (sqlite3.Error, OSError, ValueError) as exc:
             raise StorageError('Entwurf konnte nicht gespeichert werden.') from exc
+
+    def transact_record(self, account, kind, key, change):
+        """Read, validate and replace one aggregate under a database write lock."""
+        try:
+            with closing(self._connect()) as db, db:
+                db.execute('BEGIN IMMEDIATE')
+                row = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
+                                 (account, kind, key)).fetchone()
+                value = json.loads(row[0]) if row else None
+                updated = change(value, db)
+                db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?) '
+                           'ON CONFLICT(account,kind,id) DO UPDATE SET payload=excluded.payload',
+                           (account, kind, key, json.dumps(updated, ensure_ascii=False)))
+                return updated
+        except (sqlite3.Error, OSError, json.JSONDecodeError) as exc:
+            raise StorageError('Lagerbuchung konnte nicht gespeichert werden. Bitte erneut versuchen.') from exc
