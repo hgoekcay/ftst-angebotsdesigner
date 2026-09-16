@@ -36,7 +36,7 @@ class OfferStore:
             db.execute('PRAGMA busy_timeout=5000')
             db.execute('BEGIN IMMEDIATE')
             version = db.execute('PRAGMA user_version').fetchone()[0]
-            if version > 2:
+            if version > 3:
                 raise StorageError('Neuere Datenbankversion. Bitte die passende App-Version verwenden.')
             if version == 0:
                 db.execute('CREATE TABLE IF NOT EXISTS presentations ('
@@ -49,6 +49,11 @@ class OfferStore:
                            'account TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, '
                            'payload TEXT NOT NULL, PRIMARY KEY(account,kind,id))')
                 db.execute('PRAGMA user_version=2')
+            if version < 3:
+                db.execute('CREATE TABLE IF NOT EXISTS mail_blobs ('
+                           'account TEXT NOT NULL, hash TEXT NOT NULL, data BLOB NOT NULL, '
+                           'PRIMARY KEY(account,hash))')
+                db.execute('PRAGMA user_version=3')
             db.commit()
             return db
         except Exception:
@@ -143,3 +148,29 @@ class OfferStore:
                 return updated
         except (sqlite3.Error, OSError, json.JSONDecodeError) as exc:
             raise StorageError('Lagerbuchung konnte nicht gespeichert werden. Bitte erneut versuchen.') from exc
+
+    def import_mail(self, account, key, value, blobs):
+        """Commit original, attachments and work item together; identical imports never overwrite edits."""
+        try:
+            with closing(self._connect()) as db, db:
+                db.execute('BEGIN IMMEDIATE')
+                if db.execute('SELECT 1 FROM records WHERE account=? AND kind=? AND id=?',
+                              (account, 'mail', key)).fetchone():
+                    return False
+                for digest, content in blobs.items():
+                    db.execute('INSERT OR IGNORE INTO mail_blobs(account,hash,data) VALUES(?,?,?)',
+                               (account, digest, content))
+                db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?)',
+                           (account, 'mail', key, json.dumps(value, ensure_ascii=False)))
+                return True
+        except (sqlite3.Error, OSError) as exc:
+            raise StorageError('Mailimport fehlgeschlagen. Bitte erneut versuchen; kein Teilimport wurde übernommen.') from exc
+
+    def mail_blob(self, account, digest):
+        try:
+            with closing(self._connect()) as db:
+                row = db.execute('SELECT data FROM mail_blobs WHERE account=? AND hash=?',
+                                 (account, digest)).fetchone()
+                return bytes(row[0]) if row else None
+        except (sqlite3.Error, OSError) as exc:
+            raise StorageError('Originaldatei ist derzeit nicht verfügbar.') from exc
