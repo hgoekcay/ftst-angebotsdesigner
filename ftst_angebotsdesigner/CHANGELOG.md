@@ -1,3 +1,9 @@
+# 0.9.0
+
+- Barcodegestützte Lagerentnahme: Auftrag wählen, Code erfassen, Menge prüfen und ausdrücklich bestätigen.
+- Bestätigte Einzel-/Verpackungszuordnung mit führenden Nullen, Hauptlager und bestehenden Reservierungs-/Doppelbuchungssperren.
+- Kamera-Decoder lokal gebündelt, alternativ Hardware-Scanner oder Texteingabe; unklare Übertragung über dieselbe Vorgangs-ID prüfen.
+- Handyansicht geprüft; tatsächlicher iPhone-/Home-Assistant-Kameratest noch offen. Vor Rückkehr zu älterer Version Sicherung des Lagerjournals beachten.
 # 0.8.0
 
 - Mail-Arbeitsliste mit Mehrfachkategorien, Verantwortlichem, Wiedervorlage und separatem Bearbeitungs-/Beleg-/Zahlungsstatus.

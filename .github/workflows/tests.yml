@@ -17,6 +17,14 @@ jobs:
       - run: python -m compileall -q ftst_angebotsdesigner
       - run: python -m ruff check --select E9,F63,F7,F82 ftst_angebotsdesigner tests
       - run: python -m pytest -q
+  barcode-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/barcode_browser.cjs
   local-ai-container:
     runs-on: ubuntu-latest
     steps:

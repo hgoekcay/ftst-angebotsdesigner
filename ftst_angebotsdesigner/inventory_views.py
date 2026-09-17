@@ -58,6 +58,9 @@ def register(app, base, ingress, escape, get_store):
         return Response('\ufeff' + out.getvalue(), mimetype='text/csv; charset=utf-8',
                         headers={'Content-Disposition': f'attachment; filename="{filename}"', 'Cache-Control': 'no-store'})
 
+    from barcode_views import register as register_barcodes
+    register_barcodes(app, ingress, escape, get_store, fields, protect, page, error, actor_field, run)
+
     @app.route('/inventory', methods=['GET', 'POST'])
     def inventory_home():
         store = get_store()
@@ -86,13 +89,15 @@ def register(app, base, ingress, escape, get_store):
             return redirect(ingress('inventory') + '?saved=1')
         query = request.args.get('q', '').strip()[:100]
         visible_articles = {k: a for k, a in state['articles'].items() if query.casefold() in (a['title'] + ' ' + k).casefold()}
-        saved = '<p class="success">Buchung dauerhaft gespeichert.</p>' if request.args.get('saved') else ''
+        saved = ('<p class="success">Buchung dauerhaft gespeichert.</p>' if request.args.get('saved') else '')
+        saved += f'<p><a class="btn" href="{ingress("inventory/scan")}">Für Auftrag scannen</a> <a href="{ingress("inventory/barcodes")}">Barcodes zuordnen</a></p>'
         rows = ''.join(f'<tr><td data-label="Artikel">{escape(a["title"])}<br><small>Billomat-ID {escape(aid)}</small></td><td data-label="Einheit">{a["unit"]}</td><td data-label="Vorhanden">{fmt(a["stock"]) if a["known"] else "Noch nicht gezählt"}</td><td data-label="Reserviert">{fmt(reserved(state, aid))}</td><td data-label="Frei">{fmt(a["stock"]-reserved(state, aid)) if a["known"] else "Unbekannt"}</td></tr>' for aid, a in visible_articles.items())
         article_options = ''.join(f'<option value="{escape(aid)}">{escape(a["title"])} ({a["unit"]})</option>' for aid, a in state['articles'].items())
         catalog_options = ''.join(f'<option value="{escape(aid)}">{escape(a.get("title"))} · {escape(a.get("article_number") or aid)}</option>' for aid, a in catalog(store).items() if aid not in state['articles'])
         orders = ''.join(f'<option value="{escape(oid)}">{escape(o["title"])}{" (storniert, nur Rückgabe)" if not o["active"] else ""}</option>' for oid, o in state['orders'].items())
         labels = dict(article='Artikel aufgenommen', order='Auftrag erfasst', opening='Anfangszählung', receive='Wareneingang', issue='Entnahme', return_='Rückgabe', count='Zählkorrektur', reserve='Reservierung', release='Reservierung freigegeben', cancel='Auftrag storniert', need='Bedarf geändert', reverse='Gegenbuchung', purchase='Externe Bestellung erfasst', purchase_cancel='Externe Reststornierung erfasst')
         labels['return'] = labels.pop('return_')
+        labels.update(barcode_assign='Barcode zugeordnet', barcode_remove='Barcodezuordnung aufgehoben')
         def event_details(event):
             p = event['payload']
             aid = p.get('article', p.get('id', ''))
@@ -111,6 +116,10 @@ def register(app, base, ingress, escape, get_store):
                 purchase = state['purchases'].get(p['purchase'], {})
                 details.append('Bestellung: ' + str(purchase.get('reference', p['purchase'])))
             details.extend(str(p[k]) for k in ('supplier', 'reference', 'delivery', 'note') if p.get(k))
+            if p.get('barcode') or p.get('code'):
+                details.append('Barcode: ' + str(p.get('barcode', p.get('code'))))
+            if p.get('warehouse'):
+                details.append('Lagerort: Hauptlager')
             return '<br>'.join(escape(d) for d in details if d)
         history = ''.join(f'<tr><td data-label="Zeit (Berlin)">{datetime.fromisoformat(e["at"]).astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y %H:%M")}<br><small>Vorgang {escape(e["id"])}</small></td><td data-label="Erfasst von">{escape(e["actor"])}</td><td data-label="Aktion">{escape(labels.get(e["action"], e["action"]))}</td><td data-label="Details">{event_details(e)}</td></tr>' for e in reversed(state['events'][-100:]))
         actions = ''.join(f'<option value="{key}">{label}</option>' for key, label in [('opening','Anfangsbestand gezählt'),('receive','Ware erhalten'),('issue','Für Auftrag entnehmen'),('return','Verwendbare Ware zurückgeben'),('count','Gezählten Bestand korrigieren')])
