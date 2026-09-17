@@ -112,7 +112,7 @@ def register(app, base, ingress, escape, get_store):
                 status=503
         saved=store.record(account(),'catalog','shared') or {}
         data=saved.get('data',{})
-        return base('Billomat-Verbindung', f'<div class="card"><h1>Billomat-Verbindung</h1>{message}<p>Speichern sichert Ihre Eingaben. Dieser Abruf lädt die Stammdaten aus Billomat für neue Angebotsentwürfe und das Lager. Bestehende geprüfte Entwürfe behalten ihren bisherigen Datenstand.</p><p>Letzter erfolgreicher Abruf: {escape(saved.get("at") or "Noch nicht geladen")}</p><p>{len(data.get("articles",[]))} Artikel · {len(data.get("clients",[]))} Kunden</p><form method="post">{csrf()}<button class="btn">Artikel und Kunden jetzt laden</button></form><p><a href="{ingress("inventory")}">Zum Lager</a> · <a href="{ingress("customers")}">Kunden finden oder anlegen</a></p></div>'),status
+        return base('Billomat-Verbindung', f'<div class="card"><h1>Billomat-Verbindung</h1>{message}<p>Speichern sichert Ihre Eingaben. Dieser Abruf lädt die Stammdaten aus Billomat für neue Angebotsentwürfe und das Lager. Bestehende geprüfte Entwürfe behalten ihren bisherigen Datenstand.</p><p>Letzter erfolgreicher Abruf: {escape(saved.get("at") or "Noch nicht geladen")}</p><p>{len(data.get("articles",[]))} Artikel · {len(data.get("clients",[]))} Kunden</p><form method="post">{csrf()}<button class="btn">Artikel und Kunden jetzt laden</button></form><p><a href="{ingress("inventory")}">Zum Lager</a> · <a href="{ingress("customers")}">Kunden finden oder anlegen</a> · <a href="{ingress("billomat/receipts-check")}">Beleg-Verbindung prüfen</a></p></div>'),status
 
     @app.route('/customers',methods=['GET','POST'])
     def customers_home():

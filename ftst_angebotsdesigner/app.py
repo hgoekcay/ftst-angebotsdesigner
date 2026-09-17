@@ -14,11 +14,12 @@ import inventory_views
 import customers
 import ai_status
 import mail_assistant
+import billomat_receipts
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.9.0"
+APP_VERSION = "0.10.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -292,6 +293,7 @@ inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)
 mail_assistant.register(app, base, ingress, clean, offer_store)
+billomat_receipts.register(app, base, ingress, clean)
 
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))

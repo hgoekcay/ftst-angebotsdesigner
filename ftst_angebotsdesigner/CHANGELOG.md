@@ -1,3 +1,9 @@
+# 0.10.0
+
+- Bewusste, rein lesende Billomat-Belegprüfung unter Billomat-Daten → Beleg-Verbindung prüfen.
+- Begrenzte Stichprobe von Eingangsrechnungen und Beleg-Inbox; nur Erreichbarkeit, Gesamtzahl und bekannte Feldnamen sichtbar.
+- Keine Beleganlage, Dateiübertragung, Banking-Abfrage oder Buchung; TLS, Redirect-Sperre, Zeit-/Größenlimit und redigierte Fehler.
+
 # 0.9.0
 
 - Barcodegestützte Lagerentnahme: Auftrag wählen, Code erfassen, Menge prüfen und ausdrücklich bestätigen.
