@@ -60,6 +60,26 @@ def incoming(state, order, article):
 
 def apply(state, action, p):
     """Deterministic projection; only validated journal commands are persisted."""
+    if action in ('barcode_assign', 'barcode_remove'):
+        from inventory_barcodes import code_value
+        code = code_value(p.get('code'))
+        if action == 'barcode_remove':
+            required(p.get('note'), 'Grund für aufgehobene Barcodezuordnung')
+            if code not in state['barcodes']:
+                raise InventoryError('Barcodezuordnung nicht vorhanden.')
+            del state['barcodes'][code]
+            return
+        if code in state['barcodes']:
+            raise InventoryError('Barcode bereits zugeordnet. Alte Zuordnung zuerst begründet aufheben.')
+        article = state['articles'].get(str(p.get('article', '')))
+        if not article or p.get('kind') not in ('single', 'pack') or p.get('confirmed') != 'yes':
+            raise InventoryError('Lagerartikel und Produkt-/Verpackungszuordnung ausdrücklich bestätigen; keine Seriennummer.')
+        factor = quantity(p.get('factor'), article['unit'])
+        if p['kind'] == 'single' and factor != 1000:
+            raise InventoryError('Einzelartikel entspricht genau einer Lagereinheit.')
+        state['barcodes'][code] = dict(code=code, article=article['id'], kind=p['kind'], factor=factor,
+                                      revision=len(state['events']) + 1)
+        return
     if action == 'purchase':
         pid = required(p.get('id'), 'Bestellvorgang', 100)
         oid, aid = str(p.get('order', '')), str(p.get('article', ''))
@@ -205,6 +225,9 @@ def apply(state, action, p):
             raise InventoryError('Zählbestand unterschreitet Reservierungen. Betroffene Aufträge zuerst prüfen und Reservierungen freigeben.')
         a['stock'] = n
     elif action == 'issue':
+        if 'barcode' in p:
+            from inventory_barcodes import check_issue
+            check_issue(state, p)
         if not order or not order['active']:
             raise InventoryError('Aktiven Auftrag auswählen.')
         if n > open_need(order, aid):
@@ -230,7 +253,7 @@ def project(journal):
         journal = {'version': 1, 'events': []}
     if journal.get('version') != 1 or not isinstance(journal.get('events'), list):
         raise StorageError('Unbekannte Lagerdatenversion.')
-    state = {'articles': {}, 'orders': {}, 'purchases': {}, 'events': [], 'revision': len(journal['events'])}
+    state = {'articles': {}, 'orders': {}, 'purchases': {}, 'barcodes': {}, 'events': [], 'revision': len(journal['events'])}
     try:
         for event in journal['events']:
             apply(state, event['action'], event['payload'])
