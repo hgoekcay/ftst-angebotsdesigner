@@ -1,6 +1,8 @@
 import base64
 import io
 import json
+import threading
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from PIL import Image
@@ -127,11 +129,48 @@ def test_network_failure_releases_shared_lock_without_fallback(server, failure):
     local_ai._busy.release()
 
 
-def test_concurrent_text_analysis_blocks_image_request(server):
+def test_concurrent_text_analysis_has_bounded_wait_without_parallel_image_request(server, monkeypatch):
+    monkeypatch.setattr(module, 'LOCK_WAIT_SECONDS', 0)
     with local_ai._busy:
-        with pytest.raises(module.Unavailable, match='bereits'):
+        with pytest.raises(module.Unavailable, match='weiterhin beschäftigt'):
             module.classify(picture(), CATEGORIES)
     server.assert_not_called()
+
+
+def test_background_photo_waits_for_text_analysis_and_resumes_after_release(server, monkeypatch):
+    gate = threading.Lock()
+    gate.acquire()
+    waiting = threading.Event()
+    captured_timeouts, results, failures = [], [], []
+
+    def acquire(*, timeout):
+        captured_timeouts.append(timeout)
+        waiting.set()
+        return gate.acquire(timeout=timeout)
+
+    monkeypatch.setattr(module, 'LOCK_WAIT_SECONDS', 1)
+    monkeypatch.setattr(local_ai, '_busy', SimpleNamespace(acquire=acquire, release=gate.release))
+
+    def classify_in_background():
+        try:
+            results.append(module.classify(picture(), CATEGORIES))
+        except Exception as exc:
+            failures.append(exc)
+
+    worker = threading.Thread(target=classify_in_background, daemon=True)
+    worker.start()
+    try:
+        assert waiting.wait(timeout=2), 'Photo worker must reach the shared gate'
+        assert captured_timeouts == [1]
+        server.assert_not_called()
+    finally:
+        gate.release()
+        worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert failures == []
+    assert results == [dict(VALUE, source='ollama:gemma3:4b', review_required=True)]
+    assert server.call_count == 2
+    assert not gate.locked()
 
 
 def test_oversized_response_stops_reading_and_closes_connection(server):

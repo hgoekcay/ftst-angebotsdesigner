@@ -1,3 +1,8 @@
+## 0.13.1
+
+- Bildaufträge warten im Hintergrund bis zu 150 Sekunden auf eine bereits laufende lokale Textauswertung, statt sofort auf manuelle Zuordnung zurückzufallen.
+- Türstationen mit Klingeltasten werden bei der Bildbeschreibung ausdrücklich der Türsprechanlage zugeordnet.
+
 ## 0.13.0
 
 - Bis zu 20 Referenzfotos gemeinsam auswählen, einzeln übertragen und gesammelt prüfen/speichern. Fortschritt pro Bild, Wiederaufnahme und Schutz vor doppeltem Speichern.
