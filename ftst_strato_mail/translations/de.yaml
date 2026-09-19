@@ -1,0 +1,30 @@
+configuration:
+  email:
+    name: STRATO-E-Mail-Adresse
+    description: Vollständige Adresse des zu lesenden Postfachs.
+  password:
+    name: STRATO-Postfach-Passwort
+    description: Hier lokal eingeben. Nicht in Chat, Screenshots oder Quellcode aufnehmen.
+  public_url:
+    name: Externe HTTPS-Adresse
+    description: HTTPS-Basisadresse des eigenen Mail-Assistenten, ohne /mcp.
+  login_password:
+    name: Eigenes Anmeldepasswort für den Assistenten
+    description: Mindestens 24 zufällige Zeichen; ein anderes Passwort als für STRATO verwenden.
+  accounts:
+    name: Zusätzliche STRATO-Postfächer
+    description: Bis zu 20 weitere Postfächer mit eindeutiger ID, E-Mail und Passwort. Optional folder (INBOX) und enabled (true). Bestehendes Hauptpostfach hat ID primary.
+  bridge_token:
+    name: Internes Brückentoken
+    description: Optional. Separates zufälliges Token für den AngebotsDesigner; automatisch lokal bereitstellen. Leer deaktiviert die Brücke.
+  folder:
+    name: Überwachter Mailordner
+    description: Ordner des Hintergrundabrufs, normalerweise INBOX.
+  poll_interval_seconds:
+    name: Abrufabstand in Sekunden
+    description: Standard 300 Sekunden. Bei Verbindungsfehlern können Wiederholungen später erfolgen.
+  allowed_redirect_uris:
+    name: Erlaubte OAuth-Rücksprungadressen
+    description: Nur exakte HTTPS-Rücksprungadressen des verwendeten MCP-Clients eintragen.
+network:
+  8098/tcp: MCP/OAuth-Zugang für den lokalen Cloudflare-Tunnel

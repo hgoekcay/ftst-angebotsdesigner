@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "strato-mail-local"
+version = "0.3.0"
+description = "Read-only STRATO IMAP tools for MCP clients"
+requires-python = ">=3.12"
+dependencies = ["mcp==1.30.0"]
+
+[project.scripts]
+strato-mail = "strato_mail:main"
+strato-mail-service = "strato_service:main"
+
+[tool.setuptools]
+py-modules = ["strato_mail", "strato_http", "strato_service", "strato_worker", "strato_internal_bridge", "strato_bridge_transport"]

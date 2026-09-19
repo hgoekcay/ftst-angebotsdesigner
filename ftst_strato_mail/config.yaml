@@ -1,0 +1,52 @@
+name: "FTST STRATO Mail"
+version: "0.3.0"
+slug: "ftst_strato_mail"
+description: "STRATO-Mails lesen und den Postfachzugang automatisch überwachen."
+arch:
+  - amd64
+startup: application
+boot: auto
+init: true
+stage: experimental
+host_network: false
+hassio_api: false
+homeassistant_api: false
+docker_api: false
+full_access: false
+apparmor: true
+ingress: false
+tmpfs: true
+timeout: 30
+backup: cold
+ports:
+  8098/tcp: 8098
+ports_description:
+  8098/tcp: "MCP/OAuth über Cloudflared; nicht per Router ins Internet freigeben"
+watchdog: "http://[HOST]:[PORT:8098]/healthz"
+options:
+  email: ""
+  password: ""
+  public_url: ""
+  login_password: ""
+  bridge_token: ""
+  accounts: []
+  folder: "INBOX"
+  poll_interval_seconds: 300
+  allowed_redirect_uris:
+    - "https://chatgpt.com/connector_platform_oauth_redirect"
+schema:
+  email: email
+  password: password
+  public_url: url
+  login_password: password
+  bridge_token: "password?"
+  accounts:
+    - id: str
+      email: email
+      password: password
+      folder: "str?"
+      enabled: "bool?"
+  folder: str
+  poll_interval_seconds: "int(60,3600)"
+  allowed_redirect_uris:
+    - url

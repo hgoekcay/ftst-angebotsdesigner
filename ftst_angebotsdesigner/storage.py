@@ -175,19 +175,23 @@ class OfferStore:
         except (sqlite3.Error, OSError) as exc:
             raise StorageError('Originaldatei ist derzeit nicht verfügbar.') from exc
 
-    def commit_mail_batch(self, account, expected_revision, checkpoint, messages):
+    def commit_mail_batch(self, account, expected_revision, checkpoint, messages, *, sync_key='strato'):
         """Atomically persist IMAP identities, original bytes, work items and checkpoint."""
         try:
             with closing(self._connect()) as db, db:
                 db.execute('BEGIN IMMEDIATE')
                 row = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
-                                 (account, 'mail_sync', 'strato')).fetchone()
+                                 (account, 'mail_sync', sync_key)).fetchone()
                 current = json.loads(row[0]) if row else {}
                 if current.get('revision', '') != expected_revision:
                     raise RecordConflict('Der Abrufstand wurde geändert. Bitte neu laden.')
                 added = 0
                 for uid, key, value, blobs in messages:
-                    source_key = 'info@ftst.eu/INBOX/' + str(checkpoint['uidvalidity']) + '/' + str(uid)
+                    source = checkpoint.get('source', {'mailbox': 'info@ftst.eu', 'folder': 'INBOX'})
+                    if sync_key == 'strato' and source.get('mailbox') == 'info@ftst.eu' and source.get('folder') == 'INBOX':
+                        source_key = 'info@ftst.eu/INBOX/' + str(checkpoint['uidvalidity']) + '/' + str(uid)
+                    else:
+                        source_key = json.dumps([sync_key, source.get('mailbox'), source.get('folder'), checkpoint['uidvalidity'], uid], separators=(',', ':'))
                     existing = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
                                           (account, 'mail_imap_source', source_key)).fetchone()
                     if existing and json.loads(existing[0])['mail_key'] != key:
@@ -204,7 +208,7 @@ class OfferStore:
                                (account, 'mail_imap_source', source_key, json.dumps({'mail_key': key})))
                 db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?) '
                            'ON CONFLICT(account,kind,id) DO UPDATE SET payload=excluded.payload',
-                           (account, 'mail_sync', 'strato', json.dumps(checkpoint)))
+                           (account, 'mail_sync', sync_key, json.dumps(checkpoint)))
                 return added
         except (sqlite3.Error, OSError, json.JSONDecodeError) as exc:
             raise StorageError('Abruf konnte nicht gespeichert werden. Keine Teilübernahme; erneut versuchen.') from exc

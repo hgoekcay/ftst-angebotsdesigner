@@ -1,7 +1,22 @@
 configuration:
+  strato_provider:
+    name: STRATO-Verbindungsart
+    description: bridge verwendet die lokale STRATO Mail-App. direct benötigt ein eigenes Postfachpasswort. Kein automatischer Wechsel.
+  strato_bridge_token:
+    name: Schlüssel zur lokalen Mail-App
+    description: Gemeinsamer zufälliger Verbindungsschlüssel; kein Postfachpasswort. Nur für bridge.
+  strato_auto_import:
+    name: Neue Mails automatisch importieren
+    description: Erst nach bewusst gesetztem Startpunkt. Bestehende Nachrichten werden nicht rückwirkend importiert.
+  strato_auto_ai:
+    name: Lokale KI-Entwürfe automatisch vorbereiten
+    description: Entwürfe sind ungeprüft. Kein Versand und keine verbindlichen Zusagen.
+  strato_poll_seconds:
+    name: Abrufabstand in Sekunden
+    description: 60 bis 3600 Sekunden; Standard 300.
   strato_imap_enabled:
     name: STRATO-Lesepilot aktivieren
-    description: Nur info@ftst.eu. Abruf erst nach Startpunkt und bewusstem Klick in der Mail-Arbeitsliste.
+    description: Nur info@ftst.eu. Abruf erst nach bewusst gesetztem Startpunkt. Automatischer Import ist separat aktivierbar.
   strato_imap_password:
     name: STRATO-Postfachpasswort
     description: Passwort für info@ftst.eu. Nur hier eingeben; HA-Administratoren und Sicherungen schützen.

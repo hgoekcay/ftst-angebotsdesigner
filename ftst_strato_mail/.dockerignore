@@ -1,0 +1,12 @@
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+.git/
+.env
+data/
+options.json
+*.db
+*.sqlite*
+*.zip
+*.tar.gz
