@@ -17,6 +17,7 @@ import ai_status
 import mail_assistant
 import strato_views
 import billomat_receipts
+import offer_cache
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
@@ -240,15 +241,13 @@ def index():
 
 @app.get("/offers")
 def offers():
-    try:
-        bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
-        if not bid or not key:return base("Billomat",'<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
-        data=BillomatClient(bid,key).list_offers(request.args.get("search",""))
-        data=sorted(data,key=lambda x:str(x.get("date","") if isinstance(x,dict) else ""),reverse=True)
-        rows="".join(f'<tr><td data-label="Nr."><b>{clean(o.get("offer_number") or o.get("number") or "-")}</b></td><td data-label="Datum">{date_de(o.get("date"))}</td><td data-label="Titel">{clean(o.get("title") or "-")}</td><td data-label="Brutto" class="money">{money(o.get("total_gross"))}</td><td data-label="Aktion"><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
-        return base("Angebote",f'<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">{len(data)} Angebote · neueste zuerst</p><table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>')
-    except Exception as e:
-        log.exception("Offer list failed"); return base("Fehler",f'<div class="card"><h1>Fehler</h1><p>{clean(e)}</p></div>'),502
+    bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
+    if not bid or not key:
+        return base("Billomat", '<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
+    response = app.make_response(offer_cache.page(request, offer_store(), bid.lower(), BillomatClient(bid,key),
+                                                 base, ingress, clean, money, date_de))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 @app.get("/offer/<oid>")
 def offer(oid): return detail(get_offer(oid))
@@ -314,6 +313,9 @@ strato_views.register(app, base, ingress, clean, offer_store)
 billomat_receipts.register(app, base, ingress, clean)
 
 if __name__=="__main__":
+    bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
+    if bid and key:
+        offer_cache.worker(offer_store(), bid.lower(), BillomatClient(bid,key)).start()
     from mail_automation import MailAutomation
     automation = MailAutomation(offer_store, materials.account())
     automation.start(app.config['FTST_DATA_DIR'])
