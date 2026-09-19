@@ -120,18 +120,29 @@ def register(app, base, ingress, escape, get_store):
             store.put_record(account(), 'mail', key, value)
             return redirect(ingress('mail/' + key))
         chosen_status, chosen_category = request.args.get('status', ''), request.args.get('category', '')
+        chosen_mailbox = request.args.get('mailbox', '')
+        records = store.records(account(), 'mail')
+        mailboxes = {v['mail_origin'].get('account_id', 'primary'): v['mail_origin']['mailbox']
+                     for v in records.values() if v.get('mail_origin', {}).get('mailbox')}
         rows = ''
-        for key, v in store.records(account(), 'mail').items():
+        for key, v in records.items():
+            origin = v.get('mail_origin', {})
+            if chosen_mailbox and (not origin or origin.get('account_id', 'primary') != chosen_mailbox):
+                continue
             if chosen_status and v.get('status', 'new') != chosen_status:
                 continue
             if chosen_category and chosen_category not in v.get('categories', ['general']):
                 continue
             work = v.get('workflow', {})
+            if origin:
+                rows += '<p>Postfach: ' + escape(origin.get('mailbox', '')) + '</p>'
             rows += ('<div class="card"><h2><a href="' + ingress('mail/' + key) + '">' + escape(v['title']) + '</a></h2><p>' +
                      ' · '.join(CATEGORIES[x] for x in v.get('categories', ['general'])) + ' · ' + STATUSES[v.get('status', 'new')] + '</p>' +
                      '<p>Verantwortlich: ' + escape(work.get('owner') or 'Offen') + ' · Wiedervorlage: ' + escape(work.get('due') or 'Keine') + '</p><p>' + escape(work.get('note', '')) + '</p>' +
                      ('<p>Beleg: ' + DOC_STATES[work['document_status']] + ' · Zahlung: ' + ('bestätigt' if work.get('paid') else 'nicht bestätigt') + '</p>' if work.get('document', 'none') != 'none' else '') + '</div>')
         filters = '<form method="get"><label for="filter-status">Bearbeitung filtern</label><select id="filter-status" name="status"><option value="">Alle</option>' + ''.join('<option value="' + k + '"' + (' selected' if k == chosen_status else '') + '>' + v + '</option>' for k, v in STATUSES.items()) + '</select><label for="filter-category">Kategorie filtern</label><select id="filter-category" name="category"><option value="">Alle</option>' + ''.join('<option value="' + k + '"' + (' selected' if k == chosen_category else '') + '>' + v + '</option>' for k, v in CATEGORIES.items()) + '</select><button class="btn light">Filtern</button></form>'
+        mailbox_filter = '<label for="filter-mailbox">Postfach filtern</label><select id="filter-mailbox" name="mailbox"><option value="">Alle Postfächer</option>' + ''.join('<option value="' + escape(k) + '"' + (' selected' if k == chosen_mailbox else '') + '>' + escape(v) + '</option>' for k, v in sorted(mailboxes.items())) + '</select>'
+        filters = filters.replace('<button class="btn">Filtern</button>', mailbox_filter + '<button class="btn">Filtern</button>')
         upload = '<div class="card"><h2>E-Mail-Datei importieren</h2><p>Eine .eml-Datei, maximal 8 MiB. Original und Anhänge bleiben erhalten. Nur Klartext ist als Prüftext nutzbar; HTML, PDF, Bilder und andere Anhänge werden nicht ausgewertet.</p><form method="post" enctype="multipart/form-data" action="' + ingress('mail/import') + '">' + csrf() + '<label for="eml">EML-Datei</label><input type="file" id="eml" name="eml" accept=".eml,message/rfc822" required><button class="btn">EML importieren</button></form></div>'
         return base('Mail-Arbeitsliste', '<div class="card"><h1>Mail-Arbeitsliste & Antwortassistent</h1><p>Kundenanfrage einfügen, lokal prüfen und einen Antwortentwurf bearbeiten. Kein Versand. Postfachabruf nur über den bewusst aktivierten Lesepiloten.</p><p><a class="btn light" href="' + ingress('mail/strato') + '">STRATO-Eingang einrichten / abrufen</a></p>' + filters + '</div>' + rows + upload + '<div class="card"><h2>Anfrage als Text aufnehmen</h2>'
                     '<form method="post">' + csrf() + '<label for="title">Bezeichnung</label><input id="title" name="title" maxlength="120">'
@@ -234,7 +245,18 @@ def register(app, base, ingress, escape, get_store):
         if value.get('proposal') and value['reply'] != value['proposal']:
             proposal = '<div class="card"><h2>KI-Vorschlag</h2><p>Ihre bearbeitete Antwort bleibt erhalten.</p><label for="proposal">Vorschlag zur Prüfung</label><textarea id="proposal" readonly rows="12">' + escape(value['proposal']) + '</textarea><form method="post">' + fields + '<button class="btn light" name="action" value="adopt">Gespeicherte Antwort durch diesen Vorschlag ersetzen</button></form></div>'
         notice = '<p class="success">Anfrage gespeichert.</p>' if request.args.get('saved') else ''
+        if value.get('mail_origin'):
+            notice += '<p>Postfach: ' + escape(value['mail_origin'].get('mailbox', '')) + '</p>'
         error = '<p role="alert">' + escape(value['error']) + '</p>' if value.get('error') else ''
+        automatic = value.get('automation', {}).get('state')
+        if automatic:
+            automatic_labels = {
+                'running': 'Lokale Auswertung gestartet. Falls sie unterbrochen wurde, unten bewusst erneut auswerten.',
+                'ready': 'Lokaler Vorschlag vorbereitet. Kategorien und Antwort bitte prüfen und selbst übernehmen.',
+                'failed': 'Automatische lokale Auswertung nicht erfolgreich. Anfrage bleibt erhalten; unten erneut versuchen.',
+                'skipped': 'Manuelle Prüfung nötig: kein geeigneter kurzer Klartext oder Abweichungen im Original.',
+            }
+            notice += '<p role="status">' + escape(automatic_labels.get(automatic, '')) + '</p>'
         archive = ''
         if value.get('original_hash'):
             def download(digest, label):

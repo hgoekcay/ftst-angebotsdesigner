@@ -129,3 +129,10 @@
 - Gemischte Gewerke als Kombination; automatische Erkennung im Editor wieder auswählbar.
 - PDF öffnet in eigenem Tab. Bestehende FTST-Gestaltung erhalten.
 - Automatisierte Tests und Abnahmeprotokoll ergänzt.
+# 0.12.0 – Lokale Mail-Verbindung
+
+- Import über die separate STRATO-Mail-App, ohne das Postfachpasswort zu kopieren.
+- Aktivierung mit Startpunkt ab jetzt; vorhandene Mails bleiben ausgeschlossen.
+- Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
+- Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
+- Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.

@@ -3,6 +3,16 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  mail-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r ftst_strato_mail/app/requirements.lock pytest
+      - run: PYTHONPATH=ftst_strato_mail/app python -m pytest -q tests_bridge
+      - run: docker build -t ftst-strato-mail:test ftst_strato_mail
   test:
     runs-on: ubuntu-latest
     strategy:

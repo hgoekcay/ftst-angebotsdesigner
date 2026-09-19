@@ -117,3 +117,40 @@ def test_checkpoint_cas_and_uid_identity_collision(browser):
         store.commit_mail_batch('test','one',dict(checkpoint,revision='two'),[(21,other_key,other_value,other_blobs)])
     assert state()==checkpoint
     assert len(store.records('test','mail'))==1
+
+
+def test_bridge_provider_without_postfach_password(browser, monkeypatch):
+    monkeypatch.setattr(views.strato_bridge, 'list_accounts', lambda p: [{'id':'primary','email':'info@ftst.eu','folder':'INBOX'}])
+    monkeypatch.setenv('STRATO_PROVIDER', 'bridge')
+    monkeypatch.setenv('STRATO_BRIDGE_TOKEN', 'synthetic-bridge-token')
+    monkeypatch.delenv('STRATO_IMAP_PASSWORD')
+    monkeypatch.setattr(views.strato_imap, 'activation_checkpoint', lambda p: pytest.fail('no direct fallback'))
+    monkeypatch.setattr(views.strato_bridge, 'activation_checkpoint', lambda p, **k: {'uidvalidity': 12, 'after_uid': 20})
+    monkeypatch.setattr(views.strato_bridge, 'fetch_batch', lambda *args, **kwargs: {'uidvalidity': 12, 'messages': [(21, raw_mail())], 'pending': False})
+    assert post(browser, 'activate').status_code == 200
+    assert state()['source']['provider'] == 'bridge'
+    assert post(browser, 'sync', state()['revision']).status_code == 200
+    assert len(module.offer_store().records('test', 'mail')) == 1
+
+
+def test_source_change_no_sync_and_background_never_activates(browser, monkeypatch):
+    with pytest.raises(RecordConflict): views.sync_once(module.offer_store(), 'test')
+    assert state() is None
+    post(browser, 'activate'); before = state()
+    monkeypatch.setattr(views.strato_bridge, 'list_accounts', lambda p: [{'id':'primary','email':'info@ftst.eu','folder':'INBOX'}])
+    monkeypatch.setenv('STRATO_PROVIDER', 'bridge')
+    monkeypatch.setenv('STRATO_BRIDGE_TOKEN', 'synthetic-bridge-token')
+    monkeypatch.setattr(views.strato_bridge, 'fetch_batch', lambda *a: pytest.fail('source changed'))
+    assert post(browser, 'sync', before['revision']).status_code == 409
+    assert state() == before
+
+
+def test_sync_returns_only_new_keys_and_shared_lock(browser, monkeypatch):
+    post(browser, 'activate')
+    monkeypatch.setattr(views.strato_imap, 'fetch_batch', lambda p,s,e,c: {'uidvalidity':12,'messages':[(c+1,raw_mail())],'pending':False})
+    first = views.sync_once(module.offer_store(), 'test')
+    second = views.sync_once(module.offer_store(), 'test')
+    assert len(first['keys']) == first['added'] == 1
+    assert second['keys'] == [] and second['added'] == 0
+    with views.LOCK:
+        with pytest.raises(RecordConflict): views.sync_once(module.offer_store(), 'test')
