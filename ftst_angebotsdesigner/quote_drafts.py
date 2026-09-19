@@ -58,11 +58,15 @@ def tokens(value):
 
 
 def candidates(description, articles):
-    wanted = tokens(description)
+    # Quantity and connecting prose must not suggest unrelated products.
+    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück'}
+    wanted = {word for word in tokens(description) if not word.isdigit() and word not in ignored}
     ranked = []
     for article in articles:
         title = tokens(article.get('title', ''))
-        score = len(wanted & title)
+        score = sum(2 if word in title else 1 if any(
+            len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))
+            for term in title) else 0 for word in wanted)
         if str(article.get('article_number', '')).casefold() == description.casefold():
             score += 100
         if score:
@@ -104,6 +108,11 @@ def calculate(draft):
     elif tax_rule == 'COUNTRY' and draft.get('tax_confirmed') != 'yes':
         problems.append('Länderabhängige Steuerregel: Anwendung der Artikelsteuersätze bitte fachlich bestätigen.')
     if problems:
+        for index, row in enumerate(draft.get('rows', []), 1):
+            if not row.get('article_id'):
+                problems.append(f'Position {index}: Artikel auswählen.')
+        if not draft.get('rows'):
+            problems.append('Mindestens eine Position ergänzen.')
         return {'problems':problems, 'lines':[], 'total':None, 'currency':currency}
     try:
         group = str(client.get('price_group') or '1')
@@ -169,7 +178,10 @@ def register(app, base, ingress, escape, get_store):
         if draft.get('source') != fingerprint(project) or not draft.get('reviewed') or result['total'] is None:
             abort(409, 'Bitte aktuelle Anforderungen, Positionen und Kalkulation zuerst vollständig prüfen und speichern.')
         from quote_export import build
-        document = build(dict(project, id=key), draft, result, store)
+        try:
+            document = build(dict(project, id=key), draft, result, store)
+        except ValueError as exc:
+            abort(409, str(exc))
         # A concurrent edit must not silently produce an obsolete review document.
         current_project = store.record(identity, 'project', key)
         current_draft = store.record(identity, 'quote', key)
@@ -280,7 +292,10 @@ def register(app, base, ingress, escape, get_store):
         if total is not None and draft.get('reviewed') and draft.get('revision'):
             export = f'<p><a class="btn dark" target="_blank" rel="noopener" href="{ingress("projects/"+key+"/quote/pdf")}?revision={escape(draft["revision"])}">PDF-Entwurf öffnen</a></p><p class="muted">Zur internen Prüfung; noch keine Freigabe und kein Versand.</p>'
         saved = '<p class="success">Entwurf gespeichert.</p>' if request.args.get('saved') else ''
-        body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Speichern sichert Ihre Auswahl. Der Knopf „Artikel und Kunden aus Billomat laden“ aktualisiert die Stammdaten.</p><p><a href="{ingress("customers")}" target="_blank" rel="noopener">Kunden suchen oder neu anlegen</a></p><p>{len(draft.get("catalog",{}).get("articles",[]))} Artikel · {len(draft.get("catalog",{}).get("clients",[]))} Kunden geladen</p><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
+        presentation_link = f'<p><a class="btn light" href="{ingress("projects/"+key+"/quote/presentation")}">Kundentexte & Fotos gestalten</a></p>'
+        if not draft.get('revision'):
+            presentation_link = '<p>Kundentexte und Fotos können nach dem ersten Speichern gestaltet werden.</p>'
+        body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}{presentation_link}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Speichern sichert Ihre Auswahl. Der Knopf „Artikel und Kunden aus Billomat laden“ aktualisiert die Stammdaten.</p><p><a href="{ingress("customers")}" target="_blank" rel="noopener">Kunden suchen oder neu anlegen</a></p><p>{len(draft.get("catalog",{}).get("articles",[]))} Artikel · {len(draft.get("catalog",{}).get("clients",[]))} Kunden geladen</p><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
         <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><label><input style="width:auto" type="checkbox" name="tax_confirmed" value="yes" {'checked' if draft.get('tax_confirmed')=='yes' else ''}> Bei länderabhängiger Steuerregel: Die Artikelsteuersätze gelten für diesen Auftrag.</label></p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
         <div class="card"><h2>Kalkulation zur Prüfung</h2><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
         return base('Angebotsentwurf', body + '<div class="card">' + export + '</div>'), status

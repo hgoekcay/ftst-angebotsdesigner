@@ -10,16 +10,18 @@ from billomat_client import BillomatClient
 import materials
 import projects
 import quote_drafts
+import quote_presentation
 import inventory_views
 import customers
 import ai_status
 import mail_assistant
+import strato_views
 import billomat_receipts
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.10.0"
+APP_VERSION = "0.11.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -41,6 +43,20 @@ def offer_store():
 def storage_error(error):
     log.error('Persistent storage unavailable: %s', error)
     return base('Speicherung nicht verfügbar', '<div class="card"><h1>Speicherung nicht verfügbar</h1><p>' + clean(error) + '</p><p>Bitte über die Zurück-Funktion des Browsers zu Ihren Eingaben zurückkehren.</p></div>'), 503
+
+@app.errorhandler(409)
+@app.errorhandler(400)
+def quote_input_error(error):
+    if request.endpoint not in ('quote_draft', 'quote_pdf', 'quote_presentation'):
+        return error
+    key = (request.view_args or {}).get('key', '')
+    back = ingress('projects/' + key + '/quote')
+    body = ('<div class="card"><div class="eyebrow">Angebotsentwurf</div>'
+            '<h1>Bitte Entwurf prüfen</h1><p role="alert">' + clean(error.description) +
+            '</p><p>Bei ungespeicherten Eingaben zuerst mit der Browser-Zurück-Funktion zum Formular zurückkehren.</p>'
+            '<a class="btn" href="' + back + '">Gespeicherten Entwurf öffnen</a></div>')
+    return base('Entwurf prüfen', body), error.code
+
 
 RED=colors.HexColor("#D71920"); DARK=colors.HexColor("#111111"); TEXT=colors.HexColor("#202020")
 MUTED=colors.HexColor("#6F6F6F"); LIGHT=colors.HexColor("#F4F4F4"); BORDER=colors.HexColor("#DCDCDC")
@@ -289,10 +305,12 @@ def offer_pdf(oid):
 materials.register(app, base, ingress, clean, offer_store, TYPES)
 projects.register(app, base, ingress, clean, offer_store)
 quote_drafts.register(app, base, ingress, clean, offer_store)
+quote_presentation.register(app, base, ingress, clean, offer_store)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)
 mail_assistant.register(app, base, ingress, clean, offer_store)
+strato_views.register(app, base, ingress, clean, offer_store)
 billomat_receipts.register(app, base, ingress, clean)
 
 if __name__=="__main__":

@@ -1,0 +1,7 @@
+configuration:
+  strato_imap_enabled:
+    name: STRATO-Lesepilot aktivieren
+    description: Nur info@ftst.eu. Abruf erst nach Startpunkt und bewusstem Klick in der Mail-Arbeitsliste.
+  strato_imap_password:
+    name: STRATO-Postfachpasswort
+    description: Passwort für info@ftst.eu. Nur hier eingeben; HA-Administratoren und Sicherungen schützen.

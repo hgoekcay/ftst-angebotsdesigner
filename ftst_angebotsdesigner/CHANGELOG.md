@@ -1,3 +1,12 @@
+## 0.11.0
+
+- Optionaler STRATO-Lesepilot für info@ftst.eu: Startpunkt bewusst setzen, neue Nachrichten begrenzt und schreibgeschützt in die Mail-Arbeitsliste übernehmen. Standardmäßig deaktiviert; Passwort direkt in der Home-Assistant-Konfiguration hinterlegen.
+- Originale und Anhänge bleiben erhalten; Duplikatschutz und atomarer Abrufstand. Kein Versand, Löschen, Verschieben oder automatischer KI-Aufruf.
+- Projektentwürfe erhalten bearbeitbare Kundentexte und eine eigene Fotowahl für die PDF-Ausgabe.
+- Artikelvorschläge ignorieren Mengen und Füllwörter; deutsche Wortformen werden besser gefunden.
+- Offene Artikelzuordnungen werden auch bei fehlender Steuerbestätigung angezeigt. Verständlicher Rückweg bei veralteten Entwürfen.
+- Preise und Entwurfkennzeichnung bleiben erhalten; Darstellungsänderungen erzeugen eine neue Revision.
+
 # 0.10.0
 
 - Bewusste, rein lesende Billomat-Belegprüfung unter Billomat-Daten → Beleg-Verbindung prüfen.
