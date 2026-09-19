@@ -43,17 +43,21 @@ class BillomatClient:
     def _unwrap(obj, key):
         return obj.get(key, obj) if isinstance(obj, dict) else obj
 
-    def list_offers(self, search=""):
-        params = {"format": "json", "per_page": 1000, "order_by": "date DESC"}
+    def list_offers(self, search="", page=1):
+        params = {"format": "json", "per_page": 30, "page": page, "order_by": "date DESC, id DESC"}
         if search:
             params["offer_number"] = search
         data = self._get("/offers", params)
+        if not isinstance(data, dict) or 'offers' not in data:
+            raise RuntimeError('Ungültige Angebotsliste von Billomat.')
         offers = self._unwrap(data, "offers")
         if isinstance(offers, dict):
             offers = offers.get("offer", [])
         if not isinstance(offers, list):
             offers = [offers] if offers else []
-        return sorted(offers, key=lambda x: (str(x.get("date", "")), str(x.get("offer_number") or x.get("number") or "")), reverse=True)
+        if len(offers) > 30 or any(not isinstance(row, dict) or not str(row.get('id', '')).isdigit() for row in offers):
+            raise RuntimeError('Ungültige Angebotsliste von Billomat.')
+        return offers
 
     def get_offer(self, offer_id):
         return self._unwrap(self._get(f"/offers/{offer_id}", {"format": "json"}), "offer")

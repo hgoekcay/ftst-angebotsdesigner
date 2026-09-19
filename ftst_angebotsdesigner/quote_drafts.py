@@ -290,7 +290,7 @@ def register(app, base, ingress, escape, get_store):
         revision = f'<input type="hidden" name="revision" value="{escape(draft["revision"])}">'
         export = '<p>PDF-Entwurf verfügbar, sobald alle Angaben geprüft und gespeichert sind.</p>'
         if total is not None and draft.get('reviewed') and draft.get('revision'):
-            export = f'<p><a class="btn dark" target="_blank" rel="noopener" href="{ingress("projects/"+key+"/quote/pdf")}?revision={escape(draft["revision"])}">PDF-Entwurf öffnen</a></p><p class="muted">Zur internen Prüfung; noch keine Freigabe und kein Versand.</p>'
+            export = f'<p><a class="btn dark" data-pdf="FTST-Angebotsentwurf.pdf" href="{ingress("projects/"+key+"/quote/pdf")}?revision={escape(draft["revision"])}">PDF-Entwurf öffnen</a></p><p class="muted">Zur internen Prüfung; noch keine Freigabe und kein Versand.</p>'
         saved = '<p class="success">Entwurf gespeichert.</p>' if request.args.get('saved') else ''
         presentation_link = f'<p><a class="btn light" href="{ingress("projects/"+key+"/quote/presentation")}">Kundentexte & Fotos gestalten</a></p>'
         if not draft.get('revision'):

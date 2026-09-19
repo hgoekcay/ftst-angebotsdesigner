@@ -17,11 +17,12 @@ import ai_status
 import mail_assistant
 import strato_views
 import billomat_receipts
+import offer_cache
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.12.0"
+APP_VERSION = "0.12.1"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -215,7 +216,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:245px;max-width:55vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:245px;max-width:55vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("static/pdf-download.js")}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -240,15 +241,13 @@ def index():
 
 @app.get("/offers")
 def offers():
-    try:
-        bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
-        if not bid or not key:return base("Billomat",'<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
-        data=BillomatClient(bid,key).list_offers(request.args.get("search",""))
-        data=sorted(data,key=lambda x:str(x.get("date","") if isinstance(x,dict) else ""),reverse=True)
-        rows="".join(f'<tr><td data-label="Nr."><b>{clean(o.get("offer_number") or o.get("number") or "-")}</b></td><td data-label="Datum">{date_de(o.get("date"))}</td><td data-label="Titel">{clean(o.get("title") or "-")}</td><td data-label="Brutto" class="money">{money(o.get("total_gross"))}</td><td data-label="Aktion"><a class="btn" href="{ingress("offer/"+str(o.get("id")))}">Öffnen</a></td></tr>' for o in data if isinstance(o,dict))
-        return base("Angebote",f'<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">{len(data)} Angebote · neueste zuerst</p><table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>')
-    except Exception as e:
-        log.exception("Offer list failed"); return base("Fehler",f'<div class="card"><h1>Fehler</h1><p>{clean(e)}</p></div>'),502
+    bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
+    if not bid or not key:
+        return base("Billomat", '<div class="card"><h1>Billomat nicht konfiguriert</h1></div>')
+    response = app.make_response(offer_cache.page(request, offer_store(), bid.lower(), BillomatClient(bid,key),
+                                                 base, ingress, clean, money, date_de))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 @app.get("/offer/<oid>")
 def offer(oid): return detail(get_offer(oid))
@@ -279,7 +278,7 @@ def detail(o):
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
-    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" target="_blank" rel="noopener" title="PDF in neuem Tab öffnen" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2>{price_summary}<table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>{clean(unit_price_heading(o))}</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2>{price_summary}<div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
+    body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" data-pdf="FTST-Angebot-{clean(o['id'])}.pdf" title="PDF innerhalb der angemeldeten App vorbereiten" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen</a></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2>{price_summary}<table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>{clean(unit_price_heading(o))}</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2>{price_summary}<div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
@@ -314,6 +313,9 @@ strato_views.register(app, base, ingress, clean, offer_store)
 billomat_receipts.register(app, base, ingress, clean)
 
 if __name__=="__main__":
+    bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
+    if bid and key:
+        offer_cache.worker(offer_store(), bid.lower(), BillomatClient(bid,key)).start()
     from mail_automation import MailAutomation
     automation = MailAutomation(offer_store, materials.account())
     automation.start(app.config['FTST_DATA_DIR'])

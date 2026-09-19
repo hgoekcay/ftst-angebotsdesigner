@@ -68,10 +68,11 @@ def test_future_schema_refused(tmp_path):
         OfferStore(tmp_path).load('test', '42')
 
 
-def test_invalid_type_rejected_and_pdf_new_tab(client):
+def test_invalid_type_rejected_and_pdf_stays_in_session(client):
     assert client.post('/offer/42/edit', data={'offer_type': 'BMA'}).status_code == 400
     page = client.get('/offer/42', headers={'X-Ingress-Path': '/api/hassio_ingress/test'}).text
-    assert 'target="_blank" rel="noopener"' in page
+    assert 'data-pdf="FTST-Angebot-42.pdf"' in page
+    assert 'target="_blank" rel="noopener"' not in page
     assert '/api/hassio_ingress/test/offer/42/pdf' in page
 
 
