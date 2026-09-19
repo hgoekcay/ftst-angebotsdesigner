@@ -180,3 +180,89 @@ test('upload token is persisted before request and resuming restores a lost prep
   assert.equal(uploads, 1);
   assert.ok(restored.requests.some(request => request.url.endsWith('/' + [...server.keys()][0])));
 });
+
+test('pending commit locks fields, removal and file selection until saved', async () => {
+  let release, sent;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
+    if (url.endsWith('/commit')) { sent = JSON.parse(options.body); return waiting; }
+    throw Error('Unexpected request ' + url);
+  }});
+  await h.choose(['A.jpg']); await h.upload();
+  const saving = h.save(); await flush();
+  assert.equal(h.input.disabled, true);
+  assert.equal(h.start.disabled, true);
+  assert.equal(h.commit.disabled, true);
+  const card = h.list.children[0];
+  const title = card.children.find(child => child.id === 'photo-0-title');
+  const remove = card.children.find(child => child.textContent === 'Aus Auswahl entfernen');
+  assert.equal(title.disabled, true);
+  assert.equal(remove.disabled, true);
+  // Also reject stale or programmatically dispatched events during the request.
+  title.value = 'Darf nicht als gespeichert erscheinen'; await title.emit('input');
+  await remove.emit('click');
+  await h.choose(['B.jpg']);
+  await h.commit.emit('click');
+  assert.equal(h.requests.filter(request => request.url.endsWith('/commit')).length, 1);
+  assert.equal(h.list.children.length, 1);
+  release(response({count: 1})); await saving;
+  assert.equal(h.input.disabled, false);
+  assert.equal(h.start.disabled, false);
+  assert.equal(h.commit.hidden, true);
+  const saved = JSON.parse(h.stored.get(storageKey)).rows;
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].title, sent.items[0].title);
+  assert.equal(saved[0].status, 'committed');
+});
+
+test('failed commit unlocks review fields and allows local removal without deletion request', async () => {
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
+    if (url.endsWith('/commit')) throw new TypeError('Network interruption');
+    throw Error('Unexpected request ' + url);
+  }});
+  await h.choose(['A.jpg']); await h.upload(); await h.save();
+  assert.equal(h.input.disabled, false);
+  assert.equal(h.list.children[0].children.find(child => child.id === 'photo-0-title').disabled, false);
+  const requestsBefore = h.requests.length;
+  await h.list.children[0].children.find(child => child.textContent === 'Aus Auswahl entfernen').emit('click');
+  assert.equal(h.list.children.length, 0);
+  assert.equal(JSON.parse(h.stored.get(storageKey)).rows.length, 0);
+  assert.equal(h.requests.length, requestsBefore, 'removal must never delete a library or server photo');
+  assert.match(h.message.textContent, /Bibliotheksfotos bleiben erhalten/);
+});
+
+test('rejected photos can be removed to free the twenty-photo limit and stay removed after reload', async () => {
+  const stored = new Map();
+  const h = harness({stored, handle: async () => response({}, 413)});
+  await h.choose(Array.from({length: 20}, (_, index) => 'large-' + index + '.jpg'));
+  await h.upload();
+  assert.equal(h.list.children.length, 20);
+  await h.list.children[0].children.find(child => child.textContent === 'Aus Auswahl entfernen').emit('click');
+  assert.equal(h.list.children.length, 19);
+  const restored = harness({stored, handle: async () => { throw Error('No request expected'); }});
+  assert.equal(restored.list.children.length, 19);
+  await restored.choose(['Replacement.jpg']);
+  assert.equal(restored.list.children.length, 20);
+  assert.ok(JSON.parse(stored.get(storageKey)).rows.some(row => row.sourceName === 'Replacement.jpg'));
+});
+
+test('upload start immediately locks previously prepared review controls', async () => {
+  let release;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare') && options.body.get('image').name === 'A.jpg') return response(ready(options.body.get('token')));
+    if (url.endsWith('/prepare')) { await waiting; return response(ready(options.body.get('token'))); }
+    throw Error('Unexpected request ' + url);
+  }});
+  await h.choose(['A.jpg']); await h.upload(); await h.choose(['B.jpg']);
+  await h.form.emit('submit'); await flush();
+  assert.equal(h.input.disabled, true);
+  const card = h.list.children[0];
+  assert.equal(card.children.find(child => child.id === 'photo-0-title').disabled, true);
+  assert.equal(card.children.find(child => child.textContent === 'Aus Auswahl entfernen').disabled, true);
+  release(); await flush();
+  assert.equal(h.input.disabled, false);
+  assert.equal(h.commit.disabled, false);
+});

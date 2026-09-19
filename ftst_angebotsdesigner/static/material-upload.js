@@ -38,23 +38,34 @@
       image.src = r.preview || root + '/' + r.token + '/preview'; card.append(image);
       const checkLabel = node('label', ' Dieses Foto übernehmen');
       const check = node('input'); check.type = 'checkbox'; check.checked = r.selected !== false; check.disabled = running || r.status !== 'ready'; check.style.width = 'auto';
-      check.addEventListener('change', () => { r.selected = check.checked; persist(); }); checkLabel.prepend(check); card.append(checkLabel);
+      check.addEventListener('change', () => { if (running) return; r.selected = check.checked; persist(); }); checkLabel.prepend(check); card.append(checkLabel);
       const title = node('input'); title.value = r.title || ''; title.maxLength = 200;
       const description = node('textarea'); description.value = r.description || ''; description.maxLength = 2000;
       const category = node('select'); category.append(new Option('Bitte zuordnen', '')); categories.forEach(c => category.append(new Option(c, c))); category.value = r.category || '';
       [['Bildtitel', title, 'title'], ['Angebotsart', category, 'category'], ['Beschreibung', description, 'description']].forEach(([label, control, key]) => {
         const id = 'photo-' + index + '-' + key; control.id = id;
         const lab = node('label', label); lab.htmlFor = id;
-        control.disabled = running || r.status !== 'ready'; control.addEventListener('input', () => { r[key] = control.value; persist(); });
+        control.disabled = running || r.status !== 'ready'; control.addEventListener('input', () => { if (running) return; r[key] = control.value; persist(); });
         card.append(lab, control);
       });
+      if (r.status !== 'committed') {
+        const remove = node('button', 'Aus Auswahl entfernen', 'btn light'); remove.type = 'button'; remove.disabled = running;
+        remove.addEventListener('click', () => {
+          if (running) return;
+          rows = rows.filter(row => row !== r);
+          if (r.preview) URL.revokeObjectURL(r.preview);
+          files.value = ''; persist(); render();
+          message.textContent = 'Foto aus dieser Auswahl entfernt. Gespeicherte Bibliotheksfotos bleiben erhalten.';
+        });
+        card.append(remove);
+      }
       const status = node('p', r.message || (r.status === 'committed' ? 'Bereits gespeichert.' : 'Bereit zum Hochladen.')); status.setAttribute('role', 'status'); card.append(status); list.append(card);
     });
     save.hidden = !rows.some(r => r.status === 'ready'); save.disabled = running;
   }
   async function process() {
     if (running) return;
-    running = true; start.disabled = true; files.disabled = true; save.disabled = true;
+    running = true; start.disabled = true; files.disabled = true; save.disabled = true; render();
     let failure = false;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]; if (r.status === 'ready' || r.status === 'committed') continue;
@@ -89,6 +100,7 @@
     render(); persist();
   }
   files.addEventListener('change', () => {
+    if (running) return;
     const chosen = Array.from(files.files);
     const match = file => rows.find(r => r.status !== 'committed' && r.sourceName === file.name && r.size === file.size && r.modified === file.lastModified);
     const extra = chosen.filter(file => !match(file));
@@ -103,17 +115,18 @@
   });
   form.addEventListener('submit', event => { event.preventDefault(); if (!rows.length) { message.textContent = 'Bitte zuerst Fotos auswählen.'; return; } process(); });
   save.addEventListener('click', async () => {
+    if (running) return;
     const selected = rows.filter(r => r.selected !== false && r.status === 'ready');
     if (!selected.length) { message.textContent = 'Bitte mindestens ein fertiges Foto auswählen.'; return; }
     if (selected.some(r => !r.title?.trim() || !categories.includes(r.category))) { message.textContent = 'Bitte für jedes ausgewählte Foto Bildtitel und Kategorie prüfen.'; return; }
-    save.disabled = true; start.disabled = true;
+    running = true; save.disabled = true; start.disabled = true; files.disabled = true; render();
     try {
       const result = await api(root + '/commit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({batch, items:selected.map(({token,title,category,description}) => ({token,title,category,description}))})});
       selected.forEach(r => { r.status = 'committed'; r.message = 'Gespeichert.'; }); persist(); render();
       message.textContent = result.count + ' Fotos gespeichert. Sie stehen jetzt für die automatische Angebotsauswahl bereit.';
       const link = node('a', 'Referenzbibliothek öffnen', 'btn light'); link.href = form.dataset.library; message.append(document.createElement('br'), link);
     } catch (error) { message.textContent = error.name === 'AbortError' ? 'Antwort ausgeblieben. Speichern erneut versuchen; es werden keine doppelten Bilder angelegt.' : error.message; }
-    finally { save.disabled = false; start.disabled = false; }
+    finally { running = false; start.disabled = false; files.disabled = false; render(); }
   });
   try {
     const stored = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
