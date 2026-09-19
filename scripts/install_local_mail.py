@@ -41,8 +41,8 @@ def private_write(path, content):
 
 
 def backup():
-    for slug, version in ((DESIGNER, '0.10.0'), (MAIL, '0.2.0')):
-        if info(slug)['version'] != version:
+    for slug, versions in ((DESIGNER, ('0.10.0', '0.11.0')), (MAIL, ('0.2.0',))):
+        if info(slug)['version'] not in versions:
             raise RuntimeError('Installierter Ausgangsstand abweichend; zuerst prüfen.')
     RECOVERY.mkdir(mode=0o700, exist_ok=False)
     password = secrets.token_urlsafe(48)
