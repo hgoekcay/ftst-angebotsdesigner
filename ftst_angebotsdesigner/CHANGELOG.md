@@ -1,3 +1,8 @@
+## 0.12.2
+
+- Automatisch bis zu vier passende Originalreferenzen nach Angebotsart in Billomat-Angebote aufnehmen; manuelle Auswahl hat Vorrang. Bildvorschläge bleiben änderbar, Rückkehr zur Automatik möglich.
+- Keine bezahlten KI-Aufrufe für die Bildauswahl; fehlende passende Motive werden angezeigt.
+
 ## 0.12.1
 
 - PDF in der angemeldeten App abrufen; anschließend speichern oder auf unterstützten Handys teilen, ohne geschützte Download-Adresse im externen Browser zu öffnen.
