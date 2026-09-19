@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -e
+export STRATO_IMAP_ENABLED="$(bashio::config 'strato_imap_enabled')"
+export STRATO_IMAP_PASSWORD="$(bashio::config 'strato_imap_password')"
 export AI_PROVIDER="$(bashio::config 'ai_provider')"
 export BILLOMAT_ID="$(bashio::config 'billomat_id')"
 export BILLOMAT_API_KEY="$(bashio::config 'billomat_api_key')"

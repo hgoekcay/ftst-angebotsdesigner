@@ -137,3 +137,23 @@ def test_draft_browser_persistence_stale_notes_and_failed_refresh(monkeypatch,ca
     assert 'Entwurf: Netto' not in page
     monkeypatch.setenv('BILLOMAT_ID','other')
     assert client.get(url).status_code==404
+
+
+def test_search_ignores_quantity_and_matches_german_product_words():
+    articles = [dict(id='1', title='4 Kanal Rekorder'),
+                dict(id='2', title='Funk-Bewegungsmelder PIR'),
+                dict(id='3', title='Alarmzentrale'),
+                dict(id='4', title='8MP Domekamera', article_number='ART-954')]
+    assert {a['id'] for a in candidates('alarm mit 4 bewegungsmeldern', articles)} == {'2', '3'}
+    assert candidates('4 mit und', articles) == []
+    assert candidates('Domekameras', articles)[0]['id'] == '4'
+    assert candidates('ART-954', articles)[0]['id'] == '4'
+
+
+def test_tax_confirmation_does_not_hide_missing_article_selections(draft):
+    draft['catalog']['clients'][0]['tax_rule'] = 'COUNTRY'
+    draft['rows'][0]['article_id'] = ''
+    result = calculate(draft)
+    assert result['total'] is None
+    assert any('Steuerregel' in p for p in result['problems'])
+    assert 'Position 1: Artikel auswählen.' in result['problems']

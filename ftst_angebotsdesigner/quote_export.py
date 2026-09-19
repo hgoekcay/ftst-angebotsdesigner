@@ -4,6 +4,8 @@ from decimal import Decimal
 from html import escape
 
 from materials import enrich
+from asset_library import catalog
+from materials import account
 from offer_design import build as build_offer
 from quote_drafts import display_money
 
@@ -78,4 +80,17 @@ def build(project, draft, result, store):
         ],
     )
     enrich(offer, store)
+    presentation = draft.get('presentation') or {}
+    if presentation.get('title'):
+        offer['customer_title'] = presentation['title']
+    if presentation.get('intro'):
+        offer['customer_intro'] += '\n\n' + presentation['intro']
+    if presentation.get('summary'):
+        offer['project_summary'] = presentation['summary'] + '\n\n' + source
+    if 'images' in presentation:
+        images = catalog(store, account())
+        selected = presentation['images']
+        if any(key not in images for key in selected):
+            raise ValueError('Ein ausgewähltes Projektbild fehlt. Bitte die Kundendarstellung prüfen und speichern.')
+        offer['reference_images'] = [images[key] for key in selected]
     return build_offer(offer, escape, money, _date, _customer_name)
