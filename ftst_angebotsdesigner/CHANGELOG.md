@@ -1,3 +1,9 @@
+## 0.13.0
+
+- Bis zu 20 Referenzfotos gemeinsam auswählen, einzeln übertragen und gesammelt prüfen/speichern. Fortschritt pro Bild, Wiederaufnahme und Schutz vor doppeltem Speichern.
+- Lokale Bilderkennung mit gemma3:4b schlägt Titel, Beschreibung und Kategorie vor. Unsichere Zuordnungen bleiben offen. Keine Cloud-Bildübertragung.
+- Benötigt FTST Lokale KI 0.1.1 mit vorbereitetem Bildmodell. Bei fehlender Erkennung bleibt manuelle Zuordnung möglich.
+
 ## 0.12.2
 
 - Automatisch bis zu vier passende Originalreferenzen nach Angebotsart in Billomat-Angebote aufnehmen; manuelle Auswahl hat Vorrang. Bildvorschläge bleiben änderbar, Rückkehr zur Automatik möglich.

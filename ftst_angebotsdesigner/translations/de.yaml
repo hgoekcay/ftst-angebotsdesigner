@@ -1,4 +1,7 @@
 configuration:
+  ollama_vision_model:
+    name: Lokales Bildmodell
+    description: gemma3:4b für Bildvorschläge. Zuvor in FTST Lokale KI die Bildmodell-Vorbereitung aktivieren. Keine Cloud-Verarbeitung.
   strato_provider:
     name: STRATO-Verbindungsart
     description: bridge verwendet die lokale STRATO Mail-App. direct benötigt ein eigenes Postfachpasswort. Kein automatischer Wechsel.

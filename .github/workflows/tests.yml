@@ -34,13 +34,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs
+      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs tests/material_upload_browser.cjs
   local-ai-container:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build pinned local service
-        run: docker build --build-arg BUILD_VERSION=0.1.0 --build-arg BUILD_ARCH=amd64 -t ftst-local-ai:test ftst_local_ai
+        run: docker build --build-arg BUILD_VERSION=0.1.1 --build-arg BUILD_ARCH=amd64 -t ftst-local-ai:test ftst_local_ai
       - name: Check startup and shutdown without downloading a model
         run: |
           mkdir -p "$RUNNER_TEMP/ftst-local-ai"

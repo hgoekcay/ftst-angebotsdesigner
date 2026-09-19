@@ -1,7 +1,7 @@
 name: "FTST Lokale KI"
-version: "0.1.0"
+version: "0.1.1"
 slug: "ftst_local_ai"
-description: "Lokaler Ollama-Textmodellpilot für FTST, ohne Cloud-Fallback."
+description: "Lokale Text- und optionale Foto-KI für FTST, ohne Cloud-Fallback."
 arch:
   - amd64
 startup: application
@@ -12,6 +12,10 @@ timeout: 30
 options:
   prepare_model: false
   download_attempt: 1
+  prepare_vision_model: false
+  vision_download_attempt: 1
 schema:
   prepare_model: bool
   download_attempt: int(1,1000)
+  prepare_vision_model: bool
+  vision_download_attempt: int(1,1000)
