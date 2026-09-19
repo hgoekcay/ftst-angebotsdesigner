@@ -1,5 +1,5 @@
 name: "FTST AngebotsDesigner"
-version: "0.12.2"
+version: "0.13.0"
 slug: "ftst_angebotsdesigner"
 description: "Professioneller AngebotsDesigner für FT Sicherheitstechnik mit Billomat-Anbindung und PDF-Erstellung."
 arch:
@@ -24,6 +24,7 @@ options:
   strato_imap_enabled: false
   strato_imap_password: ""
   ai_provider: ollama
+  ollama_vision_model: "gemma3:4b"
   billomat_id: ""
   billomat_api_key: ""
   flask_secret: ""
@@ -39,6 +40,7 @@ schema:
   strato_imap_enabled: bool
   strato_imap_password: password?
   ai_provider: list(ollama|openai)
+  ollama_vision_model: str?
   billomat_id: str?
   billomat_api_key: password?
   flask_secret: password?

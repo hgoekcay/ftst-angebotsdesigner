@@ -1,5 +1,7 @@
 """Company identity and reusable real project photographs."""
 import io
+import json
+import material_uploads
 import os
 import uuid
 from pathlib import Path
@@ -99,6 +101,7 @@ def image_groups(images, ingress, escape, selected=None):
 
 def register(app, base, ingress, escape, get_store, types, get_offer=None):
     app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024
+    material_uploads.register(app, get_store, account, types)
 
     def field(name, label, value='', multiline=False):
         if multiline:
@@ -153,9 +156,17 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
             store.put_record(account(), 'image', key, record)
             return redirect(ingress('materials'))
         cards = image_groups(catalog(store, account()), ingress, escape)
-        fields = ''.join(field(k, label, multiline=k=='description') for k, label in {'title':'Bildtitel', 'place':'Ort', 'object_type':'Objektart', 'description':'Beschreibung'}.items())
-        options = ''.join(f'<option>{k}</option>' for k in types)
-        return base('Fotos & Referenzen', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Fotos & Referenzen</h1><p>Eure Originalfotos, Logos und Symbolbilder sind fest hinterlegt. Weitere Bilder hochladen und je Angebot auswählen.</p><form method="post" enctype="multipart/form-data"><label for="image">Bild</label><input id="image" name="image" type="file" accept="image/png,image/jpeg,image/webp" required>{fields}<label for="category">Angebotsart</label><select id="category" name="category">{options}</select><p><button class="btn">Bild speichern</button></p></form></div>{cards}')
+        categories = escape(json.dumps(list(types), ensure_ascii=False))
+        upload = f'''<div class="card"><h1>Fotos & Referenzen</h1><p>Bis zu 20 Fotos gemeinsam auswählen. Die lokale Bilderkennung schlägt Titel und Kategorien vor. Vorschläge vor dem Speichern prüfen; unsichere Bilder selbst zuordnen.</p>
+        <form id="photo-batch" data-endpoint="{ingress('materials/batch')}" data-library="{ingress('materials')}" data-categories="{categories}">
+        <label for="photo-files">Fotos auswählen</label><input id="photo-files" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+        <p>JPG, PNG oder WebP, maximal 12 MB je Foto. HEIC bitte vorher als JPG exportieren. Die Fotos bleiben auf Ihrem Server.</p>
+        <button class="btn">Fotos hochladen & erkennen</button></form><p id="photo-progress" role="status" aria-live="polite"></p></div>
+        <div id="photo-review" class="material-grid"></div><div class="material-actions"><button id="photo-commit" class="btn" hidden>Geprüfte Fotos gemeinsam speichern</button></div>
+        <noscript><p>Für den Mehrfachupload bitte JavaScript aktivieren.</p></noscript>
+        <style>#photo-commit[hidden]{{display:none}}.photo-review-card{{min-width:0;padding:16px}}.photo-review-card label{{margin-top:14px}}.photo-review-card p{{overflow-wrap:anywhere}}</style>
+        <script defer src="{ingress('static/material-upload.js')}"></script>'''
+        return base('Fotos & Referenzen', f'<div class="back"><a href="{ingress()}">← Startseite</a></div>{upload}{cards}')
 
     @app.get('/materials/<key>')
     def material(key):

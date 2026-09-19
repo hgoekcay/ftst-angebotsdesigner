@@ -1,0 +1,13 @@
+configuration:
+  prepare_model:
+    name: Textmodell einmalig vorbereiten
+    description: Lädt qwen3:4b einmalig (ca. 2,5 GB). Danach ausschalten. Speichern und App neu starten.
+  download_attempt:
+    name: Downloadversuch Textmodell
+    description: Nach einem abgebrochenen Versuch erst Ursache beheben, dann diese Nummer erhöhen.
+  prepare_vision_model:
+    name: Bildmodell einmalig vorbereiten
+    description: Lädt gemma3:4b für lokale Fotoerkennung (ca. 3,3 GB; mindestens 6 GiB frei). Danach ausschalten. Speichern und App neu starten.
+  vision_download_attempt:
+    name: Downloadversuch Bildmodell
+    description: Eigene Versuchsnummer für das Bildmodell. Nach einem Fehler erst Ursache beheben, dann erhöhen.

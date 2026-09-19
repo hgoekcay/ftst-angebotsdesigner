@@ -10,8 +10,18 @@
 
 ## Betrieb und Fehler
 
+### Optionales Bildmodell ab 0.1.1
+
+In Home Assistant **Einstellungen → Apps → FTST Lokale KI → Konfiguration** öffnen. **Bildmodell einmalig vorbereiten** (`prepare_vision_model`) einschalten und **Downloadversuch Bildmodell** (`vision_download_attempt`) zunächst auf `1` lassen. Speichern und die App neu starten. Im Protokoll auf **Modell gemma3:4b vorbereitet** warten; danach den Vorbereitungsschalter wieder ausschalten. Die Textmodell-Option muss dafür nicht aktiviert werden. Im AngebotsDesigner ist `gemma3:4b` das zugehörige lokale Bildmodell.
+
+Das offizielle multimodale Q4_K_M-Modell umfasst ungefähr 3,3 GB. Mindestens 6 GiB müssen vor dem Download frei sein. Der Dienst beendet den Versuch nach 45 Minuten, bei weniger als 2 GiB freiem Restspeicher oder nach mehr als 5 GiB zusätzlich belegtem Plattenplatz. Letzteres erfasst den gesamten Verbrauch auf derselben Partition während des Downloads, also gegebenenfalls auch parallele Vorgänge anderer Apps. Das ist eine laufende Schutzprüfung, keine harte Dateisystemquote.
+
+Die Datei `/data/vision-download-attempt-N.json` wird vor dem Versuch geschrieben, unabhängig vom Textmodell-Marker. Auch zu wenig Speicher verbraucht die Versuchsnummer. Nach einem Fehler zuerst Ursache beseitigen, dann die **Downloadversuch Bildmodell**-Nummer erhöhen und mit aktivem Vorbereitungsschalter neu starten. Neustarts, fehlgeschlagene Versuche und Updates lösen keine automatische Wiederholung aus; bereits vorhandene Modelle werden übersprungen. Sind beide Vorbereitungen freigegeben, erfolgen die Downloads nacheinander.
+
+Die Modellgewichte werden aus dem Internet bezogen. Fotoauswertung und Kategorisierung laufen anschließend ausschließlich im lokalen App-Netzwerk, ohne Cloud-KI. Das Textmodell und das Bildmodell werden wegen `OLLAMA_MAX_LOADED_MODELS=1` nicht parallel geladen. Für kurze Fotoanfragen mit begrenzter Bildgröße und Kontext auf dem gemeldeten 16-GB-Server geeignet zu erproben; das ist keine gemessene RAM-Garantie. CPU-Laufzeit, tatsächlichen RAM-Verbrauch und Bildqualität bei der Abnahme prüfen. Bestehende Begrenzungen für Parallelität, Kontext und Modellhaltezeit bleiben bestehen.
+
 - Modellablage `/data/models` bleibt bei App-Neustarts und Updates erhalten; App-Sicherung enthält mehrere GB Modelldaten. Deinstallation kann diese löschen.
-- Ohne `prepare_model` wird nichts heruntergeladen. Vor jedem erlaubten Versuch wird `/data/download-attempt-N.json` geschrieben. Neustarts wiederholen einen abgebrochenen/fehlgeschlagenen Versuch nicht. Nach Ursachenprüfung `download_attempt` erhöhen und `prepare_model` einschalten; danach neu starten. Keine automatische Wiederholung, kein automatisches Modellupdate. Ein vorhandenes Modell wird nie erneut gepullt.
+- Ohne `prepare_model` und `prepare_vision_model` wird nichts heruntergeladen. Vor jedem erlaubten Textmodell-Versuch wird `/data/download-attempt-N.json` geschrieben. Neustarts wiederholen einen abgebrochenen/fehlgeschlagenen Versuch nicht. Nach Ursachenprüfung `download_attempt` erhöhen und `prepare_model` einschalten; danach neu starten. Keine automatische Wiederholung, kein automatisches Modellupdate. Ein vorhandenes Modell wird nie erneut gepullt.
 - Download endet spätestens nach 45 Minuten. Ein App-Stopp beendet Download und Server; Supervisor darf nach 30 Sekunden hart stoppen. Fertige Modelle bleiben erhalten, unvollständige Blobs können beim ausdrücklich erlaubten nächsten Download wiederverwendet werden.
 - „API bereit“ bedeutet nur Server verfügbar. `GET /api/tags` muss `qwen3:4b` enthalten; `GET /api/ps` zeigt nach Analyse das geladene Modell. Nach etwa 60 Sekunden Inaktivität sollte es entladen sein. Andere API-Clients können diese Vorgabe pro Anfrage überschreiben.
 - Bei zu hohem RAM-Verbrauch oder schlechter Home-Assistant-Reaktion: lokale KI stoppen; den AngebotsDesigner ohne KI weiter nutzen. Kein automatischer Wechsel zu einem kostenpflichtigen Dienst.
@@ -37,6 +47,7 @@ Primärquellen:
 - [Image-Metadaten](https://hub.docker.com/v2/repositories/ollama/ollama/tags/0.34.1)
 - [Ollama-Umgebungsoptionen im Versionsquellcode](https://github.com/ollama/ollama/blob/v0.34.1/envconfig/config.go)
 - [Qwen3:4b Modellbibliothek](https://ollama.com/library/qwen3:4b)
+- [Gemma3:4b Bildmodell, 3,3 GB Q4_K_M; Ollama ab 0.6](https://ollama.com/library/gemma3:4b)
 - [Home-Assistant-App-Konfiguration](https://developers.home-assistant.io/docs/apps/configuration/)
 - [Interne App-Kommunikation](https://developers.home-assistant.io/docs/apps/communication/)
 
