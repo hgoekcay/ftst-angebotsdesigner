@@ -1,3 +1,9 @@
+## 0.12.1
+
+- PDF in der angemeldeten App abrufen; anschließend speichern oder auf unterstützten Handys teilen, ohne geschützte Download-Adresse im externen Browser zu öffnen.
+- PDF-Antworten prüfen und Anmeldefehler verständlich anzeigen.
+- Die letzten 30 Angebote lokal zwischenspeichern und im Hintergrund aktualisieren; weitere Angebote seitenweise laden.
+
 ## 0.11.0
 
 - Optionaler STRATO-Lesepilot für info@ftst.eu: Startpunkt bewusst setzen, neue Nachrichten begrenzt und schreibgeschützt in die Mail-Arbeitsliste übernehmen. Standardmäßig deaktiviert; Passwort direkt in der Home-Assistant-Konfiguration hinterlegen.
