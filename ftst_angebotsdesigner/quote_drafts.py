@@ -59,15 +59,57 @@ def tokens(value):
 
 def candidates(description, articles):
     # Quantity and connecting prose must not suggest unrelated products.
-    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück'}
-    wanted = {word for word in tokens(description) if not word.isdigit() and word not in ignored}
+    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück', 'ajax'}
+    terms = tokens(description)
+    wanted = {word for word in terms if not word.isdigit() and word not in ignored}
+    # These are search synonyms only. BM/MK require the explicitly confirmed
+    # Ajax context; product variants still require a manual article selection.
+    families = set()
+    if 'ajax' in terms:
+        if 'bm' in terms or any(word.startswith('bewegungsmeld') for word in terms):
+            families.update(('motionprotect', 'motioncam'))
+        if 'mk' in terms or any(word.startswith('magnetkontakt') for word in terms):
+            families.add('doorprotect')
+        if any(word.startswith('sirene') or word.startswith(('innensirene', 'aussensirene')) for word in terms):
+            families.update(('homesiren', 'streetsiren'))
+        if any(word.startswith(('bedienteil', 'aussenbedienteil', 'innenbedienteil')) for word in terms):
+            families.add('keypad')
+    outside = any(word.startswith(('aussen', 'outdoor')) for word in terms)
+    inside = any(word.startswith(('innen', 'indoor')) for word in terms)
+    locations = {'aussen', 'aussenbereich', 'aussenmontage', 'outdoor', 'innen', 'innenbereich', 'innenmontage', 'indoor'}
+    accessories = ('halter', 'halterung', 'montageplatte', 'batterie', 'abdeckung', 'blende', 'hood')
     ranked = []
     for article in articles:
         title = tokens(article.get('title', ''))
         score = sum(2 if word in title else 1 if any(
             len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))
             for term in title) else 0 for word in wanted)
-        if str(article.get('article_number', '')).casefold() == description.casefold():
+        exact_number = bool(article.get('article_number')) and str(article['article_number']).casefold() == description.casefold()
+        if families and not exact_number:
+            family_match = any(term.startswith(family) for term in title for family in families)
+            # A location or the brand name alone must not make an unrelated
+            # Ajax product appear as a detector, siren or keypad suggestion.
+            device_words = wanted - {'bm', 'mk'} - locations
+            title_devices = title - locations
+            named_device = any(word in title_devices or any(len(word) >= 4 and len(term) >= 4
+                               and (word.startswith(term) or term.startswith(word)) for term in title_devices)
+                               for word in device_words)
+            if not family_match and not ('ajax' in title and named_device):
+                continue
+            accessory = any(term.startswith(prefix) for term in title for prefix in accessories)
+            requested_accessory = any(word.startswith(prefix) for word in terms for prefix in accessories)
+            if accessory and not requested_accessory:
+                continue
+            article_outside = any(term.startswith(('aussen', 'outdoor', 'streetsiren')) for term in title)
+            article_inside = any(term.startswith(('innen', 'indoor', 'homesiren')) for term in title)
+            if outside != inside:
+                if (outside and article_inside and not article_outside) or (inside and article_outside and not article_inside):
+                    continue
+                if (outside and article_outside) or (inside and article_inside):
+                    score += 3
+            if family_match:
+                score += 6
+        if exact_number:
             score += 100
         if score:
             ranked.append((score, article))

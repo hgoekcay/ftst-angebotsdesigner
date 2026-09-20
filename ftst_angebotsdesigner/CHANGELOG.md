@@ -1,5 +1,7 @@
 ## 0.14.0
 
+- Technikeraufnahme am Handy: Handzettelfoto hochladen und lokal auswerten oder eine strukturierte Liste erfassen. Originalfoto, Transkript und Positionen bleiben zur Prüfung sichtbar; erst bestätigte Mengen und Beschreibungen gehen in die Projektkalkulation ein.
+- Ajax als Vorgabe für die Aufnahme und gezielte Artikelvorschläge für Bewegungsmelder, Magnetkontakte, Sirenen und Bedienteile. Die konkrete Billomat-Variante wird weiterhin ausgewählt; unklare Strichlisten, Zentrale und Montage werden nicht ergänzt.
 - Geprüfte Projektkalkulationen nach Vorschau und ausdrücklicher Bestätigung als Billomat-Angebotsentwurf anlegen. Kundenkonditionen werden vor der Übergabe erneut geladen; Kunde, Texte, Positionen und Beträge anschließend aus Billomat zurückgelesen und verglichen.
 - Dauerhaft gespeicherter Übertragungsstand verhindert doppelte Anlage bei Doppelklick, Zeitüberschreitung und Neustart. Unklare Ergebnisse ausschließlich über „Status in Billomat prüfen“ klären; kein automatischer erneuter Schreibversuch.
 - Kundendarstellung und gewählte Referenzbilder bleiben mit dem erzeugten Angebot in der FTST-App verbunden. Billomat-Entwürfe werden auch in der PDF als Entwurf gekennzeichnet. Keine Freigabe und kein Versand an Kunden.

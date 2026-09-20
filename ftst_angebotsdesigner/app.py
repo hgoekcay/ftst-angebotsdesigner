@@ -9,6 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from billomat_client import BillomatClient
 import materials
 import projects
+import project_intake
 import quote_drafts
 import quote_presentation
 import inventory_views
@@ -310,6 +311,7 @@ def offer_pdf(oid):
 
 materials.register(app, base, ingress, clean, offer_store, TYPES, get_offer)
 projects.register(app, base, ingress, clean, offer_store)
+project_intake.register(app, base, ingress, clean, offer_store)
 quote_drafts.register(app, base, ingress, clean, offer_store)
 quote_presentation.register(app, base, ingress, clean, offer_store)
 quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)

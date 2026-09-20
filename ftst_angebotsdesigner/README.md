@@ -24,6 +24,14 @@ In **Angebote** lassen sich Status filtern sowie Datum und interne Notiz als Wie
 
 Vor einem Update die App einschließlich ihrer Daten sichern. Übertragungsdatensätze nicht manuell löschen: Sie schützen vor doppelten Billomat-Angeboten. Nach einer Wiederherstellung prüft die App vor einer neuen Anlage die Projekt-Referenz in Billomat. Mehrdeutige Treffer benötigen eine Prüfung in Billomat.
 
+## Aufnahme durch Techniker
+
+Im Projekt **Technikeraufnahme** öffnen. Dort ein lesbares Handzettelfoto speichern oder die Komponenten direkt mit Menge und Beschreibung erfassen. Die Fotoauswertung verwendet das installierte lokale Bildmodell und läuft im Hintergrund. Sie lädt kein Modell herunter und verwendet keine Cloud-Ausweichverarbeitung.
+
+Vor der Übernahme Originalfoto, erkannte Texte und jede Menge vergleichen. Strichlisten und unleserliche Stellen bleiben offen. Abkürzungen wie BM oder MK erst nach Bestätigung auflösen; Ajax ist als Hersteller vorgegeben, die genaue Variante wird danach im Billomat-Katalog gewählt. Kundenadresse, vorhandene Zentrale, Innen-/Außenbereich und Montageangaben ergänzen. Fehlende Angaben bleiben Rückfragen, niemals automatisch ergänzte Angebotspositionen.
+
+Anschließend die Aufnahme bestätigen, in der Kalkulation die aktuellen Positionen übernehmen und Billomat-Artikel samt Preisen laden. Das Technikerfoto bleibt beim Projekt und wird nicht automatisch als Referenzbild in Kunden-PDFs eingefügt.
+
 ## Entwicklung
 
 Der Antwortassistent enthält eine Mail-Arbeitsliste mit manuellem Text-/EML-Import, Originalen und Anhängen. Bearbeitung und Belegstatus bleiben getrennt. Keine automatische Postfachverbindung, kein Versand, keine OCR oder steuerliche Buchung. Billomat bleibt das führende System; die weitere Eingangsbeleg-Anbindung wird separat geprüft.
