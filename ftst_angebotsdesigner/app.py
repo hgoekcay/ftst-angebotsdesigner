@@ -7,6 +7,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from billomat_client import BillomatClient
+from asset_library import DEFAULT_LOGO
 import materials
 import projects
 import project_intake
@@ -25,7 +26,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.14.0"
+APP_VERSION = "0.15.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -71,9 +72,10 @@ CSS='body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ececec;col
 CSS += """
 body{background:#f5f6f7;color:#15191c;font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.55}
 .top{background:#fff;color:#15191c;border-bottom:1px solid #e1e4e6;padding:20px 0}
-.topin{max-width:1180px;margin:auto;padding:0 32px;gap:20px;display:flex;align-items:center;justify-content:space-between}
+.topin{max-width:1180px;margin:auto;padding:0 32px;gap:20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.app-brand{width:300px;max-width:100%;flex:0 1 300px}.app-logo{display:block;width:300px;max-width:100%;height:auto;background:white}
 .sub{color:#72797f;font-size:10px;letter-spacing:2px;text-transform:uppercase;margin:7px 0 0}
-.appnav{display:flex;align-items:center;gap:24px}.appnav a{color:#525a61;text-decoration:none;font-size:13px;font-weight:600}.appnav a:hover{color:#e30613}.appnav span{color:#879096}
+.appnav{display:flex;flex-wrap:wrap;align-items:center;gap:24px}.appnav a{color:#525a61;text-decoration:none;font-size:13px;font-weight:600}.appnav a:hover{color:#e30613}.appnav span{color:#879096}
 .wrap{max-width:1180px;padding:36px 32px 70px;margin:auto}
 .card{background:#fff;border:1px solid #e2e5e7;border-radius:12px;padding:30px;box-shadow:none;margin-bottom:22px}
 .hero{padding:44px;background:white;border-top:3px solid #e30613}
@@ -220,7 +222,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div><a href="{ingress()}"><img src="{ingress("materials/builtin-ftst-wide")}" alt="FT Sicherheitstechnik" style="width:245px;max-width:55vw;height:auto;background:white;border-radius:4px"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("static/pdf-download.js")}"></script></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("static/pdf-download.js")}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")

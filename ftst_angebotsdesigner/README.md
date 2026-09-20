@@ -4,7 +4,13 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.14.0**
+**0.15.0**
+
+## Firmenauftritt im Angebot
+
+Unter **Firma** werden Inhaber, Adresse, Kontakt und Bankverbindung gepflegt. Diese Daten erscheinen in der Fußzeile jeder PDF-Seite; sie werden ausschließlich in den App-Daten gespeichert. Die IBAN-Prüfsumme und das BIC-Format werden beim Speichern geprüft. Das neue Standardlogo zeigt FT Sicherheitstechnik mit ®; bei einer früher ausdrücklich gespeicherten Logoauswahl kann es unter Firma gewählt werden.
+
+Referenzseiten zeigen bis zu vier ausgewählte Bilder gemeinsam. Ablauf, häufige Fragen zur Sicherheitstechnik und persönlicher Kontakt ergänzen das Angebot. Die Vorlage erfindet keine Referenzzahlen, Bewertungen, Garantien oder Zahlungsfristen. Der konkret angebotene Leistungsumfang und die Konditionen bleiben maßgeblich.
 
 Die App liest Angebote aus Billomat und stellt sie im FTST-Design dar. Angebote können als A4-PDF ausgegeben werden. Projekte, Angebotsentwürfe, Lager und lokale KI unterstützen die Vorbereitung. Die Handyansicht vermeidet seitliches Scrollen.
 

@@ -1,7 +1,7 @@
 """A4 offer presentation based on the supplied FT offer reference."""
 import io
+import math
 from price_notes import item_notes, offer_notes, unit_price_heading
-from collections import OrderedDict
 from PIL import Image as PILImage, ImageOps
 
 from reportlab.lib import colors
@@ -57,7 +57,7 @@ class NumberedCanvas(Canvas):
             self.__dict__.update(state)
             self.setFont('Helvetica', 8)
             self.setFillColor(MUTED)
-            self.drawRightString(190*mm, 14*mm, f'{self._pageNumber:02d} / {total:02d}')
+            self.drawRightString(190*mm, 8*mm, f'{self._pageNumber:02d} / {total:02d}')
             super().showPage()
         super().save()
 
@@ -78,6 +78,11 @@ def build(offer, escape, money, date_de, cname):
         'white': ParagraphStyle('white', fontName=font, fontSize=10, leading=14, textColor=WHITE),
         'price': ParagraphStyle('price', fontName='Helvetica-Bold', fontSize=36, leading=44, textColor=WHITE),
         'step': ParagraphStyle('step', fontName='Helvetica-Bold', fontSize=19, leading=25, textColor=RED),
+        'footer': ParagraphStyle('footer', fontName=font, fontSize=7.5, leading=10, textColor=MUTED),
+        'caption': ParagraphStyle('caption', fontName=font, fontSize=8.5, leading=11, textColor=INK, spaceAfter=3),
+        'question': ParagraphStyle('question', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=INK, spaceAfter=4),
+        'answer': ParagraphStyle('answer', fontName=font, fontSize=9, leading=12, textColor=MUTED),
+        'service': ParagraphStyle('service', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=RED, alignment=1),
     }
 
     def p(value, style='body'):
@@ -99,18 +104,63 @@ def build(offer, escape, money, date_de, cname):
         table.setStyle(TableStyle(commands))
         return table
 
-    def heading(canvas, doc):
-        canvas.saveState()
+    def draw_logo(canvas, doc):
+        """Clip the original logo asset; never resample or rewrite brand artwork."""
         logo = o.get('logo_path')
         if logo:
             reader = ImageReader(logo)
             iw, ih = reader.getSize()
-            scale = min((52 if doc.page == 1 else 38)*mm/iw, 13*mm/ih)
-            canvas.drawImage(reader, 20*mm, 270*mm, iw*scale, ih*scale, mask='auto')
+            left, top, crop_width, crop_height = 0, 0, iw, ih
+            crop = o.get('logo_crop')
+            if isinstance(crop, (list, tuple)) and len(crop) == 4:
+                try:
+                    candidate = tuple(float(value) for value in crop)
+                    x, y, width, height = candidate
+                    if (all(math.isfinite(value) for value in candidate)
+                            and x >= 0 and y >= 0 and width > 0 and height > 0
+                            and x + width <= iw and y + height <= ih):
+                        left, top, crop_width, crop_height = candidate
+                except (TypeError, ValueError, OverflowError):
+                    pass
+            scale = min((75 if doc.page == 1 else 63)*mm/crop_width,
+                        (16 if doc.page == 1 else 14)*mm/crop_height)
+            x, y = 20*mm, 270*mm
+            canvas.saveState()
+            clip = canvas.beginPath()
+            clip.rect(x, y, crop_width*scale, crop_height*scale)
+            canvas.clipPath(clip, stroke=0, fill=0)
+            canvas.drawImage(reader, x-left*scale, y-(ih-top-crop_height)*scale,
+                             iw*scale, ih*scale, mask='auto')
+            canvas.restoreState()
         else:
-            canvas.setFont('Helvetica-Bold', 10)
+            canvas.setFont('Helvetica-Bold', 12)
             canvas.setFillColor(INK)
             canvas.drawString(20*mm, 275*mm, 'FT SICHERHEITSTECHNIK')
+
+    def draw_footer(canvas):
+        canvas.setStrokeColor(LINE)
+        canvas.line(20*mm, 35*mm, 190*mm, 35*mm)
+        company_lines = [profile.get('company') or 'FT Sicherheitstechnik']
+        if profile.get('owner'):
+            company_lines.append('Inhaber: ' + str(profile['owner']))
+        company_lines += [profile[key] for key in ('street', 'city') if profile.get(key)]
+        contact_lines = [(label + str(profile[key])) for key, label in
+                         (('phone', 'Telefon: '), ('email', 'E-Mail: '), ('website', 'Web: '))
+                         if profile.get(key)]
+        bank_lines = [(label + str(profile[key])) for key, label in
+                      (('bank_name', 'Bank: '), ('iban', 'IBAN: '), ('bic', 'BIC: '))
+                      if profile.get(key)]
+        for x, width, lines in ((20, 55, company_lines), (80, 51, contact_lines), (136, 54, bank_lines)):
+            if not lines:
+                continue
+            text = Paragraph('<br/>'.join(escape(str(line)) for line in lines), styles['footer'])
+            footer = KeepInFrame(width*mm, 22*mm, [text], mode='shrink', hAlign='LEFT', vAlign='TOP')
+            _, height = footer.wrapOn(canvas, width*mm, 22*mm)
+            footer.drawOn(canvas, x*mm, 32*mm-height)
+
+    def heading(canvas, doc):
+        canvas.saveState()
+        draw_logo(canvas, doc)
         if doc.page == 1:
             canvas.setStrokeColor(RED)
             canvas.roundRect(128*mm, 271*mm, 62*mm, 9*mm, 4.5*mm, fill=0)
@@ -121,35 +171,27 @@ def build(offer, escape, money, date_de, cname):
                       ('STATUS' if is_draft else 'GÜLTIGKEIT', 'Nicht freigegeben' if is_draft else (date_de(o.get('validity_date')) if o.get('validity_date') else (str(o['validity_days'])+' Tage' if o.get('validity_days') else 'Gemäß Angebot'))),
                       ('ENTWURFSPREIS' if is_draft else 'IHR FESTPREIS', money(o.get('total_gross')))]
             for x, (label, value) in zip((20, 78, 136), labels):
-                p(label, 'small').wrapOn(canvas, 53*mm, 12*mm)
                 label_p = p(label, 'small')
                 label_p.wrapOn(canvas, 53*mm, 12*mm)
-                label_p.drawOn(canvas, x*mm, 40*mm)
+                label_p.drawOn(canvas, x*mm, 52*mm)
                 value_p = Paragraph(escape(value), ParagraphStyle('meta', parent=styles['body'], fontName='Helvetica-Bold', textColor=GREEN if x==136 else INK))
                 _, height = value_p.wrapOn(canvas, 53*mm, 20*mm)
-                value_p.drawOn(canvas, x*mm, 37*mm-height)
+                value_p.drawOn(canvas, x*mm, 49*mm-height)
         else:
             info = p('ENTWURF / NICHT FREIGEGEBEN' if is_draft else f'Angebot {number[:35]} · {cname(customer)[:75]}', 'small')
-            info.wrapOn(canvas, 92*mm, 20*mm)
-            info.drawOn(canvas, 98*mm, 274*mm)
+            info_box = KeepInFrame(88*mm, 17*mm, [info], mode='shrink', hAlign='RIGHT')
+            _, info_height = info_box.wrapOn(canvas, 88*mm, 17*mm)
+            info_box.drawOn(canvas, 102*mm, 282*mm-info_height)
             canvas.setStrokeColor(LINE)
             canvas.line(20*mm, 265*mm, 190*mm, 265*mm)
-        canvas.setStrokeColor(LINE)
-        canvas.line(20*mm, 20*mm, 190*mm, 20*mm)
-        foot = profile.get('company') or 'FT Sicherheitstechnik'
-        if profile.get('email'):
-            foot += ' · ' + profile['email']
-        # Keep even unusually long company/contact names inside the footer band.
-        footer = KeepInFrame(145*mm, 12*mm, [p(foot, 'small')], mode='shrink')
-        _, footer_height = footer.wrapOn(canvas, 145*mm, 12*mm)
-        footer.drawOn(canvas, 20*mm, 18*mm-footer_height)
+        draw_footer(canvas)
         canvas.restoreState()
 
     buffer = io.BytesIO()
     doc = BaseDocTemplate(buffer, pagesize=(210*mm, 297*mm), title=f'FTST Angebotsentwurf {number}' if is_draft else f'FTST Angebot {number}', author=profile.get('company') or 'FT Sicherheitstechnik')
     doc.addPageTemplates([
-        PageTemplate('cover', [Frame(20*mm, 58*mm, WIDTH, 144*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
-        PageTemplate('content', [Frame(20*mm, 26*mm, WIDTH, 232*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
+        PageTemplate('cover', [Frame(20*mm, 68*mm, WIDTH, 144*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
+        PageTemplate('content', [Frame(20*mm, 41*mm, WIDTH, 217*mm, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)], onPage=heading),
     ])
     title = o.get('customer_title') or o.get('title') or 'Ihre individuelle Sicherheitslösung.'
     if len(title) > 120:
@@ -201,45 +243,116 @@ def build(offer, escape, money, date_de, cname):
                               ('RIGHTPADDING',(0,0),(-1,-1),2*mm),('TOPPADDING',(0,0),(-1,-1),4*mm),('BOTTOMPADDING',(0,0),(-1,-1),4*mm)]))
     story += [table, Spacer(1,6*mm), p('Interner Kalkulationsentwurf. Keine Angebotsfreigabe, kein Kundenversand.' if is_draft else 'Maßgeblich sind die im Angebot aufgeführten Leistungen und Konditionen.', 'small')]
 
-    groups = OrderedDict()
-    for item in o.get('reference_images', []):
-        groups.setdefault(item.get('category') or 'Projektbilder', []).append(item)
+    images = o.get('reference_images', [])
     section_number = 3
-    for category, images in groups.items():
-        for start in range(0, len(images), 4):
-            story += [PageBreak()] + section(f'{section_number:02d} · EINBLICKE', category + ' in der Praxis.')
-            story += [p('Ausgewählte Bilder zu Ihrer Sicherheitslösung.'), Spacer(1,7*mm)]
-            batch = images[start:start+4]
-            for offset in range(0, len(batch), 2):
-                cells = []
-                for item in batch[offset:offset+2]:
-                    image = Photo(item['path'], (100 if len(batch)<=2 else 58)*mm)
-                    kind = item.get('kind') or 'Projektfoto'
-                    cells.append([image, Spacer(1,3*mm), p(kind, 'label'),
-                                  Paragraph('<b>'+escape(item.get('title') or '')+'</b>', styles['body']),
-                                  p(' · '.join(item[k] for k in ('place','object_type') if item.get(k)), 'small'),
-                                  p(item.get('description'), 'small')])
-                if len(cells)==1:
-                    cells.append('')
-                row = Table([[cells[0], '', cells[1]]], colWidths=[82*mm,6*mm,82*mm], splitInRow=1)
-                row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),0)]))
-                story += [row, Spacer(1,10*mm)]
-            section_number += 1
+    for start in range(0, len(images), 4):
+        story += [PageBreak()] + section(f'{section_number:02d} · EINBLICKE IN UNSERE ARBEIT', 'Sicherheitstechnik in der Praxis.')
+        story += [p('Ausgewählte Bilder zu Ihrer Sicherheitslösung.', 'small'), Spacer(1, 5*mm)]
+        batch = images[start:start+4]
+        for offset in range(0, len(batch), 2):
+            photos, captions = [], []
+            for item in batch[offset:offset+2]:
+                photos.append(Photo(item['path'], (78 if len(batch) <= 2 else 44)*mm))
+                category = item.get('category') or item.get('kind') or 'Projektfoto'
+                kind = item.get('kind')
+                label = category + (' · ' + str(kind) if kind and kind != category else '')
+                caption = [Paragraph('<font color="#e30613">'+escape(label)+'</font>', styles['caption']),
+                           Paragraph('<b>'+escape(item.get('title') or '')+'</b>', styles['caption'])]
+                place = ' · '.join(str(item[key]) for key in ('place', 'object_type') if item.get(key))
+                if place:
+                    caption.append(p(place, 'small'))
+                if item.get('description'):
+                    caption.append(p(item['description'], 'caption'))
+                captions.append(caption)
+            if len(photos) == 1:
+                photos.append('')
+                captions.append('')
+            row = Table([[photos[0], '', photos[1]], [captions[0], '', captions[1]]],
+                        colWidths=[82*mm, 6*mm, 82*mm], splitInRow=1)
+            commands = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                        ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0)]
+            for column in (0, 2):
+                if column == 2 and not captions[1]:
+                    continue
+                commands += [('BOX', (column, 0), (column, -1), .5, LINE),
+                             ('BACKGROUND', (column, 1), (column, 1), PALE),
+                             ('LEFTPADDING', (column, 1), (column, 1), 4*mm),
+                             ('RIGHTPADDING', (column, 1), (column, 1), 4*mm),
+                             ('TOPPADDING', (column, 1), (column, 1), 3*mm),
+                             ('BOTTOMPADDING', (column, 1), (column, 1), 3*mm)]
+            row.setStyle(TableStyle(commands))
+            story += [row, Spacer(1, 5*mm)]
+        services = Table([[p(value, 'service') for value in ('Beratung', 'Planung', 'Montage', 'Einweisung')]],
+                         colWidths=[WIDTH/4]*4)
+        services.setStyle(TableStyle([('LINEABOVE', (0, 0), (-1, 0), .5, LINE),
+                                     ('LINEBELOW', (0, 0), (-1, 0), .5, LINE),
+                                     ('TOPPADDING', (0, 0), (-1, -1), 5*mm),
+                                     ('BOTTOMPADDING', (0, 0), (-1, -1), 5*mm)]))
+        story.append(services)
+        section_number += 1
 
-    story += [PageBreak()] + section(f'{section_number:02d} · NÄCHSTE SCHRITTE', 'So geht es weiter.')
+    story += [PageBreak()] + section(f'{section_number:02d} · SO GEHT ES WEITER', 'Von der Planung zur sicheren Übergabe.')
     story += [p('Prüfung und Freigabe stehen noch aus.' if is_draft else 'Wir begleiten Sie von der Abstimmung bis zur Übergabe.'), Spacer(1,8*mm)]
-    for n, step in enumerate(o.get('next_steps', []),1):
-        row = Table([[p(n,'step'), p(step)]], colWidths=[16*mm,154*mm], splitInRow=1)
-        row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEBELOW',(0,0),(-1,-1),0.4,LINE),('TOPPADDING',(0,0),(-1,-1),5*mm),('BOTTOMPADDING',(0,0),(-1,-1),5*mm)]))
+    default_details = {
+        'Angebot prüfen und bestätigen': 'Sie prüfen die angebotenen Geräte und Leistungen. Offene Fragen klären wir vor der Beauftragung.',
+        'Installationstermin abstimmen': 'Montageorte, Leitungswege und den Termin stimmen wir passend zu Ihrem Objekt ab.',
+        'Montage, Konfiguration und Inbetriebnahme': 'Die vereinbarten Komponenten werden installiert, eingerichtet und auf ihre Funktion geprüft.',
+        'Übergabe und Einweisung': 'Sie erhalten eine Einweisung in die Bedienung und die für Ihr System vereinbarten Funktionen.',
+    }
+    steps = list(o.get('next_steps', []))
+    if not is_draft and steps == list(default_details):
+        steps.append('Abrechnung nach Vereinbarung')
+        default_details[steps[-1]] = 'Für Abrechnung und Zahlung gelten die im Angebot oder in der Auftragsbestätigung vereinbarten Konditionen.'
+    for n, step in enumerate(steps, 1):
+        contents = [p(step, 'question')]
+        if step in default_details:
+            contents.append(p(default_details[step], 'answer'))
+        row = Table([[p(f'{n:02d}', 'step'), contents]], colWidths=[16*mm,154*mm], splitInRow=1)
+        row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEBELOW',(0,0),(-1,-1),0.4,LINE),
+                                ('LEFTPADDING',(0,0),(-1,-1),0), ('RIGHTPADDING',(0,0),(-1,-1),2*mm),
+                                ('TOPPADDING',(0,0),(-1,-1),5*mm),('BOTTOMPADDING',(0,0),(-1,-1),5*mm)]))
         story.append(row)
-    story += [Spacer(1,10*mm)]
-    contact = [p('IHR KONTAKT', 'label')]
-    for key in ('company','contact','street','city','phone','email','website'):
+    story += [Spacer(1, 8*mm), box([
+        Paragraph('<b>Auf Ihr Objekt abgestimmt.</b>', styles['white']),
+        p('Der konkrete Leistungsumfang, die Geräteauswahl und die Konditionen ergeben sich aus diesem Angebot. Änderungen stimmen wir gemeinsam ab.', 'white')], background=INK, accent=True)]
+
+    section_number += 1
+    story += [PageBreak()] + section(f'{section_number:02d} · HÄUFIGE FRAGEN', 'Was Sie noch wissen möchten.')
+    questions = [
+        ('Wie bediene ich meine Sicherheitstechnik?',
+         'Bei der Übergabe erklären wir die vereinbarte Bedienung. App, Bedienteil und Zugriffsrechte richten sich nach den ausgewählten Geräten.'),
+        ('Kann ich mein System später erweitern?',
+         'Wir prüfen passende Ergänzungen anhand der vorhandenen Zentrale, Geräte und Systemgrenzen. Die Kompatibilität wird vor einer Erweiterung geklärt.'),
+        ('Was passiert bei Strom- oder Internetausfall?',
+         'Das hängt von den Geräten, ihrer Stromversorgung und den gewählten Übertragungswegen ab. Wir stimmen die benötigte Absicherung mit Ihnen ab.'),
+        ('Wie wird die Montage vorbereitet?',
+         'Montageorte, Leitungswege und den Zugang zum Objekt stimmen wir vorab mit Ihnen ab. Besondere Anforderungen werden in der Planung berücksichtigt.'),
+        ('Wie läuft die Bezahlung ab?',
+         'Es gelten die Zahlungsbedingungen im Angebot oder in der Auftragsbestätigung. Die Bankverbindung finden Sie in der Fußzeile, sofern sie hinterlegt ist.'),
+    ]
+    for question, answer in questions:
+        row = Table([[p('?', 'label'), [p(question, 'question'), p(answer, 'answer')]]],
+                    colWidths=[6*mm, 164*mm], splitInRow=1)
+        row.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                                ('TOPPADDING', (0, 0), (-1, -1), 3*mm), ('BOTTOMPADDING', (0, 0), (-1, -1), 3*mm),
+                                ('LINEBELOW', (0, 0), (-1, -1), .4, LINE)]))
+        story.append(row)
+    story += [Spacer(1, 6*mm)]
+    contact = [p('IHR PERSÖNLICHER KONTAKT', 'label')]
+    for key in ('company', 'contact', 'phone', 'email', 'website'):
         if profile.get(key):
-            contact.append(p(profile[key]))
+            contact.append(p(profile[key], 'caption'))
     if len(contact)==1:
         contact.append(p('FT Sicherheitstechnik'))
-    story += [box(contact, accent=True), Spacer(1,8*mm), p('Vielen Dank für Ihr Vertrauen.')]
+    story += [box(contact, accent=True), Spacer(1, 5*mm)]
+    closing_title = ('Gemeinsam prüfen. Danach freigeben.' if is_draft else
+                     'Ihr nächster Schritt: Angebot gemeinsam abstimmen.')
+    closing_text = ('Dieser Entwurf ist noch nicht freigegeben. Bitte prüfen Sie die Angaben und den Leistungsumfang.' if is_draft else
+                    ('Ihr Angebot ist bis '+date_de(o['validity_date'])+' gültig.' if o.get('validity_date') else
+                     'Gültigkeit und Konditionen entnehmen Sie diesem Angebot.'))
+    story += [box([Paragraph('<b>'+escape(closing_title)+'</b>', styles['white']), p(closing_text, 'white')], background=INK)]
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
