@@ -9,6 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from billomat_client import BillomatClient
 import materials
 import projects
+import project_intake
 import quote_drafts
 import quote_presentation
 import inventory_views
@@ -18,11 +19,13 @@ import mail_assistant
 import strato_views
 import billomat_receipts
 import offer_cache
+import offer_followup
+import quote_transfer
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.13.1"
+APP_VERSION = "0.14.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -48,7 +51,7 @@ def storage_error(error):
 @app.errorhandler(409)
 @app.errorhandler(400)
 def quote_input_error(error):
-    if request.endpoint not in ('quote_draft', 'quote_pdf', 'quote_presentation'):
+    if request.endpoint not in ('quote_draft', 'quote_pdf', 'quote_presentation', 'quote_transfer'):
         return error
     key = (request.view_args or {}).get('key', '')
     back = ingress('projects/' + key + '/quote')
@@ -151,6 +154,7 @@ def cname(c):
 
 def normalize(o):
     o=dict(o or {}); o["client"]=o.get("client") if isinstance(o.get("client"),dict) else {}
+    o['is_draft'] = bool(o.get('is_draft')) or o.get('status') == 'DRAFT'
     items=[]
     for n,x in enumerate(one_list(o.get("items")),1):
         if isinstance(x,dict):
@@ -277,8 +281,12 @@ def detail(o):
     checks="".join(f'<span class="check">✓ {clean(x)}</span>' for x in o.get("benefits",[]))
     steps="".join(f'<li>{clean(x)}</li>' for x in o.get("next_steps",[])); c=o["client"]
     saved_notice='<div class="success">✓ <span>Änderungen gespeichert.</span> Ihre Angebotsdarstellung wurde erfolgreich gespeichert.</div>' if request.args.get("saved")=="1" else ""
+    if o.get('is_draft'):
+        saved_notice += '<div class="card" role="status"><strong>Billomat-Entwurf – noch nicht freigegeben.</strong><p>Die PDF ist als Entwurf gekennzeichnet. Freigabe und Versand erfolgen in Billomat.</p></div>'
     auto_hint='<span class="auto">Automatisch erkannt</span>' if o.get("offer_type_auto") else ""
     body=f'''<div class="back"><a href="{ingress('offers')}">← Zurück zur Angebotsübersicht</a></div>{saved_notice}<div class="card hero"><div class="eyebrow">{clean(o.get('offer_type'))} · Ihr persönliches Angebot {auto_hint}</div><h1>{clean(o.get('customer_title') or o.get('title'))}</h1><p>{clean(o.get('customer_intro'))}</p><a class="btn" href="{ingress('offer/'+str(o['id'])+'/edit')}">Angebot bearbeiten</a><a class="btn dark" data-pdf="FTST-Angebot-{clean(o['id'])}.pdf" title="PDF innerhalb der angemeldeten App vorbereiten" href="{ingress('offer/'+str(o['id'])+'/pdf')}">A4-PDF erzeugen</a><a class="btn light" href="{ingress("offer/"+str(o["id"])+"/references")}">Fotos auswählen ({len(o.get("reference_images", []))})</a><p class="muted">{ "Automatische Referenzbilder" if o.get("reference_selection_auto") else "Gespeicherte Bildauswahl" }: {len(o.get("reference_images", []))} Bilder für die PDF. Über Fotos auswählen können Sie diese ändern.</p></div><div class="grid"><div class="metric"><div class="label">Kunde</div><div class="value" style="font-size:18px">{clean(cname(c))}</div><div class="muted small">{clean(c.get('street',''))}<br>{clean(c.get('zip',''))} {clean(c.get('city',''))}</div></div><div class="metric"><div class="label">Angebot</div><div class="value" style="font-size:18px">Nr. {clean(o.get('offer_number') or o.get('number'))}</div><div class="muted small">Datum: {date_de(o.get('date'))}<br>Gültig: {date_de(o.get('validity_date') or o.get('validity_days'))}</div></div><div class="metric green"><div class="label">Ihr Festpreis</div><div class="value">{money(o.get('total_gross'))}</div><div class="muted small">Netto {money(o.get('total_net'))}</div></div></div><div class="card"><h2>Projekt auf einen Blick</h2><p>{clean(o.get('project_summary'))}</p></div><div class="card"><h2>Leistungsumfang</h2>{price_summary}<table><thead><tr><th>Pos.</th><th>Leistung / Artikel</th><th>Menge</th><th>{clean(unit_price_heading(o))}</th><th>Netto</th></tr></thead><tbody>{rows}</tbody></table></div><div class="card"><h2>Ihre Vorteile</h2><div class="checks">{checks}</div></div><div class="card"><h2>Nächste Schritte</h2><ol>{steps}</ol></div><div class="card"><h2>Kostenübersicht</h2>{price_summary}<div class="grid"><div class="metric"><div class="label">Netto</div><div class="value">{money(o.get('total_net'))}</div></div><div class="metric"><div class="label">MwSt.</div><div class="value">{money(o.get('tax_amount'))}</div></div><div class="metric green"><div class="label">Gesamt</div><div class="value">{money(o.get('total_gross'))}</div></div></div></div>'''
+    if o.get('is_draft'):
+        body = body.replace('Ihr persönliches Angebot', 'Ihr Angebotsentwurf').replace('Ihr Festpreis', 'Entwurfsbetrag')
     return base("FTST Angebot",body)
 
 def footer(canvas,doc):
@@ -303,8 +311,11 @@ def offer_pdf(oid):
 
 materials.register(app, base, ingress, clean, offer_store, TYPES, get_offer)
 projects.register(app, base, ingress, clean, offer_store)
+project_intake.register(app, base, ingress, clean, offer_store)
 quote_drafts.register(app, base, ingress, clean, offer_store)
 quote_presentation.register(app, base, ingress, clean, offer_store)
+quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)
+offer_followup.register(app, offer_store, base, ingress, clean, date_de)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)

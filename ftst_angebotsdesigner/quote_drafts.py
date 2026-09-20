@@ -1,4 +1,4 @@
-"""Reviewable local quote drafts. Billomat is read-only in this workflow."""
+"""Reviewable local quote drafts; explicit transfer is a separate workflow."""
 import hashlib
 import json
 import os
@@ -59,15 +59,57 @@ def tokens(value):
 
 def candidates(description, articles):
     # Quantity and connecting prose must not suggest unrelated products.
-    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück'}
-    wanted = {word for word in tokens(description) if not word.isdigit() and word not in ignored}
+    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück', 'ajax'}
+    terms = tokens(description)
+    wanted = {word for word in terms if not word.isdigit() and word not in ignored}
+    # These are search synonyms only. BM/MK require the explicitly confirmed
+    # Ajax context; product variants still require a manual article selection.
+    families = set()
+    if 'ajax' in terms:
+        if 'bm' in terms or any(word.startswith('bewegungsmeld') for word in terms):
+            families.update(('motionprotect', 'motioncam'))
+        if 'mk' in terms or any(word.startswith('magnetkontakt') for word in terms):
+            families.add('doorprotect')
+        if any(word.startswith('sirene') or word.startswith(('innensirene', 'aussensirene')) for word in terms):
+            families.update(('homesiren', 'streetsiren'))
+        if any(word.startswith(('bedienteil', 'aussenbedienteil', 'innenbedienteil')) for word in terms):
+            families.add('keypad')
+    outside = any(word.startswith(('aussen', 'outdoor')) for word in terms)
+    inside = any(word.startswith(('innen', 'indoor')) for word in terms)
+    locations = {'aussen', 'aussenbereich', 'aussenmontage', 'outdoor', 'innen', 'innenbereich', 'innenmontage', 'indoor'}
+    accessories = ('halter', 'halterung', 'montageplatte', 'batterie', 'abdeckung', 'blende', 'hood')
     ranked = []
     for article in articles:
         title = tokens(article.get('title', ''))
         score = sum(2 if word in title else 1 if any(
             len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))
             for term in title) else 0 for word in wanted)
-        if str(article.get('article_number', '')).casefold() == description.casefold():
+        exact_number = bool(article.get('article_number')) and str(article['article_number']).casefold() == description.casefold()
+        if families and not exact_number:
+            family_match = any(term.startswith(family) for term in title for family in families)
+            # A location or the brand name alone must not make an unrelated
+            # Ajax product appear as a detector, siren or keypad suggestion.
+            device_words = wanted - {'bm', 'mk'} - locations
+            title_devices = title - locations
+            named_device = any(word in title_devices or any(len(word) >= 4 and len(term) >= 4
+                               and (word.startswith(term) or term.startswith(word)) for term in title_devices)
+                               for word in device_words)
+            if not family_match and not ('ajax' in title and named_device):
+                continue
+            accessory = any(term.startswith(prefix) for term in title for prefix in accessories)
+            requested_accessory = any(word.startswith(prefix) for word in terms for prefix in accessories)
+            if accessory and not requested_accessory:
+                continue
+            article_outside = any(term.startswith(('aussen', 'outdoor', 'streetsiren')) for term in title)
+            article_inside = any(term.startswith(('innen', 'indoor', 'homesiren')) for term in title)
+            if outside != inside:
+                if (outside and article_inside and not article_outside) or (inside and article_outside and not article_inside):
+                    continue
+                if (outside and article_outside) or (inside and article_inside):
+                    score += 3
+            if family_match:
+                score += 6
+        if exact_number:
             score += 100
         if score:
             ranked.append((score, article))
@@ -76,7 +118,7 @@ def candidates(description, articles):
 
 def catalog_snapshot(raw):
     fields = {
-        'articles': ('id','article_number','title','sales_price','sales_price2','sales_price3','sales_price4','sales_price5','currency_code','unit_id','tax_id','type'),
+        'articles': ('id','article_number','title','description','sales_price','sales_price2','sales_price3','sales_price4','sales_price5','currency_code','unit_id','tax_id','type'),
         'clients': ('id','client_number','name','first_name','last_name','price_group','reduction','tax_rule','net_gross','currency_code','archived'),
         'taxes': ('id','name','rate','is_default'),
         'units': ('id','name'),
@@ -298,4 +340,10 @@ def register(app, base, ingress, escape, get_store):
         body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}{presentation_link}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Speichern sichert Ihre Auswahl. Der Knopf „Artikel und Kunden aus Billomat laden“ aktualisiert die Stammdaten.</p><p><a href="{ingress("customers")}" target="_blank" rel="noopener">Kunden suchen oder neu anlegen</a></p><p>{len(draft.get("catalog",{}).get("articles",[]))} Artikel · {len(draft.get("catalog",{}).get("clients",[]))} Kunden geladen</p><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
         <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><label><input style="width:auto" type="checkbox" name="tax_confirmed" value="yes" {'checked' if draft.get('tax_confirmed')=='yes' else ''}> Bei länderabhängiger Steuerregel: Die Artikelsteuersätze gelten für diesen Auftrag.</label></p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
         <div class="card"><h2>Kalkulation zur Prüfung</h2><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
-        return base('Angebotsentwurf', body + '<div class="card">' + export + '</div>'), status
+        transfer = store.record(account(), 'quote_transfer', key)
+        if transfer:
+            body = body.replace('<p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p>',
+                                '<p>Für dieses Projekt besteht ein Billomat-Übertragungsvorgang. Den aktuellen Stand finden Sie unter „Billomat-Übertragung öffnen“.</p>', 1)
+        transfer_label = 'Billomat-Übertragung öffnen' if transfer else 'Übergabe an Billomat prüfen'
+        transfer_link = f'<p><a class="btn" href="{ingress("projects/"+key+"/quote/transfer")}">{transfer_label}</a></p>'
+        return base('Angebotsentwurf', body + '<div class="card">' + export + transfer_link + '</div>'), status

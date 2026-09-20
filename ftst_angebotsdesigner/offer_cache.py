@@ -3,10 +3,29 @@ import threading
 import time
 from urllib.parse import urlencode
 from datetime import datetime, timezone
+import offer_followup
 
 INTERVAL = 300
 RETRY = 60
-FIELDS = ('id', 'offer_number', 'number', 'date', 'title', 'total_gross')
+FIELDS = ('id', 'offer_number', 'number', 'date', 'title', 'total_gross', 'status')
+STATUSES = {'DRAFT': 'Entwurf', 'OPEN': 'Offen', 'WON': 'Gewonnen',
+            'LOST': 'Verloren', 'CANCELED': 'Storniert', 'CLEARED': 'Abgerechnet'}
+
+
+def status_label(value):
+    if not isinstance(value, str) or not value:
+        return 'Status nicht verfügbar'
+    return STATUSES.get(value, 'Unbekannter Status: ' + value[:50])
+
+
+def data_time(value):
+    try:
+        stamp = datetime.fromisoformat(value)
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return stamp.astimezone(timezone.utc).strftime('%d.%m.%Y, %H:%M UTC')
+    except (ValueError, TypeError):
+        return 'Zeitpunkt nicht verfügbar'
 
 
 class OfferCache:
@@ -76,14 +95,17 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
     except ValueError:
         return base('Angebote', '<div class="card"><h1>Ungültige Angebotsseite</h1></div>'), 400
     search = request.args.get('search', '').strip()[:100]
+    selected_status = request.args.get('status', '').strip()
+    if selected_status and selected_status not in STATUSES:
+        return base('Angebote', '<div class="card"><h1>Ungültiger Angebotsstatus</h1></div>'), 400
     cache = worker(store, account, client)
     cache.start()
     refresh = ''
-    if number == 1 and not search:
+    if number == 1 and not search and not selected_status:
         snapshot = cache.snapshot()
         data = snapshot.get('rows', [])
         if snapshot.get('updated_at'):
-            note = 'Letzte 30 Angebote · gespeicherter Stand: ' + clean(snapshot['updated_at'])
+            note = 'Letzte 30 Angebote · Datenstand: ' + clean(data_time(snapshot['updated_at']))
             if snapshot.get('error'):
                 note += ' · Aktualisierung derzeit nicht möglich. Gespeicherte Angebote bleiben verfügbar.'
             else:
@@ -95,23 +117,58 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
             refresh = '<meta http-equiv="refresh" content="10">'
     else:
         try:
-            data = client.list_offers(search, page=number)
-            note = f'Seite {number} · bis zu 30 Angebote direkt aus Billomat'
+            parameters = {'page': number}
+            if selected_status:
+                parameters['status'] = selected_status
+            data = client.list_offers(search, **parameters)
+            note = f'Seite {number} · bis zu 30 Angebote direkt aus Billomat · Datenstand: ' + data_time(datetime.now(timezone.utc).isoformat())
+            if selected_status:
+                note += ' · Statusfilter für alle Billomat-Angebote: ' + STATUSES[selected_status]
         except Exception:
             return base('Angebote', '<div class="card"><h1>Billomat derzeit nicht erreichbar</h1><p>Bitte später erneut versuchen.</p><a class="btn" href="' + ingress('offers') + '">Gespeicherte Angebote</a></div>'), 502
+    followups = store.records(account, offer_followup.KIND)
+
+    def followup_cell(oid):
+        value = followups.get(str(oid), {})
+        due = value.get('due_date', '')
+        text = '<b>' + clean(date_de(due)) + '</b>' if due else 'Kein Termin'
+        if value.get('note'):
+            text += '<div class="small">' + clean(value['note']) + '</div>'
+        return text + '<a class="btn light" href="' + ingress('offer/' + str(oid) + '/followup') + '">Wiedervorlage bearbeiten</a>'
+
     rows = ''.join('<tr><td data-label="Nr."><b>' + clean(o.get('offer_number') or o.get('number') or '-') +
                    '</b></td><td data-label="Datum">' + clean(date_de(o.get('date'))) +
                    '</td><td data-label="Titel">' + clean(o.get('title') or '-') +
+                   '</td><td data-label="Billomat-Status">' + clean(status_label(o.get('status'))) +
                    '</td><td data-label="Brutto" class="money">' + money(o.get('total_gross')) +
+                   '</td><td data-label="Wiedervorlage">' + followup_cell(o['id']) +
                    '</td><td><a class="btn" href="' + ingress('offer/' + str(o['id'])) + '">Öffnen</a></td></tr>' for o in data)
     links = ''
-    if number > 1 or search:
+    if number > 1 or search or selected_status:
         links += '<a class="btn light" href="' + ingress('offers') + '">Neueste Angebote</a>'
+    def page_link(page_number):
+        parameters = {'page': page_number, 'search': search}
+        if selected_status:
+            parameters['status'] = selected_status
+        return ingress('offers') + '?' + clean(urlencode(parameters))
+
     if number > 1:
-        links += '<a class="btn light" href="' + ingress('offers') + '?' + clean(urlencode({'page': number-1, 'search': search})) + '">Vorherige Seite</a>'
+        links += '<a class="btn light" href="' + page_link(number-1) + '">Vorherige Seite</a>'
     if len(data) == 30:
-        links += '<a class="btn light" href="' + ingress('offers') + '?' + clean(urlencode({'page': number+1, 'search': search})) + '">Weitere 30 Angebote</a>'
-    form = '<form method="get"><label for="offer-search">Angebotsnummer suchen</label><input id="offer-search" name="search" value="' + clean(search) + '"><button class="btn">Suchen</button></form>'
+        links += '<a class="btn light" href="' + page_link(number+1) + '">Weitere 30 Angebote</a>'
+    options = '<option value="">Alle Status</option>' + ''.join('<option value="' + key + '"' + (' selected' if key == selected_status else '') + '>' + label + '</option>' for key, label in STATUSES.items())
+    form = ('<form method="get"><div class="grid"><div class="field"><label for="offer-search">Angebotsnummer suchen</label><input id="offer-search" name="search" value="' + clean(search) + '"></div>' +
+            '<div class="field"><label for="offer-status">Billomat-Status</label><select id="offer-status" name="status">' + options + '</select></div></div><button class="btn">Angebote filtern</button></form>')
+    # Keep reminders reachable after their offers leave the newest thirty entries.
+    scheduled = sorted(((key, value) for key, value in followups.items() if value.get('due_date')),
+                       key=lambda entry: (entry[1]['due_date'], entry[0]))
+    reminders = ''
+    if scheduled:
+        reminder_rows = ''.join('<tr><td data-label="Termin">' + clean(date_de(value['due_date'])) + '</td>' +
+                                '<td data-label="Angebot">' + clean(value.get('offer_number') or oid) + '</td>' +
+                                '<td data-label="Notiz">' + clean(value.get('note', '')) + '</td>' +
+                                '<td><a class="btn light" href="' + ingress('offer/' + oid + '/followup') + '">Bearbeiten</a></td></tr>' for oid, value in scheduled)
+        reminders = '<div class="card"><h2>Wiedervorlagen</h2><p class="muted">Lokal gespeicherte Termine, nach Datum sortiert. Es werden keine Nachrichten versendet.</p><table><thead><tr><th>Termin</th><th>Angebot</th><th>Notiz</th><th></th></tr></thead><tbody>' + reminder_rows + '</tbody></table></div>'
     return base('Angebote', refresh + '<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">' + note + '</p>' + form +
-                '<table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Brutto</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
-                ('<p>Keine Angebote auf dieser Seite.</p>' if not data and not refresh else '') + links + '</div>')
+                '<table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Billomat-Status</th><th>Brutto</th><th>Wiedervorlage</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
+                ('<p>Keine Angebote auf dieser Seite.</p>' if not data and not refresh else '') + links + '</div>' + reminders)
