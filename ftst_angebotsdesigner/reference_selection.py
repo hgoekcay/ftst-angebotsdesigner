@@ -1,6 +1,8 @@
 """Local, deterministic reference suggestions; no paid AI calls."""
 import re
 
+MAX_REFERENCE_IMAGES = 4
+
 TERMS = {
     'Alarmanlage': ('alarm', 'sirene', 'bewegungsmelder', 'bedienteil'),
     'Videoüberwachung': ('kamera', 'video'),
@@ -12,7 +14,7 @@ TERMS = {
 }
 
 
-def suggest(images, category, limit=4):
+def suggest(images, category, limit=MAX_REFERENCE_IMAGES):
     ranked = []
     for key, item in images.items():
         kind = item.get('kind', '')
@@ -33,4 +35,4 @@ def suggest(images, category, limit=4):
         else:
             chosen.append(key)
             seen.add(family)
-    return (chosen + alternatives)[:limit]
+    return (chosen + alternatives)[:max(0, min(limit, MAX_REFERENCE_IMAGES))]

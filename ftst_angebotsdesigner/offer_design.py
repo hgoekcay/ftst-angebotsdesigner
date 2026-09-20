@@ -2,6 +2,7 @@
 import io
 import math
 from price_notes import item_notes, offer_notes, unit_price_heading
+from reference_selection import MAX_REFERENCE_IMAGES
 from PIL import Image as PILImage, ImageOps
 
 from reportlab.lib import colors
@@ -40,6 +41,65 @@ class Photo(Flowable):
         scale = min(self.width / iw, self.height / ih)
         width, height = iw*scale, ih*scale
         canvas.drawImage(self.reader, (self.width-width)/2, (self.height-height)/2, width, height)
+
+
+def reference_caption(value, style, escape, max_lines):
+    """Use readable fixed-size type and shorten only the reference-card copy."""
+    source = ' '.join(str(value or '').split())
+    width = 74*mm
+    height = style.leading * max_lines
+
+    def paragraph(text):
+        result = Paragraph(escape(text), style)
+        _, actual_height = result.wrap(width, height)
+        return result, actual_height <= height + .01
+
+    # Bound paragraph parsing even when an old library entry has very long copy.
+    if len(source) <= 600:
+        result, fits = paragraph(source)
+        if fits:
+            return result
+    left, right = 0, min(len(source), 600)
+    best, _ = paragraph('...')
+    while left <= right:
+        middle = (left + right) // 2
+        prefix = source[:middle].rstrip()
+        if middle < len(source) and ' ' in prefix and not source[middle:middle+1].isspace():
+            prefix = prefix.rsplit(' ', 1)[0]
+        candidate, fits = paragraph(prefix + '...')
+        if fits:
+            best = candidate
+            left = middle + 1
+        else:
+            right = middle - 1
+    return best
+
+
+class ReferenceGrid(Flowable):
+    """One non-splitting 2-by-2 grid, regardless of caption or library size."""
+    def __init__(self, cards):
+        super().__init__()
+        self.width, self.height = WIDTH, 146*mm
+        self.cards = cards[:MAX_REFERENCE_IMAGES]
+
+    def draw(self):
+        canvas = self.canv
+        for index, (photo, captions) in enumerate(self.cards):
+            x = (index % 2) * 88*mm
+            y = self.height - 70*mm - (index // 2) * 76*mm
+            canvas.saveState()
+            canvas.setFillColor(PALE)
+            canvas.rect(x, y, 82*mm, 26*mm, fill=1, stroke=0)
+            photo.drawOn(canvas, x, y+26*mm)
+            cursor = y + 23*mm
+            for caption in captions:
+                _, height = caption.wrap(74*mm, 23*mm)
+                cursor -= height
+                caption.drawOn(canvas, x+4*mm, cursor)
+            canvas.setStrokeColor(LINE)
+            canvas.setLineWidth(.5)
+            canvas.rect(x, y, 82*mm, 70*mm, fill=0, stroke=1)
+            canvas.restoreState()
 
 
 class NumberedCanvas(Canvas):
@@ -83,6 +143,9 @@ def build(offer, escape, money, date_de, cname):
         'question': ParagraphStyle('question', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=INK, spaceAfter=4),
         'answer': ParagraphStyle('answer', fontName=font, fontSize=9, leading=12, textColor=MUTED),
         'service': ParagraphStyle('service', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=RED, alignment=1),
+        'reference_label': ParagraphStyle('reference_label', fontName=font, fontSize=8, leading=10, textColor=RED),
+        'reference_title': ParagraphStyle('reference_title', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=INK),
+        'reference_detail': ParagraphStyle('reference_detail', fontName=font, fontSize=8.5, leading=11, textColor=MUTED),
     }
 
     def p(value, style='body'):
@@ -243,46 +306,24 @@ def build(offer, escape, money, date_de, cname):
                               ('RIGHTPADDING',(0,0),(-1,-1),2*mm),('TOPPADDING',(0,0),(-1,-1),4*mm),('BOTTOMPADDING',(0,0),(-1,-1),4*mm)]))
     story += [table, Spacer(1,6*mm), p('Interner Kalkulationsentwurf. Keine Angebotsfreigabe, kein Kundenversand.' if is_draft else 'Maßgeblich sind die im Angebot aufgeführten Leistungen und Konditionen.', 'small')]
 
-    images = o.get('reference_images', [])
+    # Protect legacy selections as well as current UI/API input at the last mile.
+    images = list(o.get('reference_images') or [])[:MAX_REFERENCE_IMAGES]
     section_number = 3
-    for start in range(0, len(images), 4):
+    if images:
         story += [PageBreak()] + section(f'{section_number:02d} · EINBLICKE IN UNSERE ARBEIT', 'Sicherheitstechnik in der Praxis.')
         story += [p('Ausgewählte Bilder zu Ihrer Sicherheitslösung.', 'small'), Spacer(1, 5*mm)]
-        batch = images[start:start+4]
-        for offset in range(0, len(batch), 2):
-            photos, captions = [], []
-            for item in batch[offset:offset+2]:
-                photos.append(Photo(item['path'], (78 if len(batch) <= 2 else 44)*mm))
-                category = item.get('category') or item.get('kind') or 'Projektfoto'
-                kind = item.get('kind')
-                label = category + (' · ' + str(kind) if kind and kind != category else '')
-                caption = [Paragraph('<font color="#e30613">'+escape(label)+'</font>', styles['caption']),
-                           Paragraph('<b>'+escape(item.get('title') or '')+'</b>', styles['caption'])]
-                place = ' · '.join(str(item[key]) for key in ('place', 'object_type') if item.get(key))
-                if place:
-                    caption.append(p(place, 'small'))
-                if item.get('description'):
-                    caption.append(p(item['description'], 'caption'))
-                captions.append(caption)
-            if len(photos) == 1:
-                photos.append('')
-                captions.append('')
-            row = Table([[photos[0], '', photos[1]], [captions[0], '', captions[1]]],
-                        colWidths=[82*mm, 6*mm, 82*mm], splitInRow=1)
-            commands = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-                        ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0)]
-            for column in (0, 2):
-                if column == 2 and not captions[1]:
-                    continue
-                commands += [('BOX', (column, 0), (column, -1), .5, LINE),
-                             ('BACKGROUND', (column, 1), (column, 1), PALE),
-                             ('LEFTPADDING', (column, 1), (column, 1), 4*mm),
-                             ('RIGHTPADDING', (column, 1), (column, 1), 4*mm),
-                             ('TOPPADDING', (column, 1), (column, 1), 3*mm),
-                             ('BOTTOMPADDING', (column, 1), (column, 1), 3*mm)]
-            row.setStyle(TableStyle(commands))
-            story += [row, Spacer(1, 5*mm)]
+        cards = []
+        for item in images:
+            category = str(item.get('category') or 'Projektfoto')
+            kind = str(item.get('kind') or '')
+            # Keep the provenance visible even when a category name is long.
+            label = kind + ' · ' + category if kind and kind != category else category
+            details = ' · '.join(str(item[key]) for key in ('place', 'object_type', 'description') if item.get(key))
+            captions = [reference_caption(label, styles['reference_label'], escape, 1),
+                        reference_caption(item.get('title'), styles['reference_title'], escape, 2),
+                        reference_caption(details, styles['reference_detail'], escape, 2)]
+            cards.append((Photo(item['path'], 44*mm), captions))
+        story += [ReferenceGrid(cards), Spacer(1, 5*mm)]
         services = Table([[p(value, 'service') for value in ('Beratung', 'Planung', 'Montage', 'Einweisung')]],
                          colWidths=[WIDTH/4]*4)
         services.setStyle(TableStyle([('LINEABOVE', (0, 0), (-1, 0), .5, LINE),

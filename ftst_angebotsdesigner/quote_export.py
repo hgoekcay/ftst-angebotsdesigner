@@ -8,6 +8,7 @@ from asset_library import catalog
 from materials import account
 from offer_design import build as build_offer
 from quote_drafts import display_money
+from reference_selection import MAX_REFERENCE_IMAGES
 
 
 def _customer_name(customer):
@@ -88,9 +89,10 @@ def build(project, draft, result, store):
     if presentation.get('summary'):
         offer['project_summary'] = presentation['summary'] + '\n\n' + source
     if 'images' in presentation:
-        images = catalog(store, account())
-        selected = presentation['images']
-        if any(key not in images for key in selected):
-            raise ValueError('Ein ausgewähltes Projektbild fehlt. Bitte die Kundendarstellung prüfen und speichern.')
+        images = {key: item for key, item in catalog(store, account()).items()
+                  if item.get('category') != 'Logo'}
+        selected = list(dict.fromkeys(key for key in presentation['images']
+                                      if isinstance(key, str) and key in images))[:MAX_REFERENCE_IMAGES]
+        offer['reference_image_ids'] = selected
         offer['reference_images'] = [images[key] for key in selected]
     return build_offer(offer, escape, money, _date, _customer_name)

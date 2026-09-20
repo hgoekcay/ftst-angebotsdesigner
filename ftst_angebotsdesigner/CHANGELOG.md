@@ -1,3 +1,10 @@
+## 0.15.1
+
+- Maximal vier Referenzbilder insgesamt pro Angebot und Projektentwurf, immer gemeinsam auf einer einzigen Seite im 2×2-Raster.
+- Ältere Auswahlen mit mehr Bildern verwenden die ersten vier gültigen Motive. Die Bildbibliothek und gespeicherte Altbestände bleiben erhalten.
+- Lange Bildtexte werden für die feste Referenzseite lesbar gekürzt. Die vollständigen Angaben bleiben in der Bildbibliothek gespeichert.
+- Bildauswahl mit Vierergrenze im Formular und serverseitiger Prüfung.
+
 ## 0.15.0
 - Größeres originales FT-Sicherheitstechnik-Logo mit ® im Appkopf und in der PDF.
 - Firmenadresse, Inhaber, Kontakt und Bankverbindung in einer dreispaltigen Fußzeile auf jeder PDF-Seite; Angaben werden unter Firma gepflegt. IBAN-Prüfsumme und BIC-Format werden vor dem Speichern geprüft.

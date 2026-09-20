@@ -5,6 +5,7 @@ from flask import abort, redirect, request
 from asset_library import catalog
 from materials import account, image_groups
 from storage import RecordConflict
+from reference_selection import MAX_REFERENCE_IMAGES
 
 
 FIELDS = {'title': ('Kundentitel', 240), 'intro': ('Einleitung', 4000),
@@ -33,8 +34,8 @@ def register(app, base, ingress, escape, get_store):
                     abort(400, f'{label}: höchstens {limit} Zeichen verwenden.')
                 presentation[name] = value
             selected = list(dict.fromkeys(request.form.getlist('images')))
-            if len(selected) > 8 or any(k not in images for k in selected):
-                abort(400, 'Höchstens acht vorhandene Projekt- oder Symbolbilder auswählen.')
+            if len(selected) > MAX_REFERENCE_IMAGES or any(k not in images for k in selected):
+                abort(400, 'Höchstens vier vorhandene Projekt- oder Symbolbilder für eine Referenzseite auswählen.')
             presentation['images'] = selected
             updated = dict(draft, presentation=presentation, revision=uuid.uuid4().hex)
             try:
@@ -51,17 +52,38 @@ def register(app, base, ingress, escape, get_store):
                 widget = f'<textarea id="{name}" name="{name}" maxlength="{limit}">{escape(value)}</textarea>'
             fields.append(f'<div class="field"><label for="{name}">{label}</label>{widget}</div>')
         chosen = presentation.get('images', [])
-        missing = any(k not in images for k in chosen)
+        available = list(dict.fromkeys(k for k in chosen if isinstance(k, str) and k in images))
+        selected = available[:MAX_REFERENCE_IMAGES]
+        missing = any(not isinstance(k, str) or k not in images for k in chosen)
         notice = '<p class="success">Kundendarstellung gespeichert. Öffnen Sie die PDF aus der aktuellen Kalkulation neu.</p>' if request.args.get('saved') else ''
         if missing:
             notice += '<p role="alert">Ein ausgewähltes Bild ist nicht mehr verfügbar. Bitte Auswahl prüfen und speichern.</p>'
-        content = image_groups(images, ingress, escape, [k for k in chosen if k in images])
+        if len(available) > MAX_REFERENCE_IMAGES:
+            notice += '<p role="status">In Ihrer bisherigen Auswahl sind mehr als vier Bilder. Für die PDF werden die ersten vier verfügbaren Bilder auf einer Referenzseite verwendet. Bitte diese Auswahl prüfen und bei Bedarf ändern.</p>'
+        content = image_groups(images, ingress, escape, selected)
+        counter = f'''<script>
+(function(){{
+const form=document.getElementById('project-reference-selection');
+const boxes=Array.from(form.querySelectorAll('input[name="images"]'));
+const count=document.getElementById('project-reference-count');
+const note=document.getElementById('project-reference-limit');
+function update(){{
+  const selected=boxes.filter(box=>box.checked).length;
+  count.textContent=String(selected);
+  note.textContent=selected>={MAX_REFERENCE_IMAGES}?'Vier Bilder ausgewählt. Zum Wechseln zuerst ein Bild abwählen.':'';
+  boxes.forEach(box=>{{box.disabled=!box.checked&&selected>={MAX_REFERENCE_IMAGES};}});
+}}
+boxes.forEach(box=>box.addEventListener('change',update));
+update();
+}})();
+</script>'''
         back = ingress('projects/' + key + '/quote')
         return base('Kundendarstellung', f'<div class="back"><a href="{back}">← Zur Kalkulation</a></div>'
                     '<div class="card"><h1>Kundendarstellung & Bilder</h1>'
                     f'{notice}<p>Texte und Bilder für den PDF-Entwurf. Preise bleiben unverändert; '
                     'der Entwurf ist weiterhin nicht freigegeben.</p><p>Leere Textfelder verwenden '
-                    'die bisherige Entwurfsdarstellung. Maximal acht Bilder, bis zu vier je Bildseite.</p>'
-                    f'<form method="post"><input type="hidden" name="revision" value="{escape(draft.get("revision", ""))}">'
-                    f'{"".join(fields)}{content}<div class="material-actions"><button class="btn">Darstellung speichern</button>'
-                    f'<a class="btn light" href="{back}">Zur Kalkulation</a></div></form></div>')
+                    'die bisherige Entwurfsdarstellung. Maximal vier Bilder gemeinsam auf einer Referenzseite.</p>'
+                    f'<form method="post" id="project-reference-selection"><input type="hidden" name="revision" value="{escape(draft.get("revision", ""))}">'
+                    f'{"".join(fields)}{content}<div class="material-actions"><p><strong><span id="project-reference-count" aria-live="polite">{len(selected)}</span> von {MAX_REFERENCE_IMAGES} Bildern ausgewählt</strong></p>'
+                    '<p id="project-reference-limit" role="status"></p><button class="btn">Darstellung speichern</button>'
+                    f'<a class="btn light" href="{back}">Zur Kalkulation</a></div></form></div>{counter}')
