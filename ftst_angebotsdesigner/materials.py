@@ -10,7 +10,7 @@ import re
 import secrets
 from pathlib import Path
 from asset_library import catalog, DEFAULT_LOGO
-from reference_selection import suggest
+from reference_selection import suggest, MAX_REFERENCE_IMAGES
 
 from flask import abort, redirect, request, send_file, session, Response
 from PIL import Image as PILImage, ImageOps, UnidentifiedImageError
@@ -44,6 +44,9 @@ def enrich(offer, store):
     selection = store.records(identity, 'offer_images').get(str(offer['id']))
     automatic = selection is None or selection.get('mode') == 'auto'
     chosen = suggest(images, offer.get('offer_type')) if automatic else selection.get('ids', [])
+    chosen = list(dict.fromkeys(key for key in chosen if isinstance(key, str) and key in images))
+    offer['reference_selection_limited'] = len(chosen) > MAX_REFERENCE_IMAGES
+    chosen = chosen[:MAX_REFERENCE_IMAGES]
     offer['reference_selection_auto'] = automatic
     offer['reference_image_ids'] = chosen
     offer['reference_images'] = [images[key] for key in chosen if key in images]
@@ -229,8 +232,8 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
                 store.put_record(account(), 'offer_images', oid, {'mode': 'auto'})
                 return redirect(ingress('offer/'+oid+'/references'))
             selected = list(dict.fromkeys(request.form.getlist('images')))
-            if len(selected)>8 or any(key not in images for key in selected):
-                abort(400, 'Höchstens acht vorhandene Bilder auswählen.')
+            if len(selected) > MAX_REFERENCE_IMAGES or any(key not in images for key in selected):
+                abort(400, 'Höchstens vier vorhandene Bilder auswählen. Alle Bilder erscheinen auf einer Seite.')
             store.put_record(account(), 'offer_images', oid, {'ids':selected})
             return redirect(ingress('offer/'+oid)+'?saved=1')
         offer = get_offer(oid) if get_offer else {}
@@ -241,7 +244,9 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
                        'Diese Bilder werden direkt in der PDF verwendet. ' if automatic else 'Ihre gespeicherte Bildauswahl hat Vorrang. ')
         if automatic and len(selected) < 4:
             explanation += 'Für vier passende Fotos bitte weitere Referenzen dieser Angebotsart hochladen. '
-        selected = [key for key in selected if key in images]
+        if offer.get('reference_selection_limited'):
+            explanation += 'Ihre ältere Auswahl enthält mehr als vier Bilder. Für die PDF werden die ersten vier vorhandenen Bilder verwendet. Hier können Sie die Auswahl ändern. '
+        selected = list(dict.fromkeys(key for key in selected if key in images))[:MAX_REFERENCE_IMAGES]
         options = image_groups(images, ingress, escape, selected)
         counter_script = """<script>
 (function(){
@@ -251,8 +256,10 @@ const counter=document.getElementById('selection-count');
 const message=document.getElementById('selection-limit');
 function update(){const count=boxes.filter(box=>box.checked).length;
 counter.textContent=count;
-message.textContent=count>8?'Bitte reduzieren Sie die Auswahl auf höchstens 8 Bilder.':'';
+message.textContent=count>4?'Bitte reduzieren Sie die Auswahl auf höchstens 4 Bilder.':count===4?'Vier Bilder ausgewählt. Zum Wechseln zuerst ein Bild abwählen.':'';
+boxes.forEach(box=>box.disabled=count>=4&&!box.checked);
+form.querySelector('button[type="submit"]').disabled=count>4;
 }
 boxes.forEach(box=>box.addEventListener('change',update));update();
 })();</script>"""
-        return base('Referenzen wählen', f'<div class="back"><a href="{ingress("offer/"+oid)}">← Zurück zum Angebot</a></div><div class="card"><h1>Bilder für Ihr Angebot</h1><p>{explanation}</p><p>Wählen Sie passende Montagefotos und Symbolbilder aus. Die PDF zeigt bis zu vier Motive je Bildseite. Ohne Auswahl entfallen die Bildseiten.</p><p class="muted">Das Firmenlogo wird separat in den Firmendaten festgelegt.</p><form method="post" id="reference-selection">{options}<div class="material-actions"><p><strong><span id="selection-count" aria-live="polite">{len(selected)}</span> von maximal 8 Bildern ausgewählt</strong></p><p id="selection-limit" role="status"></p><button class="btn">Auswahl speichern</button><button class="btn light" name="action" value="auto">Automatisch 4 Bilder wählen</button><a class="btn light" href="{ingress("materials")}">Eigenes Foto hochladen</a></div></form></div>{counter_script}')
+        return base('Referenzen wählen', f'<div class="back"><a href="{ingress("offer/"+oid)}">← Zurück zum Angebot</a></div><div class="card"><h1>Bilder für Ihr Angebot</h1><p>{explanation}</p><p>Wählen Sie insgesamt höchstens vier Montagefotos oder Symbolbilder aus. Alle Bilder erscheinen gemeinsam auf einer einzigen Referenzseite. Lange Bildtexte werden in der PDF gekürzt. Ohne Auswahl entfällt die Referenzseite.</p><p class="muted">Das Firmenlogo wird separat in den Firmendaten festgelegt.</p><form method="post" id="reference-selection">{options}<div class="material-actions"><p><strong><span id="selection-count" aria-live="polite">{len(selected)}</span> von maximal 4 Bildern ausgewählt</strong></p><p id="selection-limit" role="status"></p><button class="btn" type="submit">Auswahl speichern</button><button class="btn light" name="action" value="auto">Automatisch 4 Bilder wählen</button><a class="btn light" href="{ingress("materials")}">Eigenes Foto hochladen</a></div></form></div>{counter_script}')

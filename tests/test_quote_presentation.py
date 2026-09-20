@@ -1,5 +1,6 @@
 from copy import deepcopy
 from io import BytesIO
+import re
 
 import pytest
 from PIL import Image
@@ -7,7 +8,7 @@ from pypdf import PdfReader
 
 import app as module
 from storage import RecordConflict
-from test_quote_export import exported, draft, catalog, isolated_storage
+from test_quote_export import exported, draft, catalog, isolated_storage, add_reference_images
 
 
 @pytest.fixture
@@ -94,3 +95,46 @@ def test_cross_account_and_missing_project(presentation_client, monkeypatch):
     monkeypatch.setenv('BILLOMAT_ID', 'other')
     assert client.get('/projects/one/quote/presentation').status_code == 404
     assert client.post('/projects/one/quote/presentation', data=payload()).status_code == 404
+
+
+@pytest.mark.parametrize('count', [5, 8])
+def test_more_than_four_valid_project_images_are_rejected_without_changing_selection(presentation_client, count):
+    client, store, project, quote = presentation_client
+    ids = add_reference_images(store)
+    quote['presentation'] = {'title': 'Gespeicherte Darstellung', 'images': ['small']}
+    store.put_record('test', 'quote', 'one', quote)
+    before = deepcopy(store.record('test', 'quote', 'one'))
+    data = payload()
+    data['images'] = ids[:count]
+    response = client.post('/projects/one/quote/presentation', data=data)
+    assert response.status_code == 400
+    assert 'Höchstens vier' in response.text
+    assert store.record('test', 'quote', 'one') == before
+
+
+def test_four_valid_project_images_save_and_duplicate_ids_do_not_add_images(presentation_client):
+    client, store, *_ = presentation_client
+    ids = add_reference_images(store)
+    data = payload()
+    data['images'] = ids[:4] + [ids[0]]
+    assert client.post('/projects/one/quote/presentation', data=data).status_code == 302
+    assert store.record('test', 'quote', 'one')['presentation']['images'] == ids[:4]
+    page = client.get('/projects/one/quote/presentation').text
+    assert 'Maximal vier Bilder gemeinsam auf einer Referenzseite' in page
+    assert 'Maximal acht' not in page
+    assert 'id="project-reference-count" aria-live="polite">4</span> von 4' in page
+
+
+def test_legacy_project_image_selection_is_capped_for_display_without_writing(presentation_client):
+    client, store, project, quote = presentation_client
+    ids = add_reference_images(store)
+    quote['presentation'] = {'images': ['unavailable', ids[7], ids[7], *ids]}
+    store.put_record('test', 'quote', 'one', quote)
+    before = deepcopy(store.record('test', 'quote', 'one'))
+    page = client.get('/projects/one/quote/presentation').text
+    checked = re.findall(r'name="images" value="([^"]+)" checked', page)
+    assert set(checked) == {ids[7], ids[0], ids[1], ids[2]}
+    assert len(checked) == 4
+    assert 'ersten vier verfügbaren Bilder' in page
+    assert 'nicht mehr verfügbar' in page
+    assert store.record('test', 'quote', 'one') == before

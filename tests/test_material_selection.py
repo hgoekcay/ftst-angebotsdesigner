@@ -21,11 +21,33 @@ def test_selection_groups_sources_and_saved_counter(client):
 def test_selection_limit_and_empty_selection_without_javascript(client):
     keys = list(catalog(module.offer_store(), 'test'))
     assert len(keys) >= 9
-    assert client.post('/offer/42/references', data=MultiDict([('images', k) for k in keys[:8]])).status_code == 302
-    assert client.post('/offer/42/references', data=MultiDict([('images', k) for k in keys[:9]])).status_code == 400
-    assert len(module.offer_store().records('test', 'offer_images')['42']['ids']) == 8
+    assert client.post('/offer/42/references', data=MultiDict([('images', k) for k in keys[:4]])).status_code == 302
+    for count in (5, 8, 9):
+        assert client.post('/offer/42/references', data=MultiDict([('images', k) for k in keys[:count]])).status_code == 400
+        assert module.offer_store().records('test', 'offer_images')['42']['ids'] == keys[:4]
+    repeated = keys[:4] + keys[:4]
+    assert client.post('/offer/42/references', data=MultiDict([('images', k) for k in repeated])).status_code == 302
+    assert module.offer_store().records('test', 'offer_images')['42']['ids'] == keys[:4]
     assert client.post('/offer/42/references', data={}).status_code == 302
     assert module.offer_store().records('test', 'offer_images')['42']['ids'] == []
+
+
+def test_legacy_selection_limits_valid_unique_images_without_rewriting(client):
+    import materials
+    store = module.offer_store()
+    keys = list(catalog(store, 'test'))[:8]
+    original = ['missing', keys[0], keys[0], *keys[1:]]
+    store.put_record('test', 'offer_images', '42', {'ids': original})
+    offer = materials.enrich({'id': '42', 'offer_type': 'Alarmanlage'}, store)
+    assert offer['reference_image_ids'] == keys[:4]
+    assert len(offer['reference_images']) == 4
+    assert offer['reference_selection_limited']
+    assert store.records('test', 'offer_images')['42']['ids'] == original
+    page = client.get('/offer/42/references').text
+    assert 'von maximal 4 Bildern' in page
+    assert 'auf einer einzigen Referenzseite' in page
+    assert 'ältere Auswahl enthält mehr als vier Bilder' in page
+    assert store.records('test', 'offer_images')['42']['ids'] == original
 
 
 def test_library_groups_logos_and_escapes_upload_titles(client, tmp_path):

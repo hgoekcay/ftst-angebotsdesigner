@@ -4,7 +4,9 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.15.0**
+**0.15.1**
+
+Referenzbilder sind auf insgesamt vier Motive pro Angebot begrenzt und erscheinen gemeinsam auf einer einzigen Seite. Das gilt auch für ältere Auswahlen mit mehr Bildern. Lange Bildtexte werden nur in der PDF gekürzt; die vollständigen Angaben bleiben in der Bildbibliothek erhalten.
 
 ## Firmenauftritt im Angebot
 

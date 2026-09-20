@@ -9,6 +9,7 @@ def test_four_relevant_photos_and_no_stock_or_logos():
     images.update({'logo': {'category': 'Logo'}, 'stock': {'category': 'Alarmanlage', 'kind': 'Symbolfoto'},
                    'camera': {'category': 'Videoüberwachung', 'title': 'Kamera'}})
     assert suggest(images, 'Alarmanlage') == ['0', '1', '2', '3']
+    assert suggest(images, 'Alarmanlage', 8) == ['0', '1', '2', '3']
     assert suggest(images, 'Rauchmeldeanlage') == []
 
 
