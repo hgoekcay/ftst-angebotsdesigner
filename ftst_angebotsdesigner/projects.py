@@ -13,6 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from materials import account
 from project_ai import extract, AIError
 from storage import RecordConflict
+from project_workflow import render as render_workflow
 
 
 def register(app, base, ingress, escape, get_store):
@@ -98,6 +99,7 @@ def register(app, base, ingress, escape, get_store):
             except RecordConflict as exc:
                 abort(409, str(exc))
             return redirect(ingress('projects/'+key)+'?saved=1')
+        workflow = render_workflow(value, key, store, account(), ingress)
         result = value.get('analysis', {})
         rows = ''.join(f'<tr><td data-label="Komponente">{escape(row.get("description"))}</td><td data-label="Menge">{escape(row.get("quantity") if row.get("quantity") is not None else "Offen")}</td><td data-label="Beleg">{escape(row.get("evidence"))}</td></tr>' for row in result.get('components',[]))
         questions = ''.join(f'<li>{escape(q)}</li>' for q in result.get('questions',[]))
@@ -110,7 +112,7 @@ def register(app, base, ingress, escape, get_store):
         saved = '<p class="success">Projekt gespeichert.</p>' if request.args.get('saved') else ''
         intake_link = f'<a class="btn" href="{ingress("projects/"+key+"/intake")}">Technikeraufnahme: Foto & Komponenten</a>'
         attachments = ' · '.join(label for field,label in [('image','Merkzettelfoto vorhanden'),('audio','Sprachnotiz vorhanden')] if value.get(field))
-        return base('Projekt', f'<div class="back"><a href="{ingress("projects")}">← Projekte</a></div><div class="card"><h1>{escape(value["title"])}</h1>{saved}{intake_link}<form method="post" enctype="multipart/form-data"><label for="notes">Notizen / Anforderungen</label><textarea id="notes" name="notes">{escape(value["notes"])}</textarea><label for="image">Merkzettel / Objektfoto</label><input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp"><label for="audio">Sprachnotiz hochladen</label><input id="audio" type="file" name="audio" accept="audio/*"><p>{attachments}</p><label for="offer_id">Billomat-Angebots-ID (falls vorhanden)</label><input id="offer_id" name="offer_id" value="{escape(value.get("offer_id"))}"><p><button class="btn">Eingaben speichern</button>{link}</p></form></div><div class="card"><h2>FTST Projektassistent</h2><p>{state}</p>{error}<form method="post" action="{ingress("projects/"+key+"/analyze")}"><p>{disclosure}</p><p><a href="{ingress("ai")}">KI-Status und Funktionstest</a></p><p><label><input style="width:auto" type="checkbox" name="force" value="yes"> Bewusst neu analysieren (sonst gespeichertes lokales Ergebnis wiederverwenden)</label></p><button class="btn">Gespeicherte Eingaben analysieren</button></form></div>{summary}<div class="card"><h2>Artikel und Preise</h2><p>Aus den Notizen einen lokalen Angebotsentwurf mit Billomat-Artikeln vorbereiten.</p><a class="btn" href="{ingress("projects/"+key+"/quote")}">Angebotsentwurf vorbereiten</a><a class="btn light" href="{ingress("projects/"+key+"/operations")}">Material & Termine</a></div>')
+        return base('Projekt', f'<div class="back"><a href="{ingress("projects")}">← Projekte</a></div><div class="card"><h1>{escape(value["title"])}</h1>{saved}</div>{workflow}<div class="card"><h2>Projektangaben</h2>{intake_link}<form method="post" enctype="multipart/form-data"><label for="notes">Notizen / Anforderungen</label><textarea id="notes" name="notes">{escape(value["notes"])}</textarea><label for="image">Merkzettel / Objektfoto</label><input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp"><label for="audio">Sprachnotiz hochladen</label><input id="audio" type="file" name="audio" accept="audio/*"><p>{attachments}</p><label for="offer_id">Billomat-Angebots-ID (falls vorhanden)</label><input id="offer_id" name="offer_id" value="{escape(value.get("offer_id"))}"><p><button class="btn">Eingaben speichern</button>{link}</p></form></div><div class="card"><h2>FTST Projektassistent</h2><p>{state}</p>{error}<form method="post" action="{ingress("projects/"+key+"/analyze")}"><p>{disclosure}</p><p><a href="{ingress("ai")}">KI-Status und Funktionstest</a></p><p><label><input style="width:auto" type="checkbox" name="force" value="yes"> Bewusst neu analysieren (sonst gespeichertes lokales Ergebnis wiederverwenden)</label></p><button class="btn">Gespeicherte Eingaben analysieren</button></form></div>{summary}<div class="card"><h2>Artikel und Preise</h2><p>Aus den Notizen einen lokalen Angebotsentwurf mit Billomat-Artikeln vorbereiten.</p><a class="btn" href="{ingress("projects/"+key+"/quote")}">Angebotsentwurf vorbereiten</a><a class="btn light" href="{ingress("projects/"+key+"/operations")}">Material & Termine</a></div>')
 
     @app.post('/projects/<key>/analyze')
     def analyze(key):

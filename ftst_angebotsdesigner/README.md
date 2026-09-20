@@ -4,7 +4,9 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.15.1**
+**0.16.0**
+
+In Projekten zeigt **Ihr Weg zum Angebot** den gespeicherten Fortschritt und führt zum nächsten Schritt. Unter **Technikeraufnahme → Ajax-Komponente schnell ergänzen** lassen sich Bewegungsmelder, Magnetkontakte, Innen-/Außensirenen, Innen-/Außenbedienteile und Zentralen einzeln ergänzen. Menge und konkrete Variante werden anschließend eingetragen. Der optionale Raum / Montageort bleibt nach der bestätigten Übernahme in der Kalkulationsanforderung sichtbar. Details: [Technikerablauf](../docs/TECHNIKERAUFNAHME.md).
 
 Referenzbilder sind auf insgesamt vier Motive pro Angebot begrenzt und erscheinen gemeinsam auf einer einzigen Seite. Das gilt auch für ältere Auswahlen mit mehr Bildern. Lange Bildtexte werden nur in der PDF gekürzt; die vollständigen Angaben bleiben in der Bildbibliothek erhalten.
 
