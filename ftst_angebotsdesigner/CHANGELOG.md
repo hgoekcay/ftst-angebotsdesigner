@@ -1,3 +1,11 @@
+## 0.16.0
+
+- Technikeraufnahme mit Schnellauswahl für sieben Ajax-Komponententypen. Nur bewusst gewählte Typen werden ergänzt; Mengen und genaue Varianten bleiben zur Eingabe offen.
+- Optionaler Raum / Montageort je Komponente, nach Bestätigung auch in den Projektanforderungen und der Artikelsuche sichtbar. Vorhandene Eingaben bleiben beim Ergänzen erhalten.
+- Ajax-Zentralen finden passende Hub-Vorschläge. Raumangaben beeinflussen die Artikelsuche nicht; konkrete Varianten werden weiterhin ausgewählt.
+- Projektübersicht „Ihr Weg zum Angebot“ zeigt gespeicherten Fortschritt, offene Rückfragen und den nächsten Schritt. Veraltete Kalkulationen, unbestätigte Aufnahmen und unklare Billomat-Übertragungen bleiben erkennbar.
+- Änderungen an Aufnahmefeldern setzen die Prüfbestätigung zurück. Die neuen Funktionen benötigen keine KI-Aufrufe; bestehende Konten-, Revisions- und Übertragungssperren bleiben wirksam.
+
 ## 0.15.1
 
 - Maximal vier Referenzbilder insgesamt pro Angebot und Projektentwurf, immer gemeinsam auf einer einzigen Seite im 2×2-Raster.

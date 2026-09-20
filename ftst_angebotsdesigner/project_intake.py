@@ -17,6 +17,17 @@ from storage import RecordConflict
 
 MAX_PHOTO_BYTES = 20 * 1024 * 1024
 KIND = 'project_intake'
+MAX_COMPONENTS = 30
+LOCATION_LIMIT = 150
+AJAX_COMPONENTS = {
+    'motion': 'Bewegungsmelder',
+    'contact': 'Magnetkontakt',
+    'indoor_siren': 'Innensirene',
+    'outdoor_siren': 'Außensirene',
+    'indoor_keypad': 'Bedienteil innen',
+    'outdoor_keypad': 'Bedienteil außen',
+    'central': 'Zentrale',
+}
 TEXT_FIELDS = {'manufacturer': ('Hersteller', 100), 'customer_name': ('Kunde', 200),
                'object_address': ('Objektadresse', 500), 'variant': ('Ajax-Variante / Serie', 200),
                'installation': ('Montage / Arbeitsumfang', 1000), 'travel': ('Anfahrt / Einsatzort', 500),
@@ -84,16 +95,20 @@ def parse_form(form, current, *, confirm=False):
         if fields[key] not in choices:
             raise ValueError('Bitte „' + label + '“ prüfen.')
     descriptions, quantities, evidence = (form.getlist(key) for key in ('description', 'quantity', 'evidence'))
-    if not len(descriptions) == len(quantities) == len(evidence) or len(descriptions) > 30:
+    locations = form.getlist('location') if 'location' in form else [''] * len(descriptions)
+    if not len(descriptions) == len(quantities) == len(evidence) == len(locations) or len(descriptions) > MAX_COMPONENTS:
         raise ValueError('Bitte höchstens 30 vollständige Komponenten verwenden.')
     components = []
-    for description, count, proof in zip(descriptions, quantities, evidence):
-        description, proof = description.strip(), proof.strip()
-        if not description and not count.strip() and not proof:
+    for description, count, proof, location in zip(descriptions, quantities, evidence, locations):
+        description, proof, location = description.strip(), proof.strip(), location.strip()
+        if not description and not count.strip() and not proof and not location:
             continue
         if not description or len(description) > 300 or len(proof) > 500:
             raise ValueError('Bitte Bezeichnung und Beleg der Komponente prüfen.')
-        components.append({'description': description, 'quantity': quantity(count, confirm), 'evidence': proof})
+        if len(location) > LOCATION_LIMIT:
+            raise ValueError('Bitte „Raum / Montageort“ auf höchstens 150 Zeichen kürzen.')
+        components.append({'description': description, 'quantity': quantity(count, confirm),
+                           'evidence': proof, 'location': location})
     if confirm and (not components or form.get('reviewed') != 'yes'):
         raise ValueError('Bitte Komponenten ergänzen und Mengen sowie Varianten ausdrücklich bestätigen.')
     summary = form.get('summary', '').strip()
@@ -115,9 +130,10 @@ def attempted_form(form, current):
             value['fields'][key] = form.get(key, '')[:20000]
     value['summary'] = form.get('summary', '')[:20000]
     value['questions'] = form.get('questions', '')[:20000].splitlines()
-    descriptions, quantities, proofs = (form.getlist(key) for key in ('description', 'quantity', 'evidence'))
+    descriptions, quantities, proofs, locations = (form.getlist(key) for key in ('description', 'quantity', 'evidence', 'location'))
     value['components'] = [{'description': text[:1000], 'quantity': quantities[i][:100] if i < len(quantities) else '',
-                            'evidence': proofs[i][:2000] if i < len(proofs) else ''}
+                            'evidence': proofs[i][:2000] if i < len(proofs) else '',
+                            'location': locations[i][:2000] if i < len(locations) else ''}
                            for i, text in enumerate(descriptions[:30])]
     value['slots'] = min(30, max(3, len(value['components'])))
     return value
@@ -194,8 +210,10 @@ def confirmed_components(value):
         description = row['description']
         if manufacturer.casefold() not in description.casefold():
             description = manufacturer + ' ' + description
+        if row.get('location'):
+            description += ' · Raum / Montageort: ' + row['location']
         if len(description) > 300:
-            raise ValueError('Bitte die Komponentenbezeichnung mit Hersteller auf höchstens 300 Zeichen kürzen.')
+            raise ValueError('Bitte die Komponentenbezeichnung mit Hersteller und Raum / Montageort auf höchstens 300 Zeichen kürzen.')
         rows.append(dict(row, description=description, source_description=row['description'],
                          evidence=row['evidence'] or 'Vom Techniker bestätigt', user_confirmed=True))
     return rows
@@ -283,7 +301,7 @@ def register(app, base, ingress, escape, get_store):
             if value.get('status') == 'analyzing':
                 body += '<p>Die Analyse wurde unterbrochen. Sie können sie erneut starten.</p>'
             body += '<form method="post">' + hidden + '<button class="btn" name="action" value="analyze">Gespeichertes Foto lokal auslesen</button></form>'
-        body += '<form method="post" enctype="multipart/form-data">' + hidden + '<fieldset style="border:0;padding:0;min-width:0"' + (' disabled' if live else '') + '><h2>Foto</h2>'
+        body += '<form id="intake-form" method="post" enctype="multipart/form-data">' + hidden + '<fieldset style="border:0;padding:0;min-width:0"' + (' disabled' if live else '') + '><h2>Foto</h2>'
         body += '<label for="intake-photo">Merkzettel / Objektfoto (optional)</label><input id="intake-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp"><p class="muted">JPG, PNG oder WebP, höchstens 20 MB und 25 Megapixel. Bleibt beim Projekt; kein Referenzfoto.</p><button class="btn light" name="action" value="upload">Foto und Angaben speichern</button>'
         if value.get('photo'):
             body += f'<img style="max-height:320px;object-fit:contain" src="{ingress("projects/" + key + "/intake/photo")}" alt="Gespeichertes Projektfoto">'
@@ -299,14 +317,22 @@ def register(app, base, ingress, escape, get_store):
             options = ''.join(f'<option value="{key}"' + (' selected' if fields.get(field) == key else '') + '>' + title + '</option>' for key, title in choices.items())
             body += f'<div class="field"><label for="intake-{field}">{label}</label><select id="intake-{field}" name="{field}">{options}</select></div>'
         body += '</div>'
-        body += '<h2>Komponenten prüfen</h2><p>Mengen und Varianten prüfen. Leere Zeilen werden ignoriert; maximal 30 Komponenten.</p>'
+        body += '<h2 id="intake-components">Komponenten prüfen</h2><p>Mengen und Varianten prüfen. Leere Zeilen werden ignoriert; maximal 30 Komponenten.</p>'
         rows = value.get('components', [])
         slots = min(30, max(len(rows), value.get('slots', 3)))
+        body += '<details><summary>Ajax-Komponente schnell ergänzen</summary><p>Ein Klick ergänzt nur den gewählten Komponententyp. Menge, genaue Variante und Raum tragen Sie anschließend ein.</p><div style="display:flex;flex-wrap:wrap;gap:8px">'
+        for component, label in AJAX_COMPONENTS.items():
+            disabled = ' disabled' if len(rows) >= MAX_COMPONENTS else ''
+            body += f'<button class="btn light" style="flex:1 1 180px;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere" name="action" value="add_component:{component}"{disabled}>{label} ergänzen</button>'
+        body += '</div></details>'
         for index in range(slots):
             row = rows[index] if index < len(rows) else {}
             body += f'<fieldset class="field" style="min-width:0;border:1px solid #dfe4e7;border-radius:8px;padding:12px"><legend>Komponente {index + 1}</legend>'
-            for field, label, limit in [('description', 'Bezeichnung / Variante', 300), ('quantity', 'Menge', 20), ('evidence', 'Beleg / Ihre Ergänzung', 500)]:
+            for field, label, limit in [('description', 'Bezeichnung / Variante', 300), ('quantity', 'Menge', 20),
+                                        ('location', 'Raum / Montageort (optional)', LOCATION_LIMIT), ('evidence', 'Beleg / Ihre Ergänzung', 500)]:
                 inputmode = ' inputmode="decimal"' if field == 'quantity' else ''
+                if field == 'location':
+                    inputmode += ' placeholder="z. B. Flur EG"'
                 body += f'<label for="{field}-{index}">{label}</label><input id="{field}-{index}" name="{field}" maxlength="{limit}" value="{escape(row.get(field, ""))}"{inputmode}>'
             body += '</fieldset>'
         if slots < 30:
@@ -315,6 +341,7 @@ def register(app, base, ingress, escape, get_store):
         questions = '\n'.join(value.get('questions', []))
         body += f'<label for="intake-questions">Offene Rückfragen (eine pro Zeile)</label><textarea id="intake-questions" name="questions" maxlength="6000">{escape(questions)}</textarea><p class="muted">Montage und Anfahrt bleiben freie Angaben. Preise werden später geprüft; offene Angaben werden nicht geschätzt.</p>'
         body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen und Ajax-Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben ins Projekt übernehmen</button></fieldset></form></div>'
+        body += f'<script defer src="{ingress("static/project_intake.js")}"></script>'
         body += '<div class="card"><h2>Lokaler Fotovorschlag</h2><p>Nur das gespeicherte Foto und die gespeicherten Angaben werden lokal ausgewertet. Für die Analyse höchstens 4000 Zeichen einschließlich Feldangaben und Rückfragen; längere Aufnahmen können manuell bearbeitet werden. Der Vorschlag wird erst nach Ihrer Prüfung übernommen.</p>'
         if not value.get('photo'):
             body += '<p>Für einen Fotovorschlag zuerst ein Foto speichern. Manuelle Komponenten sind jederzeit möglich.</p>'
@@ -341,7 +368,8 @@ def register(app, base, ingress, escape, get_store):
         if request.form.get('account') != identity:
             abort(409, 'Das Konto wurde geändert. Bitte neu öffnen.')
         action = request.form.get('action')
-        if action not in ('upload', 'add_row', 'apply', 'analyze'):
+        component = action.removeprefix('add_component:') if action and action.startswith('add_component:') else ''
+        if action not in ('upload', 'add_row', 'apply', 'analyze') and component not in AJAX_COMPONENTS:
             abort(400)
         expected = request.form.get('revision', '')
         project_revision = request.form.get('project_revision', '')
@@ -368,6 +396,12 @@ def register(app, base, ingress, escape, get_store):
                     thread.start()
                 return redirect(ingress('projects/' + key + '/intake'), code=303)
             value = parse_form(request.form, current, confirm=action == 'apply')
+            if component:
+                if len(value['components']) >= MAX_COMPONENTS:
+                    raise ValueError('Es sind bereits 30 Komponenten erfasst. Bitte zuerst eine nicht benötigte Zeile vollständig leeren.')
+                value['components'].append({'description': 'Ajax ' + AJAX_COMPONENTS[component],
+                                            'quantity': '', 'evidence': '', 'location': ''})
+                value['slots'] = max(current.get('slots', 3), len(value['components']))
             if current.get('fields') != value['fields']:
                 value['source_changed'] = True
             if action == 'add_row':
@@ -416,7 +450,8 @@ def register(app, base, ingress, escape, get_store):
             if new_file:
                 new_file.unlink(missing_ok=True)
             raise
-        return redirect(ingress('projects/' + key + '/intake') + '?saved=1', code=303)
+        fragment = '#intake-components' if component or action == 'add_row' else ''
+        return redirect(ingress('projects/' + key + '/intake') + '?saved=1' + fragment, code=303)
 
     @app.get('/projects/<key>/intake/photo')
     def project_intake_photo(key):
