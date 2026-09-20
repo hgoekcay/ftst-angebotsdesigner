@@ -196,7 +196,7 @@ def register(app, base, ingress, escape, get_store):
                 return error(exc)
             if plan is None:
                 return redirect(ingress('projects/'+key+'/operations') + '?saved=1')
-        title = f'<div class="card"><h1>Materialplanung · {escape(project["title"])}</h1><p>Interne Planung. Billomat bleibt für Angebote/Rechnungen zuständig; Craftnote und Google Kalender werden hier nicht verändert.</p></div>'
+        title = f'<div class="card"><h1>Materialplanung · {escape(project["title"])}</h1><p>Interne Planung. Billomat bleibt für Angebote/Rechnungen zuständig; Craftnote und Google Kalender werden hier nicht verändert.</p><p><a class="btn light" href="{ingress("projects/"+key+"/montage")}">Montageübersicht</a></p></div>'
         if not order:
             if not draft:
                 return page('Materialplanung', title + f'<div class="card"><a class="btn" href="{ingress("projects/"+key+"/quote")}">Angebotsentwurf vorbereiten</a></div>')

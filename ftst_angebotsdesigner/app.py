@@ -11,6 +11,7 @@ from asset_library import DEFAULT_LOGO
 import materials
 import projects
 import project_intake
+import montage
 import quote_drafts
 import quote_presentation
 import inventory_views
@@ -26,7 +27,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.16.0"
+APP_VERSION = "0.17.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -314,6 +315,7 @@ def offer_pdf(oid):
 materials.register(app, base, ingress, clean, offer_store, TYPES, get_offer)
 projects.register(app, base, ingress, clean, offer_store)
 project_intake.register(app, base, ingress, clean, offer_store)
+montage.register(app, base, ingress, clean, offer_store)
 quote_drafts.register(app, base, ingress, clean, offer_store)
 quote_presentation.register(app, base, ingress, clean, offer_store)
 quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)
