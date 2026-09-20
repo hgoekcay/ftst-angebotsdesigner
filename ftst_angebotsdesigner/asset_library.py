@@ -2,10 +2,11 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent / 'assets'
-DEFAULT_LOGO = 'builtin-ftst-wide'
+DEFAULT_LOGO = 'builtin-ftst-registered'
 
 # Stable identifiers are stored in SQLite; filenames never come from HTTP input.
 ASSETS = [
+    ('ftst-registered', 'branding/FTST-Registered-Original.jpg', 'FT Sicherheitstechnik ® – Firmenlogo', 'Logo', 'Firmenlogo'),
     ('ftst-wide', 'branding/FT SICHERHEITSTECHNIK - Logo.jpg', 'FT Sicherheitstechnik – Firmenlogo', 'Logo', 'Firmenlogo'),
     ('ftst-mail', 'branding/FT SICHERHEITSTECHNIK - Logommail.jpg', 'FT Sicherheitstechnik – kompakt', 'Logo', 'Firmenlogo'),
     ('ftst-square', 'branding/FT SICHERHEITSTECHNIK VIERECK_1.png', 'FT – quadratische Variante', 'Logo', 'Firmenlogo'),
@@ -29,6 +30,10 @@ def catalog(store, identity):
         for key, filename, title, category, kind in ASSETS
         if (ROOT / filename).is_file()
     }
+    if DEFAULT_LOGO in result:
+        # Display only the FT wordmark from the unchanged, user-supplied original.
+        # Coordinates are x, y, width, height in the original 1000 × 1000 image.
+        result[DEFAULT_LOGO]['logo_crop'] = (40, 230, 945, 180)
     for key, record in store.records(identity, 'image').items():
         path = store.directory / 'images' / (key + '.png')
         if not key.startswith('builtin-') and path.is_file():

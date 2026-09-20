@@ -1,20 +1,36 @@
 """Company identity and reusable real project photographs."""
 import io
+import base64
+import hmac
 import json
 import material_uploads
 import os
 import uuid
+import re
+import secrets
 from pathlib import Path
 from asset_library import catalog, DEFAULT_LOGO
 from reference_selection import suggest
 
-from flask import abort, redirect, request, send_file
+from flask import abort, redirect, request, send_file, session, Response
 from PIL import Image as PILImage, ImageOps, UnidentifiedImageError
 from reportlab.platypus import Image, Paragraph, Spacer, PageBreak
 from reportlab.lib.units import mm
 
-PROFILE_FIELDS = {'company': 'Firmenname', 'contact': 'Ansprechpartner', 'street': 'Straße',
-                  'city': 'PLZ / Ort', 'phone': 'Telefon', 'email': 'E-Mail', 'website': 'Website'}
+PROFILE_FIELDS = {'company': 'Firmenname', 'owner': 'Geschäftsinhaber', 'contact': 'Ansprechpartner',
+                  'street': 'Straße', 'city': 'PLZ / Ort', 'phone': 'Telefon', 'email': 'E-Mail',
+                  'website': 'Website', 'bank_name': 'Bank', 'iban': 'IBAN', 'bic': 'BIC'}
+
+
+def valid_iban(value):
+    if not value:
+        return True
+    if not re.fullmatch(r'[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}', value):
+        return False
+    if value.startswith('DE') and len(value) != 22:
+        return False
+    digits = ''.join(str(ord(c) - 55) if c.isalpha() else c for c in value[4:] + value[:4])
+    return int(digits) % 97 == 1
 
 
 def account():
@@ -33,8 +49,11 @@ def enrich(offer, store):
     offer['reference_images'] = [images[key] for key in chosen if key in images]
     logo = offer['company_profile'].get('logo', DEFAULT_LOGO)
     offer.pop('logo_path', None)
+    offer.pop('logo_crop', None)
     if logo in images:
         offer['logo_path'] = images[logo]['path']
+        if images[logo].get('logo_crop'):
+            offer['logo_crop'] = images[logo]['logo_crop']
     return offer
 
 
@@ -115,19 +134,34 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
         store = get_store()
         profile = store.records(account(), 'profile').get('company', {})
         images = catalog(store, account())
+        csrf = session.setdefault('company_csrf', secrets.token_urlsafe(32))
+        error = ''
         if request.method == 'POST':
-            profile = {k: request.form.get(k, '').strip()[:500] for k in PROFILE_FIELDS}
+            if not hmac.compare_digest(request.form.get('csrf', '').encode(), csrf.encode()):
+                abort(400, 'Bitte Firmendaten neu öffnen und erneut speichern.')
+            profile = dict(profile, **{k: request.form.get(k, '').strip() for k in PROFILE_FIELDS})
+            profile['iban'] = re.sub(r'\s+', '', profile['iban']).upper()
+            profile['bic'] = re.sub(r'\s+', '', profile['bic']).upper()
             logo = request.form.get('logo', '')
             if logo and logo not in images:
                 abort(400)
             profile['logo'] = logo
-            store.put_record(account(), 'profile', 'company', profile)
-            return redirect(ingress('company') + '?saved=1')
+            if any(len(profile[k]) > 500 for k in PROFILE_FIELDS):
+                error = 'Bitte je Feld höchstens 500 Zeichen eingeben.'
+            elif not valid_iban(profile['iban']):
+                error = 'Die IBAN ist nicht gültig. Bitte mit Ihrer Bankverbindung vergleichen.'
+            elif profile['bic'] and not re.fullmatch(r'[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?', profile['bic']):
+                error = 'Die BIC muss aus 8 oder 11 gültigen Zeichen bestehen.'
+            if not error:
+                store.put_record(account(), 'profile', 'company', profile)
+                return redirect(ingress('company') + '?saved=1')
         fields = ''.join(field(k, label, profile.get(k, '')) for k, label in PROFILE_FIELDS.items())
         options = '<option value="" ' + ('selected' if profile.get('logo') == '' else '') + '>Ohne Logo</option>' + ''.join(
             f'<option value="{key}" {"selected" if profile.get("logo", DEFAULT_LOGO)==key else ""}>{escape(img.get("title"))}</option>' for key, img in images.items())
         notice = '<p class="success">Firmendaten gespeichert.</p>' if request.args.get('saved') else ''
-        return base('Firmendaten', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Firmendaten & Logo</h1>{notice}<p>Hier hinterlegte Angaben erscheinen im PDF. Das FT-Firmenlogo ist bereits hinterlegt. FTronics steht als Produktmarke bereit. Eigene Logos können unter Fotos ergänzt werden.</p><form method="post">{fields}<label for="logo">Logo</label><select name="logo" id="logo">{options}</select><p><button class="btn">Speichern</button><a class="btn light" href="{ingress("materials")}">Fotos verwalten</a></p></form></div>')
+        if error:
+            notice = '<p role="alert">' + escape(error) + '</p>'
+        return base('Firmendaten', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Firmendaten & Logo</h1>{notice}<p>Adresse, Kontakt und Bankverbindung erscheinen in der Fußzeile jeder PDF-Seite. Bitte die Bankdaten vor der Verwendung prüfen. Das FT-Firmenlogo mit ® ist hinterlegt; FTronics steht als Produktmarke bereit.</p><form method="post"><input type="hidden" name="csrf" value="{escape(csrf)}">{fields}<label for="logo">Logo</label><select name="logo" id="logo">{options}</select><p><button class="btn">Speichern</button><a class="btn light" href="{ingress("materials")}">Fotos verwalten</a></p></form></div>'), (400 if error else 200)
 
     @app.route('/materials', methods=['GET', 'POST'])
     def materials():
@@ -174,6 +208,15 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
         images = catalog(store, account())
         if key not in images:
             abort(404)
+        if images[key].get('bundled') and images[key].get('logo_crop'):
+            x, y, width, height = images[key]['logo_crop']
+            payload = base64.b64encode(Path(images[key]['path']).read_bytes()).decode('ascii')
+            with PILImage.open(images[key]['path']) as original:
+                iw, ih = original.size
+            svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x} {y} {width} {height}" '
+                   f'width="{width}" height="{height}" role="img" aria-label="FT Sicherheitstechnik ®">'
+                   f'<image href="data:image/jpeg;base64,{payload}" width="{iw}" height="{ih}"/></svg>')
+            return Response(svg, mimetype='image/svg+xml', headers={'X-Content-Type-Options': 'nosniff'})
         return send_file(images[key]['path'])
 
     @app.route('/offer/<oid>/references', methods=['GET', 'POST'])

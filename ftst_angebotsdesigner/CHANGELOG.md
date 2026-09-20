@@ -1,3 +1,10 @@
+## 0.15.0
+- Größeres originales FT-Sicherheitstechnik-Logo mit ® im Appkopf und in der PDF.
+- Firmenadresse, Inhaber, Kontakt und Bankverbindung in einer dreispaltigen Fußzeile auf jeder PDF-Seite; Angaben werden unter Firma gepflegt. IBAN-Prüfsumme und BIC-Format werden vor dem Speichern geprüft.
+- Vier Referenzbilder unterschiedlicher Sicherheitsbereiche gemeinsam auf einer Seite; Bildherkunft bleibt gekennzeichnet.
+- Ablaufseite sowie häufige Fragen zur Sicherheitstechnik mit persönlichem Kontakt und Angebotsgültigkeit. Keine fremden Kennzahlen, Garantien oder Zahlungszusagen aus Mustervorlagen.
+- Firmendatenformular schützt Änderungen mit einem Sitzungstoken; fehlerhafte Angaben überschreiben keine gespeicherten Daten.
+
 ## 0.14.0
 
 - Technikeraufnahme am Handy: Handzettelfoto hochladen und lokal auswerten oder eine strukturierte Liste erfassen. Originalfoto, Transkript und Positionen bleiben zur Prüfung sichtbar; erst bestätigte Mengen und Beschreibungen gehen in die Projektkalkulation ein.
