@@ -60,6 +60,9 @@ def tokens(value):
 def candidates(description, articles):
     # Quantity and connecting prose must not suggest unrelated products.
     ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück', 'ajax'}
+    # The intake's visible room annotation is installation context, not a
+    # product term. Keep it on the requirement, but out of article matching.
+    description = description.partition(' · Raum / Montageort: ')[0]
     terms = tokens(description)
     wanted = {word for word in terms if not word.isdigit() and word not in ignored}
     # These are search synonyms only. BM/MK require the explicitly confirmed
@@ -74,6 +77,8 @@ def candidates(description, articles):
             families.update(('homesiren', 'streetsiren'))
         if any(word.startswith(('bedienteil', 'aussenbedienteil', 'innenbedienteil')) for word in terms):
             families.add('keypad')
+        if any(word.startswith(('zentrale', 'alarmzentrale')) for word in terms):
+            families.add('hub')
     outside = any(word.startswith(('aussen', 'outdoor')) for word in terms)
     inside = any(word.startswith(('innen', 'indoor')) for word in terms)
     locations = {'aussen', 'aussenbereich', 'aussenmontage', 'outdoor', 'innen', 'innenbereich', 'innenmontage', 'indoor'}
@@ -100,6 +105,12 @@ def candidates(description, articles):
             requested_accessory = any(word.startswith(prefix) for word in terms for prefix in accessories)
             if accessory and not requested_accessory:
                 continue
+            if 'hub' in families:
+                # Compatibility mentions such as "ReX für Hub" or "Netzteil
+                # für Hub" do not turn a repeater/accessory into a central unit.
+                extra = ('rex', 'repeater', 'netzteil', 'psu', 'zubehör', 'zubehoer')
+                if any(term.startswith(prefix) for term in title for prefix in extra):
+                    continue
             article_outside = any(term.startswith(('aussen', 'outdoor', 'streetsiren')) for term in title)
             article_inside = any(term.startswith(('innen', 'indoor', 'homesiren')) for term in title)
             if outside != inside:
