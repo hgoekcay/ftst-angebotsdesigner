@@ -109,7 +109,9 @@ def candidates(description, articles):
                 # Compatibility mentions such as "ReX für Hub" or "Netzteil
                 # für Hub" do not turn a repeater/accessory into a central unit.
                 extra = ('rex', 'repeater', 'netzteil', 'psu', 'zubehör', 'zubehoer')
-                if any(term.startswith(prefix) for term in title for prefix in extra):
+                requested_extra = {prefix for prefix in extra if any(word.startswith(prefix) for word in terms)}
+                article_extra = {prefix for prefix in extra if any(word.startswith(prefix) for word in title)}
+                if article_extra and not article_extra.intersection(requested_extra):
                     continue
             article_outside = any(term.startswith(('aussen', 'outdoor', 'streetsiren')) for term in title)
             article_inside = any(term.startswith(('innen', 'indoor', 'homesiren')) for term in title)

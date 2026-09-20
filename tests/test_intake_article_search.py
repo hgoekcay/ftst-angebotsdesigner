@@ -48,6 +48,17 @@ def test_central_search_alias_requires_ajax_context_and_keeps_exact_article_look
     assert [row['title'] for row in result] == ['Ajax ReX 2 für Hub']
 
 
+@pytest.mark.parametrize('query,expected,excluded', [
+    ('Netzteil für Ajax Zentrale', 'Ajax Netzteil für Hub 2', 'Ajax ReX 2 für Hub'),
+    ('Ajax ReX Repeater für Zentrale', 'Ajax ReX 2 für Hub', 'Ajax Netzteil für Hub 2'),
+    ('PSU für Ajax Zentrale', '12V PSU für Hub', 'Ajax ReX 2 für Hub'),
+])
+def test_explicitly_requested_hub_accessory_is_still_searchable(articles, query, expected, excluded):
+    titles = {row['title'] for row in candidates(query, articles)}
+    assert expected in titles
+    assert excluded not in titles
+
+
 def test_hub_suggestions_do_not_assign_article_or_change_quantity_and_price(monkeypatch, articles):
     monkeypatch.setenv('BILLOMAT_ID', 'intake-search')
     project = dict(title='Alarmanlage', notes='Zentrale im Flur')
