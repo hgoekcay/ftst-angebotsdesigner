@@ -1,4 +1,4 @@
-"""Reviewable local quote drafts. Billomat is read-only in this workflow."""
+"""Reviewable local quote drafts; explicit transfer is a separate workflow."""
 import hashlib
 import json
 import os
@@ -76,7 +76,7 @@ def candidates(description, articles):
 
 def catalog_snapshot(raw):
     fields = {
-        'articles': ('id','article_number','title','sales_price','sales_price2','sales_price3','sales_price4','sales_price5','currency_code','unit_id','tax_id','type'),
+        'articles': ('id','article_number','title','description','sales_price','sales_price2','sales_price3','sales_price4','sales_price5','currency_code','unit_id','tax_id','type'),
         'clients': ('id','client_number','name','first_name','last_name','price_group','reduction','tax_rule','net_gross','currency_code','archived'),
         'taxes': ('id','name','rate','is_default'),
         'units': ('id','name'),
@@ -298,4 +298,10 @@ def register(app, base, ingress, escape, get_store):
         body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}{presentation_link}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Speichern sichert Ihre Auswahl. Der Knopf „Artikel und Kunden aus Billomat laden“ aktualisiert die Stammdaten.</p><p><a href="{ingress("customers")}" target="_blank" rel="noopener">Kunden suchen oder neu anlegen</a></p><p>{len(draft.get("catalog",{}).get("articles",[]))} Artikel · {len(draft.get("catalog",{}).get("clients",[]))} Kunden geladen</p><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
         <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><label><input style="width:auto" type="checkbox" name="tax_confirmed" value="yes" {'checked' if draft.get('tax_confirmed')=='yes' else ''}> Bei länderabhängiger Steuerregel: Die Artikelsteuersätze gelten für diesen Auftrag.</label></p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
         <div class="card"><h2>Kalkulation zur Prüfung</h2><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
-        return base('Angebotsentwurf', body + '<div class="card">' + export + '</div>'), status
+        transfer = store.record(account(), 'quote_transfer', key)
+        if transfer:
+            body = body.replace('<p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p>',
+                                '<p>Für dieses Projekt besteht ein Billomat-Übertragungsvorgang. Den aktuellen Stand finden Sie unter „Billomat-Übertragung öffnen“.</p>', 1)
+        transfer_label = 'Billomat-Übertragung öffnen' if transfer else 'Übergabe an Billomat prüfen'
+        transfer_link = f'<p><a class="btn" href="{ingress("projects/"+key+"/quote/transfer")}">{transfer_label}</a></p>'
+        return base('Angebotsentwurf', body + '<div class="card">' + export + transfer_link + '</div>'), status

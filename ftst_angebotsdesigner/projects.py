@@ -39,6 +39,7 @@ def register(app, base, ingress, escape, get_store):
         value = project(key)
         store = get_store()
         if request.method == 'POST':
+            identity = account()
             value['notes'] = request.form.get('notes','')[:20000]
             oid = request.form.get('offer_id','').strip()
             if oid and not oid.isdigit():
@@ -48,6 +49,7 @@ def register(app, base, ingress, escape, get_store):
             value['analysis'] = {}
             value.pop('error', None)
             folder = store.directory / 'projects' / key
+            attachments = {}
             for field in ('image','audio'):
                 upload = request.files.get(field)
                 if not upload or not upload.filename:
@@ -62,6 +64,7 @@ def register(app, base, ingress, escape, get_store):
                         picture.thumbnail((2400,2400))
                         picture.save(folder/'note.png')
                         value['image'] = 'note.png'
+                        attachments['image'] = 'note.png'
                     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
                         abort(400, 'Ungültiges Bild.')
                 else:
@@ -71,7 +74,29 @@ def register(app, base, ingress, escape, get_store):
                     name = 'voice'+suffix
                     upload.save(folder/name)
                     value['audio'] = name
-            store.put_record(account(), 'project', key, value)
+                    attachments['audio'] = name
+
+            def save_project(current, db):
+                if current is None:
+                    abort(404)
+                row = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
+                                 (identity, 'quote_transfer', key)).fetchone()
+                transfer = json.loads(row[0]) if row else {}
+                linked_id = str(transfer.get('offer_id') or '') if transfer.get('status') == 'created' else ''
+                if linked_id and oid and oid != linked_id:
+                    raise RecordConflict('Dieses Projekt wurde bereits mit Billomat-Angebot ' + linked_id
+                                         + ' verknüpft. Die Angebots-ID kann hier nicht geändert werden.')
+                # Read the completed transfer and write the project under one lock:
+                # a stale form must not erase a link created by finish() meanwhile.
+                updated = dict(current, notes=value['notes'], offer_id=linked_id or oid, analysis={})
+                updated.update(attachments)
+                updated.pop('error', None)
+                return updated
+
+            try:
+                store.transact_record(identity, 'project', key, save_project)
+            except RecordConflict as exc:
+                abort(409, str(exc))
             return redirect(ingress('projects/'+key)+'?saved=1')
         result = value.get('analysis', {})
         rows = ''.join(f'<tr><td data-label="Komponente">{escape(row.get("description"))}</td><td data-label="Menge">{escape(row.get("quantity") if row.get("quantity") is not None else "Offen")}</td><td data-label="Beleg">{escape(row.get("evidence"))}</td></tr>' for row in result.get('components',[]))
