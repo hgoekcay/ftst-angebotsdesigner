@@ -284,11 +284,20 @@ def register(app, base, ingress, escape, get_store):
         live = working(get_store(), identity, key)
         body = '<meta http-equiv="refresh" content="4">' if live else ''
         body += f'<div class="back"><a href="{ingress("projects/" + key)}">← Projekt</a></div><div class="card"><h1>Technikeraufnahme</h1><p>Foto oder Notizen → Vorschlag prüfen → Kalkulation.</p>'
+        body += ('<p><strong>Speichern erstellt noch kein Angebot.</strong> Prüfen Sie unten die erkannten Komponenten, '
+                 'tragen Sie die Mengen ein und bestätigen Sie die Übernahme. Danach öffnet sich die Kalkulation für Billomat-Kunde, Artikel und Preise.</p>'
+                 '<p>Kundenname und Adresse dürfen bei der Aufnahme noch fehlen. Sie können später ergänzt werden. '
+                 'Ein Name in diesem Formular legt keinen Billomat-Kunden an und wählt noch keinen aus.</p>'
+                 f'<p><a class="btn light" data-pdf="FTST-Technikeraufnahme-Ajax.pdf" href="{ingress("static/FTST-Technikeraufnahme-Ajax.pdf")}">Checkliste als ausfüllbare PDF</a></p>'
+                 '<p class="muted">Vorlage drucken oder digital ausfüllen. In dieser Aufnahme werden JPG, PNG und WebP unterstützt; '
+                 'für die Fotoauswertung Seite 1 fotografieren und Ergänzungen von Seite 2 manuell eintragen. Kein PDF-Dateiimport.</p>')
         if error or value.get('error'):
             body += '<p role="alert">' + escape(error or value['error']) + '</p>'
             body += f'<a class="btn light" href="{ingress("projects/" + key + "/intake")}">Aktuellen Stand öffnen</a>'
         if request.args.get('saved'):
-            body += '<p class="success">Angaben gespeichert.</p>'
+            body += '<p class="success">Aufnahme gespeichert. Noch kein Angebot erstellt.</p>'
+        if value.get('components') and value.get('status') != 'applied' and not live:
+            body += '<p><a class="btn" href="#intake-components">Nächster Schritt: Komponenten prüfen</a></p>'
         if value.get('status') == 'applied':
             body += f'<p class="success">Geprüfte Komponenten ins Projekt übernommen.</p><a class="btn" href="{ingress("projects/" + key + "/quote")}">Kalkulation öffnen</a>'
         if value.get('source_project') != fingerprint(project):
@@ -340,7 +349,7 @@ def register(app, base, ingress, escape, get_store):
         body += f'<label for="intake-summary">Zusammenfassung</label><textarea id="intake-summary" name="summary" maxlength="4000">{escape(value.get("summary", ""))}</textarea>'
         questions = '\n'.join(value.get('questions', []))
         body += f'<label for="intake-questions">Offene Rückfragen (eine pro Zeile)</label><textarea id="intake-questions" name="questions" maxlength="6000">{escape(questions)}</textarea><p class="muted">Montage und Anfahrt bleiben freie Angaben. Preise werden später geprüft; offene Angaben werden nicht geschätzt.</p>'
-        body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen und Ajax-Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben ins Projekt übernehmen</button></fieldset></form></div>'
+        body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen und Ajax-Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben übernehmen und zur Kalkulation</button></fieldset></form></div>'
         body += f'<script defer src="{ingress("static/project_intake.js")}"></script>'
         body += '<div class="card"><h2>Lokaler Fotovorschlag</h2><p>Nur das gespeicherte Foto und die gespeicherten Angaben werden lokal ausgewertet. Für die Analyse höchstens 4000 Zeichen einschließlich Feldangaben und Rückfragen; längere Aufnahmen können manuell bearbeitet werden. Der Vorschlag wird erst nach Ihrer Prüfung übernommen.</p>'
         if not value.get('photo'):
@@ -450,6 +459,8 @@ def register(app, base, ingress, escape, get_store):
             if new_file:
                 new_file.unlink(missing_ok=True)
             raise
+        if action == 'apply':
+            return redirect(ingress('projects/' + key + '/quote') + '?intake_applied=1', code=303)
         fragment = '#intake-components' if component or action == 'add_row' else ''
         return redirect(ingress('projects/' + key + '/intake') + '?saved=1' + fragment, code=303)
 

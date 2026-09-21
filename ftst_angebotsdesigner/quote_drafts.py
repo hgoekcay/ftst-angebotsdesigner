@@ -347,6 +347,21 @@ def register(app, base, ingress, escape, get_store):
         if total is not None and draft.get('reviewed') and draft.get('revision'):
             export = f'<p><a class="btn dark" data-pdf="FTST-Angebotsentwurf.pdf" href="{ingress("projects/"+key+"/quote/pdf")}?revision={escape(draft["revision"])}">PDF-Entwurf öffnen</a></p><p class="muted">Zur internen Prüfung; noch keine Freigabe und kein Versand.</p>'
         saved = '<p class="success">Entwurf gespeichert.</p>' if request.args.get('saved') else ''
+        guide = ('<section class="card"><h2>Von der Aufnahme zum Angebot</h2>'
+                 '<ol><li>Artikel und Kunden aus Billomat laden, falls der Katalog noch fehlt.</li>'
+                 '<li>Den richtigen Billomat-Kunden auswählen und jeder Position einen konkreten Artikel zuordnen.</li>'
+                 '<li>Mengen, Montage, Anfahrt, Zubehör und Kundenkonditionen prüfen und speichern.</li>'
+                 '<li>Den PDF-Entwurf prüfen. Danach ist die gesonderte Übergabe an Billomat möglich.</li></ol>')
+        if project.get('customer_name'):
+            guide += f'<p><strong>Kunde laut Aufnahme:</strong> {escape(project["customer_name"])}</p>'
+        guide += '<p>Ein Kundenname aus der Aufnahme ist noch keine Billomat-Zuordnung. Fehlende Kundendaten können Sie ergänzen; ohne passenden Kunden und vollständige Artikelzuordnung bleibt die Summe offen.</p>'
+        if stale:
+            guide += ('<p role="alert"><strong>Die Aufnahme wurde geändert.</strong> Die bisherige Kalkulation bleibt erhalten. '
+                      'Mit „Positionen aus aktuellen Notizen neu übernehmen“ ersetzen Sie deren Positionsliste durch die aktuellen Anforderungen; '
+                      'bisherige Artikelzuordnungen müssen danach erneut geprüft werden.</p>')
+        if result['problems']:
+            guide += '<h3>Aktuell noch zu erledigen</h3><ul>' + problems + '</ul>'
+        guide += '</section>'
         presentation_link = f'<p><a class="btn light" href="{ingress("projects/"+key+"/quote/presentation")}">Kundentexte & Fotos gestalten</a></p>'
         if not draft.get('revision'):
             presentation_link = '<p>Kundentexte und Fotos können nach dem ersten Speichern gestaltet werden.</p>'
@@ -359,4 +374,4 @@ def register(app, base, ingress, escape, get_store):
                                 '<p>Für dieses Projekt besteht ein Billomat-Übertragungsvorgang. Den aktuellen Stand finden Sie unter „Billomat-Übertragung öffnen“.</p>', 1)
         transfer_label = 'Billomat-Übertragung öffnen' if transfer else 'Übergabe an Billomat prüfen'
         transfer_link = f'<p><a class="btn" href="{ingress("projects/"+key+"/quote/transfer")}">{transfer_label}</a></p>'
-        return base('Angebotsentwurf', body + '<div class="card">' + export + transfer_link + '</div>'), status
+        return base('Angebotsentwurf', guide + body + '<div class="card">' + export + transfer_link + '</div>'), status
