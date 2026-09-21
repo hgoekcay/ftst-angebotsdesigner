@@ -1,3 +1,9 @@
+## 0.19.0
+
+- Kundenanlage direkt aus dem Angebotsentwurf starten und bestätigten neuen Kunden mit aktuellen Billomat-Stammdaten in denselben Entwurf übernehmen.
+- Bestehende Positionen bleiben erhalten; Preis-/Steuerprüfung wird zurückgesetzt. Parallele Änderungen, andere Konten und bereits übertragene Angebote werden geschützt.
+- Kundenformulare für Privatpersonen und Firmen verständlich beschriftet; öffentliche Websuche bleibt auf Firmen ausgerichtet.
+
 ## 0.18.0
 
 - Bestätigte Technikeraufnahme führt direkt zur Kalkulation; Speichern und Übernehmen klar unterschieden.

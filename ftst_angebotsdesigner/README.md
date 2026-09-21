@@ -4,7 +4,7 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.18.0**
+**0.19.0**
 
 In Projekten zeigt **Ihr Weg zum Angebot** den gespeicherten Fortschritt und führt zum nächsten Schritt. Unter **Technikeraufnahme → Ajax-Komponente schnell ergänzen** lassen sich Bewegungsmelder, Magnetkontakte, Innen-/Außensirenen, Innen-/Außenbedienteile und Zentralen einzeln ergänzen. Menge und konkrete Variante werden anschließend eingetragen. Der optionale Raum / Montageort bleibt nach der bestätigten Übernahme in der Kalkulationsanforderung sichtbar. Details: [Technikerablauf](../docs/TECHNIKERAUFNAHME.md).
 
@@ -53,3 +53,7 @@ Unter **Projekte → Projekt → Montageübersicht** stehen ausdrücklich übern
 ## Von der Aufnahme zur Kalkulation (0.18.0)
 
 Die Technikeraufnahme enthält eine druckbare, ausfüllbare Ajax-Checkliste mit zwei A4-Seiten. Kundendaten können zunächst offen bleiben. Speichern hält die Aufnahme fest; erst **Geprüfte Angaben übernehmen und zur Kalkulation** übernimmt bestätigte Komponenten und öffnet den Angebotsentwurf. Dort werden der Billomat-Kunde und konkrete Artikel ausgewählt. Die Eingabe eines Namens in der Aufnahme ersetzt diese Zuordnung nicht. Eine bestehende Kalkulation wird nicht automatisch überschrieben; bei Änderungen müssen ihre Positionen bewusst neu übernommen werden. PDF-Dateiimport wird noch nicht unterstützt; für die Fotoauswertung Seite 1 fotografieren und Angaben von Seite 2 manuell ergänzen.
+
+## Neuer Kunde direkt aus dem Angebot (0.19.0)
+
+Im Angebotsentwurf zuerst Änderungen speichern und **Kunden suchen oder neu anlegen** öffnen. Privatpersonen mit vollständigem Namen und Anschrift manuell erfassen; Webrecherche ist für öffentliche Firmendaten vorgesehen. Nach Vorschau und ausdrücklich bestätigter Kundenanlage zeigt Billomat die neue Kundennummer. **Kunden übernehmen und zurück zum Angebot** lädt die aktuellen Stammdaten und wählt diesen Kunden im ursprünglichen Entwurf. Vorhandene Positionen bleiben erhalten. Die Preis-/Steuerprüfung muss anschließend erneut erfolgen. Zwischenzeitlich geänderte oder bereits übertragene Angebote werden nicht überschrieben. Bei unklarem Kundenanlage-Status bleibt die Übernahme gesperrt; keinen zweiten Kunden anlegen.

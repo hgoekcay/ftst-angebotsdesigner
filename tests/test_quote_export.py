@@ -51,7 +51,8 @@ def test_saved_quote_pdf_matches_discount_totals_and_draft_status(exported):
     assert store.records('test', 'quote') == before
     page = client.get('/projects/one/quote', headers={'X-Ingress-Path': '/ingress'}).text
     assert '/ingress/projects/one/quote/pdf?revision=v1' in page
-    assert 'target="_blank"' in page
+    # PDFs use the authenticated in-app download, not a new browser session.
+    assert 'data-pdf="FTST-Angebotsentwurf.pdf"' in page
 
 
 @pytest.mark.parametrize('change', ['unreviewed', 'stale', 'invalid', 'revision'])

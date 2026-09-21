@@ -12,6 +12,7 @@ from company_search import FIELDS, SearchError, research, safe_url
 from materials import account
 from quote_drafts import catalog_snapshot
 from storage import RecordConflict
+from customer_handoff import context as quote_context, select_created
 
 
 def api():
@@ -28,7 +29,7 @@ def normalize(value):
 def customer_fields(source):
     result = {k: str(source.get(k, '')).strip() for k in FIELDS}
     if any(len(v)>300 for v in result.values()) or not all(result[k] for k in ('name','street','zip','city')):
-        raise ValueError('Firmennamen und vollständige Geschäftsanschrift prüfen; höchstens 300 Zeichen je Feld.')
+        raise ValueError('Vollständigen Namen oder Firmennamen und Anschrift prüfen; höchstens 300 Zeichen je Feld.')
     result['country_code'] = result['country_code'].upper()
     if not re.fullmatch('[A-Z]{2}', result['country_code']):
         raise ValueError('Land als zweistelligen ISO-Ländercode angeben, z. B. DE.')
@@ -39,6 +40,7 @@ def customer_fields(source):
 
 def duplicates(payload, clients):
     return [c for c in clients if normalize(c.get('name')) == normalize(payload['name']) or
+            normalize(' '.join(str(c.get(k) or '') for k in ('first_name', 'last_name'))) == normalize(payload['name']) or
             (normalize(c.get('street')) == normalize(payload['street']) and
              normalize(c.get('zip')) == normalize(payload['zip']) and
              normalize(c.get('name')) and normalize(payload['name']) in normalize(c.get('name')))]
@@ -54,7 +56,7 @@ def submit(store, identity, key, revision, client_api):
     previous = store.record(identity,'customer_submit',lock)
     if previous:
         if previous.get('fields') != payload:
-            raise RecordConflict('Für diesen Firmennamen besteht bereits eine Übertragung mit anderen Daten. Billomat-Kundenbestand prüfen.')
+            raise RecordConflict('Für diesen Namen besteht bereits eine Übertragung mit anderen Daten. Billomat-Kundenbestand prüfen.')
         return previous
     existing = duplicates(payload, client_api.collection('clients','client'))
     if existing:
@@ -117,6 +119,14 @@ def register(app, base, ingress, escape, get_store):
     @app.route('/customers',methods=['GET','POST'])
     def customers_home():
         store=get_store()
+        project_id = request.form.get('project', request.args.get('project', ''))
+        try:
+            target = quote_context(store, account(), project_id)
+        except ValueError as exc:
+            abort(404, str(exc))
+        project = store.record(account(), 'project', project_id) if target else {}
+        project_field = f'<input type="hidden" name="project" value="{escape(project_id)}">'
+        back = f'<p><a class="btn light" href="{ingress("projects/"+project_id+"/quote")}">Zurück zum Angebotsentwurf</a></p>' if target else ''
         query=request.form.get('query',request.args.get('q','')).strip()[:200]
         message=''
         results=''
@@ -126,7 +136,9 @@ def register(app, base, ingress, escape, get_store):
             try:
                 if action=='manual':
                     key=uuid.uuid4().hex
-                    store.put_record(account(),'customer_draft',key,dict(fields=dict.fromkeys(FIELDS,''),revision=uuid.uuid4().hex,source_url='',source_title='Manuelle Eingabe'))
+                    initial = dict.fromkeys(FIELDS, '')
+                    initial.update(name=(project or {}).get('customer_name', '') or query, country_code='DE')
+                    store.put_record(account(),'customer_draft',key,dict(fields=initial,quote_context=target,revision=uuid.uuid4().hex,source_url='',source_title='Manuelle Eingabe'))
                     return redirect(ingress('customers/'+key))
                 if len(query)<3:
                     raise ValueError('Bitte mindestens drei Zeichen eingeben, möglichst Firmenname und Ort.')
@@ -138,7 +150,7 @@ def register(app, base, ingress, escape, get_store):
                     # Do not transmit stored customers or project notes to the web provider.
                     companies=research(query)
                     search_id=uuid.uuid4().hex
-                    store.put_record(account(),'company_search',search_id,{'companies':companies})
+                    store.put_record(account(),'company_search',search_id,{'companies':companies,'quote_context':target})
                     for index,c in enumerate(companies):
                         results+=f'<div class="card"><h2>{escape(c["name"])}</h2><p>{escape(c["street"])} · {escape(c["zip"])} {escape(c["city"])} · {escape(c["country_code"])}</p><p>{escape(c["hint"])}</p><p>Quelle: <a target="_blank" rel="noopener noreferrer" href="{escape(c["source_url"])}">{escape(c["source_title"])}</a></p><form method="post" action="{ingress("customers/select")}">{csrf()}<input type="hidden" name="search" value="{search_id}"><input type="hidden" name="index" value="{index}"><button class="btn light">Diese Firma prüfen</button></form></div>'
                     message=f'<p>{len(companies)} belegte Firmenvorschläge. Anschrift und rechtliche Firma vor der Anlage prüfen.</p>'
@@ -150,7 +162,7 @@ def register(app, base, ingress, escape, get_store):
                     raise
                 message=card_error(str(exc) if isinstance(exc,(ValueError,SearchError)) else 'Billomat-Suche fehlgeschlagen. Verbindung und API-Berechtigung prüfen.')
         ai='Web-Firmensuche verfügbar.' if os.getenv('OPENAI_API_KEY','').strip() else 'Web-Firmensuche benötigt noch den OpenAI-API-Schlüssel in der Home-Assistant-App-Konfiguration.'
-        return base('Kundenassistent',f'<div class="card"><h1>Firma finden und als Kunde übernehmen</h1><p>Zuerst nach bestehenden Kunden suchen. Neue Kundendaten werden vor dem Anlegen vollständig angezeigt.</p>{message}<form method="post">{csrf()}<label>Firmenname und Ort<input name="query" value="{escape(query)}" maxlength="200" placeholder="Firmenname GmbH, Ort"></label><button class="btn" name="action" value="existing">In Billomat suchen</button><button class="btn light" name="action" value="web">Firma im Web suchen</button><button class="btn light" name="action" value="manual">Firmendaten manuell eingeben</button></form><p>{ai}</p><p>Bei Websuche wird ausschließlich der eingegebene Suchtext an OpenAI zur Internetrecherche übertragen. Es können API-Kosten entstehen. Keine Projektnotizen, Kundenlisten oder Billomat-Zugangsdaten werden übertragen.</p></div>{results}')
+        return base('Kundenassistent',f'<div class="card"><h1>Kunden finden oder neu anlegen</h1>{back}<p>Für Privatkunden vollständigen Vor- und Nachnamen, für Firmen den vollständigen Firmennamen verwenden. Zuerst nach bestehenden Kunden suchen. Neue Kundendaten werden vor dem Anlegen vollständig angezeigt.</p>{message}<form method="post">{csrf()}{project_field}<label>Name / Firma und Ort<input name="query" value="{escape(query)}" maxlength="200" placeholder="Name oder Firma, Ort"></label><button class="btn" name="action" value="existing">In Billomat suchen</button><button class="btn light" name="action" value="web">Firma im Web suchen</button><button class="btn light" name="action" value="manual">Kundendaten manuell eingeben</button></form><p>{ai}</p><p>Die Websuche ist für öffentliche Firmendaten gedacht. Privatkunden manuell erfassen. Bei Websuche wird ausschließlich der eingegebene Suchtext an OpenAI zur Internetrecherche übertragen. Es können API-Kosten entstehen. Keine Projektnotizen, Kundenlisten oder Billomat-Zugangsdaten werden übertragen.</p></div>{results}')
 
     @app.post('/customers/select')
     def customer_select():
@@ -164,7 +176,7 @@ def register(app, base, ingress, escape, get_store):
         except (ValueError,IndexError,KeyError):
             abort(400)
         key=uuid.uuid4().hex
-        get_store().put_record(account(),'customer_draft',key,dict(fields={k:company[k] for k in FIELDS},source_url=company['source_url'],source_title=company['source_title'],revision=uuid.uuid4().hex))
+        get_store().put_record(account(),'customer_draft',key,dict(fields={k:company[k] for k in FIELDS},quote_context=saved.get('quote_context',{}),source_url=company['source_url'],source_title=company['source_title'],revision=uuid.uuid4().hex))
         return redirect(ingress('customers/'+key))
 
     @app.route('/customers/<key>',methods=['GET','POST'])
@@ -191,9 +203,14 @@ def register(app, base, ingress, escape, get_store):
                     draft=dict(draft,fields=fields,ready=True,revision=uuid.uuid4().hex)
                     store.put_revision(account(),'customer_draft',key,draft,revision)
                     return redirect(ingress('customers/'+key))
+                elif request.form.get('action')=='use':
+                    lock = hashlib.sha256(normalize(draft['fields'].get('name')).encode()).hexdigest()
+                    result = store.record(account(), 'customer_submit', lock)
+                    project_id = select_created(store, account(), draft, result, api())
+                    return redirect(ingress('projects/'+project_id+'/quote')+'?customer_selected=1', code=303)
                 elif request.form.get('action')=='create':
                     if not draft.get('ready') or request.form.get('confirmed')!='yes':
-                        raise ValueError('Bitte die angezeigten Firmendaten ausdrücklich bestätigen.')
+                        raise ValueError('Bitte die angezeigten Kundendaten ausdrücklich bestätigen.')
                     result=submit(store,account(),key,revision,api())
                 else:
                     abort(400)
@@ -205,15 +222,21 @@ def register(app, base, ingress, escape, get_store):
                 message=card_error('Billomat-Prüfung fehlgeschlagen. Bei unklarem Übertragungsstatus die Kundenliste prüfen, nicht erneut anlegen.'); status=503
         lock=hashlib.sha256(normalize(draft['fields'].get('name')).encode()).hexdigest()
         result=result or store.record(account(),'customer_submit',lock)
-        labels=dict(name='Exakter Firmenname',street='Straße und Hausnummer',zip='Postleitzahl',city='Ort',country_code='Land (ISO-Code, z. B. DE)',www='Website (optional, https://…)')
+        labels=dict(name='Vollständiger Name / Firmenname',street='Straße und Hausnummer',zip='Postleitzahl',city='Ort',country_code='Land (ISO-Code, z. B. DE)',www='Website (optional, https://…)')
         fields=''.join(f'<label>{label}<input name="{k}" maxlength="300" value="{escape(draft["fields"].get(k))}" {"required" if k!="www" else ""}></label>' for k,label in labels.items())
         source=draft.get('source_url','')
-        source_html=f'<p>Recherchequelle: <a target="_blank" rel="noopener noreferrer" href="{escape(source)}">{escape(draft.get("source_title") or source)}</a></p>' if safe_url(source) else '<p>Manuell erfasste Firmendaten.</p>'
+        source_html=f'<p>Recherchequelle: <a target="_blank" rel="noopener noreferrer" href="{escape(source)}">{escape(draft.get("source_title") or source)}</a></p>' if safe_url(source) else '<p>Manuell erfasste Kundendaten.</p>'
         token=f'<input type="hidden" name="revision" value="{escape(draft["revision"])}">'
         body=f'<div class="card"><a href="{ingress("customers")}">← Kundenassistent</a><h1>Kundendaten prüfen</h1>{source_html}{message}'
+        target = draft.get('quote_context') or {}
+        if target.get('project'):
+            body += f'<p><a class="btn light" href="{ingress("projects/"+target["project"]+"/quote")}">Zurück zum Angebotsentwurf</a></p>'
         if result:
             if result['status']=='created':
                 body+=f'<p class="success">Kunde in Billomat angelegt: {escape(result.get("fields",{}).get("name"))}. Kundennummer: {escape(result.get("client_number"))} · ID {escape(result["client_id"])}</p><p>Übertragene Anschrift: {escape(result.get("fields",{}).get("street"))}, {escape(result.get("fields",{}).get("zip"))} {escape(result.get("fields",{}).get("city"))}</p><p>Im Angebotsentwurf die Kundenliste neu laden und diesen Kunden auswählen.</p>'
+                if target.get('project') and result.get('fields') == draft.get('fields'):
+                    body = body.replace('<p>Im Angebotsentwurf die Kundenliste neu laden und diesen Kunden auswählen.</p>', '')
+                    body += f'<form method="post">{csrf()}{token}<p>Lädt aktuelle Billomat-Stammdaten und wählt diesen Kunden im zugehörigen Entwurf. Vorhandene Positionen bleiben erhalten; Preise und Steuer müssen danach erneut geprüft werden.</p><button class="btn" name="action" value="use">Kunden übernehmen und zurück zum Angebot</button></form>'
             elif result['status']=='duplicate':
                 body+='<p>Passende Kunden sind bereits in Billomat vorhanden. Es wurde kein neuer Kunde angelegt.</p>'+client_cards(result['clients'])
             else:
@@ -224,6 +247,6 @@ def register(app, base, ingress, escape, get_store):
                 body+=f'<form method="post">{csrf()}{token}{fields}<button class="btn light" name="action" value="prepare">Daten prüfen und Vorschau speichern</button></form>'
             if draft.get('ready'):
                 summary=''.join(f'<tr><th>{labels[k]}</th><td>{escape(draft["fields"][k])}</td></tr>' for k in FIELDS)
-                body+=f'<h2>Diese Daten werden an Billomat übertragen</h2><table>{summary}</table><p>Kundennummer und kaufmännische Vorgaben vergibt Billomat nach deinen Kontoeinstellungen. Es wird kein Angebot versandt.</p><form method="post">{csrf()}{token}<label><input style="width:auto" type="checkbox" name="confirmed" value="yes" required> Ja, das ist die richtige Firma. Ich bestätige die gespeicherten Daten oben und möchte sie als Kunden in meinem Billomat anlegen.</label><button class="btn" name="action" value="create">Bestätigten Kunden in Billomat anlegen</button></form>'
-                body+=f'<form method="post">{csrf()}{token}<button class="btn light" name="action" value="edit">Firmendaten korrigieren</button></form>'
+                body+=f'<h2>Diese Daten werden an Billomat übertragen</h2><table>{summary}</table><p>Kundennummer und kaufmännische Vorgaben vergibt Billomat nach deinen Kontoeinstellungen. Es wird kein Angebot versandt.</p><form method="post">{csrf()}{token}<label><input style="width:auto" type="checkbox" name="confirmed" value="yes" required> Ja, das ist der richtige Kunde. Ich bestätige die gespeicherten Daten oben und möchte sie als Kunden in meinem Billomat anlegen.</label><button class="btn" name="action" value="create">Bestätigten Kunden in Billomat anlegen</button></form>'
+                body+=f'<form method="post">{csrf()}{token}<button class="btn light" name="action" value="edit">Kundendaten korrigieren</button></form>'
         return base('Kundenprüfung',body+'</div>'),status
