@@ -1,3 +1,13 @@
+## 0.18.0
+
+- Bestätigte Technikeraufnahme führt direkt zur Kalkulation; Speichern und Übernehmen klar unterschieden.
+- Kalkulation erklärt Billomat-Kunde, Artikelzuordnung und aktuell offene Punkte. Bestehende Kalkulationen bleiben bei geänderter Aufnahme erhalten.
+- Druckbare und ausfüllbare Ajax-Checkliste mit zwei A4-Seiten direkt in der Technikeraufnahme verfügbar. Fotoauswertung weiterhin JPG/PNG/WebP; kein PDF-Dateiimport.
+
+## 0.17.0
+
+- Interne Montageübersicht gruppiert bestätigte Komponenten nach Einbauort und zeigt Montagehinweise sowie offene Rückfragen. Druckansicht und Handybedienung.
+
 ## 0.16.0
 
 - Technikeraufnahme mit Schnellauswahl für sieben Ajax-Komponententypen. Nur bewusst gewählte Typen werden ergänzt; Mengen und genaue Varianten bleiben zur Eingabe offen.

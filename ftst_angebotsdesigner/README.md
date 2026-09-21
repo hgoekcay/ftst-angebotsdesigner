@@ -4,7 +4,7 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.17.0**
+**0.18.0**
 
 In Projekten zeigt **Ihr Weg zum Angebot** den gespeicherten Fortschritt und führt zum nächsten Schritt. Unter **Technikeraufnahme → Ajax-Komponente schnell ergänzen** lassen sich Bewegungsmelder, Magnetkontakte, Innen-/Außensirenen, Innen-/Außenbedienteile und Zentralen einzeln ergänzen. Menge und konkrete Variante werden anschließend eingetragen. Der optionale Raum / Montageort bleibt nach der bestätigten Übernahme in der Kalkulationsanforderung sichtbar. Details: [Technikerablauf](../docs/TECHNIKERAUFNAHME.md).
 
@@ -49,3 +49,7 @@ Der Antwortassistent enthält eine Mail-Arbeitsliste mit manuellem Text-/EML-Imp
 ## Montageübersicht
 
 Unter **Projekte → Projekt → Montageübersicht** stehen ausdrücklich übernommene Komponenten nach Einbauort, Mengen, Montagehinweise und offene Rückfragen. Die Übersicht lässt sich am Handy lesen und über **Übersicht drucken** ausgeben. Noch ungeprüfte Änderungen werden nicht übernommen; ein Hinweis kennzeichnet den älteren bestätigten Stand. Die Ansicht reserviert kein Material und bestätigt keine Beauftragung.
+
+## Von der Aufnahme zur Kalkulation (0.18.0)
+
+Die Technikeraufnahme enthält eine druckbare, ausfüllbare Ajax-Checkliste mit zwei A4-Seiten. Kundendaten können zunächst offen bleiben. Speichern hält die Aufnahme fest; erst **Geprüfte Angaben übernehmen und zur Kalkulation** übernimmt bestätigte Komponenten und öffnet den Angebotsentwurf. Dort werden der Billomat-Kunde und konkrete Artikel ausgewählt. Die Eingabe eines Namens in der Aufnahme ersetzt diese Zuordnung nicht. Eine bestehende Kalkulation wird nicht automatisch überschrieben; bei Änderungen müssen ihre Positionen bewusst neu übernommen werden. PDF-Dateiimport wird noch nicht unterstützt; für die Fotoauswertung Seite 1 fotografieren und Angaben von Seite 2 manuell ergänzen.

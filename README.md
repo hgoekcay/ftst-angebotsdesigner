@@ -1,6 +1,6 @@
 # FTST AngebotsDesigner
 
-Home-Assistant-App mit Billomat als Datenquelle. Aktueller Entwicklungsstand: **0.17.0**.
+Home-Assistant-App mit Billomat als Datenquelle. Aktueller Entwicklungsstand: **0.18.0**.
 
 ## Funktionen
 
