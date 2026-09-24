@@ -1,3 +1,9 @@
+## 0.20.0
+
+- Zwei Versandaktionen für freigegebene Billomat-Angebote: E-Mail und WhatsApp mit prüfbaren Kundendaten, Betreff und Nachricht.
+- PDF innerhalb der angemeldeten App vorbereiten; Empfängerlink und Dateispeicherung oder natives Teilen anbieten. Versand erfolgt in der gewählten App, ohne öffentliche Angebotslinks.
+- Fehlende Kontakte, ungültige Nummern und fehlerhafte PDF-Antworten abfangen. Kein automatischer Serverversand und keine unbestätigte Versandmarkierung.
+
 ## 0.19.0
 
 - Kundenanlage direkt aus dem Angebotsentwurf starten und bestätigten neuen Kunden mit aktuellen Billomat-Stammdaten in denselben Entwurf übernehmen.
