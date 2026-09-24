@@ -4,9 +4,9 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.20.0**
+**0.21.0**
 
-Freigegebene Angebote haben Aktionen für E-Mail und WhatsApp. Kundendaten prüfen, PDF vorbereiten und über die gewählte App senden. Empfängerlinks übertragen keine Anhänge; PDF speichern und anhängen oder natives Teilen verwenden. Kein serverseitiger Direktversand. Details: [Angebotsversand](../docs/ANGEBOTSVERSAND.md).
+Kundendokumente heißen „Leistungsvorschlag“. E-Mail und WhatsApp haben getrennte bearbeitbare Texte. Nach „PDF für WhatsApp vorbereiten“ die Hauptaktion „PDF an WhatsApp teilen“ wählen und im Teilen-Menü WhatsApp samt Empfänger auswählen. Reine Empfängerlinks sind als Alternative ohne PDF gekennzeichnet. Kein serverseitiger Direktversand. Details: [Versand](../docs/ANGEBOTSVERSAND.md).
 
 In Projekten zeigt **Ihr Weg zum Angebot** den gespeicherten Fortschritt und führt zum nächsten Schritt. Unter **Technikeraufnahme → Ajax-Komponente schnell ergänzen** lassen sich Bewegungsmelder, Magnetkontakte, Innen-/Außensirenen, Innen-/Außenbedienteile und Zentralen einzeln ergänzen. Menge und konkrete Variante werden anschließend eingetragen. Der optionale Raum / Montageort bleibt nach der bestätigten Übernahme in der Kalkulationsanforderung sichtbar. Details: [Technikerablauf](../docs/TECHNIKERAUFNAHME.md).
 
