@@ -1,3 +1,7 @@
+# 0.21.1
+
+- Browserdateien sind an die App-Version gebunden, damit nach Updates keine veraltete Versandlogik geladen wird.
+
 ## 0.21.0
 
 - Kundenseitige PDF-Beschriftung, Betreff und Versanddateiname auf „Leistungsvorschlag“ umgestellt; Billomat-Kennungen und Entwurfsstatus bleiben erhalten.

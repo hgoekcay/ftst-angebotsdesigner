@@ -28,7 +28,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.21.0"
+APP_VERSION = "0.21.1"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -224,7 +224,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("static/pdf-download.js")}"></script></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("static/pdf-download.js?v="+APP_VERSION)}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -294,7 +294,7 @@ def detail(o):
     else:
         body = body.replace('Ihr persönliches Angebot', 'Ihr persönlicher Leistungsvorschlag').replace('data-pdf="FTST-Angebot-', 'data-pdf="FTST-Leistungsvorschlag-')
     body = body.replace('<div class="grid">', offer_delivery.panel(o, ingress) + '<div class="grid">', 1)
-    body += '<script defer src="' + ingress('static/offer-delivery.js') + '"></script>'
+    body += '<script defer src="' + ingress('static/offer-delivery.js?v='+APP_VERSION) + '"></script>'
     return base("FTST Angebotsentwurf" if o.get('is_draft') else "FTST Leistungsvorschlag",body)
 
 def footer(canvas,doc):

@@ -37,7 +37,9 @@ def test_missing_contacts_are_editable():
 def test_delivery_panel_on_offer_route(client):
     response = client.get('/offer/42', headers={'X-Ingress-Path': '/api/hassio_ingress/test'})
     assert response.status_code == 200
-    assert b'/api/hassio_ingress/test/static/offer-delivery.js' in response.data
+    from app import APP_VERSION
+    assert f'/api/hassio_ingress/test/static/offer-delivery.js?v={APP_VERSION}'.encode() in response.data
+    assert f'/api/hassio_ingress/test/static/pdf-download.js?v={APP_VERSION}'.encode() in response.data
     assert b'/api/hassio_ingress/test/offer/42/pdf' in response.data
 
 
