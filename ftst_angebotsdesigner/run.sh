@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -e
+export STRATO_SMTP_ENABLED="$(bashio::config 'strato_smtp_enabled')"
+export STRATO_SMTP_PASSWORD="$(bashio::config 'strato_smtp_password')"
 export STRATO_AUTO_IMPORT="$(bashio::config 'strato_auto_import')"
 export STRATO_AUTO_AI="$(bashio::config 'strato_auto_ai')"
 export STRATO_POLL_SECONDS="$(bashio::config 'strato_poll_seconds')"

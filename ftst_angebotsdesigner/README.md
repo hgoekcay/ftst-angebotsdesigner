@@ -4,9 +4,9 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.21.2**
+**0.22.0**
 
-Kundendokumente heißen „Leistungsvorschlag“. E-Mail und WhatsApp haben getrennte bearbeitbare Texte. Nach „PDF für WhatsApp vorbereiten“ die Hauptaktion „PDF an WhatsApp teilen“ wählen und im Teilen-Menü WhatsApp samt Empfänger auswählen. Reine Empfängerlinks sind als Alternative ohne PDF gekennzeichnet. Kein serverseitiger Direktversand. Details: [Versand](../docs/ANGEBOTSVERSAND.md).
+Kundendokumente heißen „Leistungsvorschlag“. E-Mail und WhatsApp haben getrennte bearbeitbare Texte. Nach „PDF für WhatsApp vorbereiten“ die Hauptaktion „PDF an WhatsApp teilen“ wählen und im Teilen-Menü WhatsApp samt Empfänger auswählen. Reine Empfängerlinks sind als Alternative ohne PDF gekennzeichnet. Direktversand über STRATO mit bestätigter Vorschau und PDF-Anhang ist optional verfügbar; Einrichtung siehe Versanddokumentation. Details: [Versand](../docs/ANGEBOTSVERSAND.md).
 
 In Projekten zeigt **Ihr Weg zum Angebot** den gespeicherten Fortschritt und führt zum nächsten Schritt. Unter **Technikeraufnahme → Ajax-Komponente schnell ergänzen** lassen sich Bewegungsmelder, Magnetkontakte, Innen-/Außensirenen, Innen-/Außenbedienteile und Zentralen einzeln ergänzen. Menge und konkrete Variante werden anschließend eingetragen. Der optionale Raum / Montageort bleibt nach der bestätigten Übernahme in der Kalkulationsanforderung sichtbar. Details: [Technikerablauf](../docs/TECHNIKERAUFNAHME.md).
 

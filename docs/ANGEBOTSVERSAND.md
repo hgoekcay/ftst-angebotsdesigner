@@ -18,3 +18,18 @@ Die E-Mail-Vorlage enthält die vom Nutzer gelieferte FTST-Signatur sowie einen 
 Deutsche Ortsvorwahlen mit führender 0 werden nach +49 normalisiert. Ausländische Nummern mit + oder 00 und Landesvorwahl eingeben. Ob eine Nummer tatsächlich WhatsApp nutzt, lässt sich vor dem Öffnen nicht feststellen.
 
 Technische Grundlagen: [WhatsApp Click-to-Chat](https://faq.whatsapp.com/5913398998672934), [Web Share API](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share).
+
+
+## Direkter E-Mail-Versand ab 0.22.0
+
+Auf einem freigegebenen Leistungsvorschlag **E-Mail mit PDF direkt versenden** wählen. Empfänger und Text prüfen, **E-Mail mit PDF prüfen** öffnet eine gespeicherte Vorschau. PDF und Nachricht sind damit eingefroren. Nach Änderungen am Leistungsvorschlag eine neue Vorschau erstellen. Erst die bestätigte Aktion **Jetzt per E-Mail senden** übermittelt die E-Mail. Jede Vorschau kann höchstens einmal übermittelt werden und bleibt eine Stunde sendefähig. Keine automatische Wiederholung und kein Hintergrundversand.
+
+Unter Home Assistant → Apps → FTST AngebotsDesigner → Konfiguration `strato_smtp_enabled` aktivieren. `strato_smtp_password` ist das Postfachpasswort für `info@ftst.eu`. Bleibt es leer, wird bei direktem STRATO-Abruf das bereits konfigurierte `strato_imap_password` verwendet. Bei Bridge-Betrieb ist ein gesondertes SMTP-Passwort erforderlich. Zugangsdaten nur in den geschützten HA-Optionen hinterlegen, nie im Chat oder Repository.
+
+SMTP verwendet ausschließlich `smtp.strato.de:465` mit verifiziertem TLS und festem Absender `info@ftst.eu`. Quelle: https://www.strato.de/faq/mail/e-mailserver-adressen-ports-ssl-tls/
+
+**Mailzugang & Referenzlogos → SMTP-Anmeldung prüfen** führt nur die Anmeldung aus und sendet keine Nachricht. Hier können bis zu drei zuvor hochgeladene Kundenlogos ausgewählt und mit dem tatsächlichen Standort beschriftet werden. Nicht konfigurierte Plätze werden ausgelassen. FT-Logo und Referenzlogos sind MIME-CID-Anlagen; keine externen Bildabrufe oder Trackingpixel. Die vorhandene Billomat-Mailvorlage wird nicht geändert.
+
+Der Versandverlauf unterscheidet vorbereitet, Versand läuft/ungeklärt, vom Mailserver angenommen, nicht versendet und unklar. Serverannahme ist kein Zustellnachweis. Bei einem Timeout nach DATA nicht nochmals senden, sondern zuerst den Empfänger bzw. das Postfach prüfen. Nach einem Prozessabbruch bleibt ein begonnener Vorgang gesperrt. E-Mail samt PDF ist als EML und im Verlauf verfügbar; kein automatisches Ablegen im STRATO-Ordner „Gesendet“. Eine Datenbankwiederherstellung kann jüngere Versandnachweise verlieren; nach Wiederherstellung Versandhistorie abgleichen, bevor ältere vorbereitete Nachrichten gesendet werden.
+
+Die Vorschau ist nur innerhalb der angemeldeten App abrufbar. Keine öffentlichen Dokumentlinks. Die bestätigte PDF wird auch dann unverändert verschickt, wenn das Angebot zwischenzeitlich editiert wird; deshalb vor dem Senden die Vorschau prüfen. Frischer Billomat-Status verhindert Versand zwischenzeitlich zu Entwürfen gewordener Angebote.

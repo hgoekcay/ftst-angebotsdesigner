@@ -1,3 +1,13 @@
+## 0.22.0
+
+- Referenzfotos für PDF-Anhänge mit ausreichender Druckauflösung optimiert; Originaldateien bleiben unverändert.
+
+- Direkter STRATO-E-Mail-Versand von info@ftst.eu mit echter PDF-Anlage, HTML-Layout und eingebettetem FT-Logo.
+- Getrennte Vorbereitung, prüfbare gespeicherte E-Mail-/PDF-Vorschau und ausdrückliche Sendeaktion; keine Hintergrundsendungen.
+- Dauerhafter Versandverlauf, Schutz vor doppelter Übermittlung und gesperrte Wiederholung bei unklarem Ergebnis.
+- Bis zu drei hochgeladene Kundenlogos mit Standortbezeichnung; Anmeldetest ohne Nachricht.
+- SMTP in den App-Optionen aktivieren; bestehender direkter STRATO-Zugang kann verwendet werden. Keine Änderung der lesenden Mail-Bridge.
+
 ## 0.21.2
 
 - Eindeutige versionierte Pfade und No-Store-Header für die Versanddateien verhindern veraltete Skripte auch bei Proxies, die Query-Parameter ignorieren.
