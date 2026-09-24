@@ -40,4 +40,5 @@ def test_baseline_routes(raw, monkeypatch):
     page = client.get('/offer/42', headers={'X-Ingress-Path': '/ingress/test'}).text
     assert 'data-pdf="FTST-Leistungsvorschlag-42.pdf"' in page
     assert 'title="PDF in neuem Tab öffnen"' not in page
-    assert '/ingress/test/static/pdf-download.js' in page
+    from app import APP_VERSION
+    assert f'/ingress/test/ui-assets/{APP_VERSION}/pdf-download.js' in page
