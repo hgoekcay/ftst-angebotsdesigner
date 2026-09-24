@@ -1,3 +1,10 @@
+## 0.21.0
+
+- Kundenseitige PDF-Beschriftung, Betreff und Versanddateiname auf „Leistungsvorschlag“ umgestellt; Billomat-Kennungen und Entwurfsstatus bleiben erhalten.
+- Ausführliche E-Mail mit FTST-Signatur und Beratungslink sowie eigener kurzer WhatsApp-Text, jeweils vor Versand bearbeitbar.
+- PDF-Dateiteilen als Hauptaktion; WhatsApp-Chat-Link ausdrücklich als reine Textalternative gekennzeichnet. Browser ohne Dateiteilen erhalten eine klare Anleitung zum manuellen Anhängen.
+- Nachricht kopieren, Abbruch-/Fehleranzeigen und Tests der tatsächlichen Dateiübergabe ergänzt. Keine Nachrichten automatisch verschickt.
+
 ## 0.20.0
 
 - Zwei Versandaktionen für freigegebene Billomat-Angebote: E-Mail und WhatsApp mit prüfbaren Kundendaten, Betreff und Nachricht.

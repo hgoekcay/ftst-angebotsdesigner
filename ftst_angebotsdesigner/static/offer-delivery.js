@@ -32,12 +32,16 @@
     const channel = button.dataset.deliver;
     const email = panel.querySelector('#delivery-email');
     const subject = panel.querySelector('#delivery-subject').value.trim();
-    const message = panel.querySelector('#delivery-text').value.trim();
+    const messageField = panel.querySelector(channel === 'email' ? '#delivery-email-text' : '#delivery-whatsapp-text');
+    const message = messageField.value.trim();
     try {
       if (channel === 'email') {
         recipient = email.value.trim();
         if (!recipient || !email.checkValidity() || /[\r\n,;]/.test(recipient)) throw Error('Bitte eine gültige E-Mail-Adresse des Kunden eingeben.');
-      } else recipient = phoneNumber(panel.querySelector('#delivery-phone').value);
+      } else {
+        const phone = panel.querySelector('#delivery-phone').value.trim();
+        recipient = phone ? phoneNumber(phone) : '';
+      }
     } catch (error) { status.textContent = error.message; return; }
     busy = true;
     panel.querySelectorAll('[data-deliver], input, textarea').forEach(node => { node.disabled = true; });
@@ -52,28 +56,48 @@
       if (await blob.slice(0, 5).text() !== '%PDF-') throw Error('Keine gültige PDF erhalten. Es wurde nichts versendet.');
       const file = new File([blob], panel.dataset.filename, {type: 'application/pdf'});
       objectUrl = URL.createObjectURL(blob);
-      status.textContent = 'PDF bereit. Empfänger: ' + (channel === 'email' ? recipient : '+' + recipient) + '. Noch nicht versendet.';
-      const save = element('a', '1. PDF speichern');
-      save.className = 'btn light'; save.href = objectUrl; save.download = file.name;
-      const open = element('a', channel === 'email' ? '2. E-Mail mit Empfänger öffnen' : '2. WhatsApp-Chat öffnen');
-      open.className = 'btn';
-      open.href = channel === 'email'
-        ? 'mailto:' + encodeURIComponent(recipient) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message)
-        : 'https://wa.me/' + recipient + '?text=' + encodeURIComponent(message);
-      if (channel === 'whatsapp') { open.target = '_blank'; open.rel = 'noopener noreferrer'; }
-      element('p', 'Die gespeicherte PDF in der geöffneten Nachricht als Anhang hinzufügen und dort senden. Der Empfänger und Nachrichtentext werden übernommen; der Anhang wird durch diesen Link nicht automatisch eingefügt.');
-      if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
-        const share = element('button', 'PDF direkt an eine App teilen');
-        share.type = 'button'; share.className = 'btn light';
-        element('p', 'Alternativ im Teilen-Menü ' + (channel === 'email' ? 'Ihre E-Mail-App' : 'WhatsApp') + ' wählen. Hier müssen Sie den oben angezeigten Empfänger selbst auswählen.');
+      status.textContent = 'PDF bereit. ' + (recipient ? 'Empfänger: ' + (channel === 'email' ? recipient : '+' + recipient) + '. ' : '') + 'Noch nicht versendet.';
+      let canShareFiles = false;
+      try { canShareFiles = Boolean(navigator.share && navigator.canShare && navigator.canShare({files: [file]})); } catch (_) { /* Use download fallback. */ }
+      if (canShareFiles) {
+        const share = element('button', channel === 'whatsapp' ? 'PDF an WhatsApp teilen' : 'PDF an E-Mail-App teilen');
+        share.type = 'button'; share.className = 'btn';
+        if (channel === 'whatsapp') share.style.background = '#16803c';
+        element('p', 'Im Teilen-Menü ' + (channel === 'email' ? 'Ihre E-Mail-App' : 'WhatsApp') + ' und anschließend den Kunden auswählen. Die PDF wird als Datei übergeben. Bitte vor dem Senden den Anhang prüfen.');
         share.addEventListener('click', async () => {
+          if (share.disabled) return;
+          share.disabled = true;
           try {
             await navigator.share({files: [file], title: subject, text: message});
             status.textContent = 'An die ausgewählte App übergeben. Bitte den Versand dort prüfen.';
           } catch (error) {
-            status.textContent = error.name === 'AbortError' ? 'Teilen abgebrochen. Es wird kein Versand bestätigt.' : 'Teilen nicht verfügbar. Bitte PDF speichern und als Anhang hinzufügen.';
-          }
+            status.textContent = error.name === 'AbortError' ? 'Teilen abgebrochen. Es wird kein Versand bestätigt.' : 'Dateiteilen wurde vom Browser nicht erlaubt. PDF speichern und in der Nachricht als Dokument anhängen.';
+          } finally { share.disabled = false; }
         });
+        element('p', 'Manche Apps übernehmen beim Dateiteilen nur die PDF. Den passenden Nachrichtentext können Sie mit „Text kopieren“ ergänzen.');
+      } else {
+        element('p', 'Dieser Browser unterstützt das direkte Teilen von PDF-Dateien hier nicht. PDF speichern und anschließend in ' + (channel === 'email' ? 'Ihrer E-Mail' : 'WhatsApp über „+ / Büroklammer → Dokument“') + ' anhängen. Ein Chat-Link allein sendet keine PDF.');
+      }
+      const save = element('a', 'PDF speichern');
+      save.className = canShareFiles ? 'btn light' : 'btn'; save.href = objectUrl; save.download = file.name;
+      const copy = element('button', 'Text kopieren');
+      copy.type = 'button'; copy.className = 'btn light';
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(message);
+          status.textContent = 'Nachrichtentext kopiert. Die PDF bitte separat über Teilen oder als Dokument hinzufügen.';
+        } catch (_) { status.textContent = 'Kopieren nicht verfügbar. Bitte den Nachrichtentext oben manuell markieren und kopieren.'; }
+      });
+      if (recipient) {
+        const alternatives = element('details', '');
+        element('summary', 'Empfänger direkt öffnen (PDF selbst anhängen)', alternatives);
+        const open = element('a', channel === 'email' ? 'E-Mail öffnen – noch ohne Anhang' : 'WhatsApp-Chat öffnen – nur Text, keine PDF', alternatives);
+        open.className = 'btn light';
+        open.href = channel === 'email'
+          ? 'mailto:' + encodeURIComponent(recipient) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message)
+          : 'https://wa.me/' + recipient + '?text=' + encodeURIComponent(message);
+        if (channel === 'whatsapp') { open.target = '_blank'; open.rel = 'noopener noreferrer'; }
+        element('p', 'Die gespeicherte PDF in der geöffneten Nachricht selbst als Anhang hinzufügen. Dieser Link überträgt nur Empfänger und Text.', alternatives);
       }
     } catch (error) {
       status.textContent = error.name === 'AbortError' ? 'PDF-Abruf hat zu lange gedauert. Bitte erneut versuchen.' : error.message;

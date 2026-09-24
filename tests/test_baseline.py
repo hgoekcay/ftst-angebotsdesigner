@@ -38,6 +38,6 @@ def test_baseline_routes(raw, monkeypatch):
     assert response.status_code == 200
     assert len(PdfReader(BytesIO(response.data)).pages) == 5
     page = client.get('/offer/42', headers={'X-Ingress-Path': '/ingress/test'}).text
-    assert 'data-pdf="FTST-Angebot-42.pdf"' in page
+    assert 'data-pdf="FTST-Leistungsvorschlag-42.pdf"' in page
     assert 'title="PDF in neuem Tab öffnen"' not in page
     assert '/ingress/test/static/pdf-download.js' in page
