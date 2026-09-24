@@ -1,5 +1,5 @@
 name: "FTST AngebotsDesigner"
-version: "0.22.0"
+version: "0.22.1"
 slug: "ftst_angebotsdesigner"
 description: "Professioneller AngebotsDesigner für FT Sicherheitstechnik mit Billomat-Anbindung und PDF-Erstellung."
 arch:
@@ -51,3 +51,4 @@ schema:
   openai_api_key: password?
   openai_model: str?
   openai_transcribe_model: str?
+
