@@ -31,7 +31,14 @@ class Photo(Flowable):
         super().__init__()
         self.width, self.height = 82*mm, height
         with PILImage.open(path) as source:
-            self.reader = ImageReader(ImageOps.exif_transpose(source).convert('RGB'))
+            photo = ImageOps.exif_transpose(source).convert('RGB')
+            # A reference occupies at most 82 mm; keep ample print resolution without
+            # embedding multi-megapixel lossless photos in every email attachment.
+            photo.thumbnail((1800, 1800), PILImage.Resampling.LANCZOS)
+            encoded = io.BytesIO()
+            photo.save(encoded, format='JPEG', quality=88, optimize=True)
+            encoded.seek(0)
+            self.reader = ImageReader(encoded)
 
     def draw(self):
         canvas = self.canv

@@ -1,4 +1,4 @@
-"""Recipient review and device-assisted delivery; never sends on the server."""
+"""Recipient review and links to explicit server or device delivery."""
 from html import escape
 
 
@@ -39,7 +39,8 @@ def panel(offer, ingress):
     subject, email_text, whatsapp_text = messages(offer)
     e = lambda v: escape(str(v), quote=True)
     return f'''<section class="card" data-offer-delivery data-pdf-url="{e(ingress('offer/' + oid + '/pdf'))}" data-filename="{e('FTST-Leistungsvorschlag-' + oid + '.pdf')}">
-<h2>Leistungsvorschlag versenden</h2><p>Kundendaten aus Billomat prüfen oder für diesen Versand ergänzen. Gesendet wird anschließend in Ihrer E-Mail-App oder WhatsApp.</p>
+<h2>Leistungsvorschlag versenden</h2><p>Kundendaten aus Billomat prüfen oder für diesen Versand ergänzen. E-Mail direkt mit PDF-Anhang vorbereiten oder die PDF über Ihre E-Mail-App bzw. WhatsApp teilen.</p>
+<p><a class="btn" style="background:#16803c" href="{e(ingress('offer/' + oid + '/email'))}">E-Mail mit PDF direkt versenden</a></p>
 <div class="grid"><div class="field"><label for="delivery-email">E-Mail des Kunden</label><input id="delivery-email" type="email" autocomplete="off" value="{e(value('email', 'email_address'))}"></div>
 <div class="field"><label for="delivery-phone">WhatsApp-Nummer des Kunden</label><input id="delivery-phone" type="tel" autocomplete="off" placeholder="+49 …" value="{e(value('mobile', 'mobile_phone', 'phone', 'phone_number'))}"><p class="small">Deutsche Nummern mit 0 werden in +49 umgewandelt. Andere Länder bitte mit +Ländervorwahl eingeben.</p></div></div>
 <div class="field"><label for="delivery-subject">Betreff</label><input id="delivery-subject" value="{e(subject)}" maxlength="200"></div>

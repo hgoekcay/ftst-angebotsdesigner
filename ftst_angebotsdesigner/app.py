@@ -23,12 +23,13 @@ import billomat_receipts
 import offer_cache
 import offer_followup
 import offer_delivery
+import offer_mail
 import quote_transfer
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.21.2"
+APP_VERSION = "0.22.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -338,6 +339,7 @@ quote_drafts.register(app, base, ingress, clean, offer_store)
 quote_presentation.register(app, base, ingress, clean, offer_store)
 quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)
 offer_followup.register(app, offer_store, base, ingress, clean, date_de)
+offer_mail.register(app, base, ingress, clean, offer_store, get_offer, make_pdf)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)
