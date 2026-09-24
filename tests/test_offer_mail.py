@@ -52,6 +52,34 @@ def test_preview_has_real_pdf_inline_logo_and_safe_html(client):
     assert 'Noch nicht eingerichtet' in client.get('/email-settings').text
 
 
+@pytest.mark.parametrize('legacy', [False, True])
+def test_umlauts_in_mime_and_preview_without_http_charset(client, monkeypatch, legacy):
+    original = offer_mail.build_message
+    if legacy:
+        def old_message(*args, **kwargs):
+            raw, message_id = original(*args, **kwargs)
+            msg = BytesParser(policy=policy.SMTP).parsebytes(raw)
+            part = msg.get_body(preferencelist=('html',))
+            html = part.get_content().replace('<meta charset="utf-8">', '')
+            part.set_content(html, subtype='html', charset='utf-8')
+            return msg.as_bytes(), message_id
+        monkeypatch.setattr(offer_mail, 'build_message', old_message)
+    data = fields(client)
+    data['text'] = 'Grüße für Hüseyin: Ä Ö Ü ä ö ü ß – persönlich.'
+    url = client.post('/offer/42/email', data=data).headers['Location']
+    frozen = client.get(url + '/eml').data
+    msg = BytesParser(policy=policy.default).parsebytes(frozen)
+    for subtype in ('plain', 'html'):
+        part = msg.get_body(preferencelist=(subtype,))
+        assert part.get_content_charset() == 'utf-8'
+        assert data['text'] in part.get_content()
+    preview = client.get(url + '/preview')
+    # Ingress may omit the HTTP charset: browsers must discover UTF-8 in the HTML.
+    assert b'<meta charset="utf-8">' in preview.data[:1024]
+    assert data['text'] in preview.data.decode('utf-8')
+    assert client.get(url + '/eml').data == frozen
+
+
 @pytest.mark.parametrize('recipient', ['a@b.de\r\nBcc: bad@evil.org', 'a@b.de,b@c.de', 'a@b.de;b@c.de', '', 'invalid'])
 def test_recipient_rejected_before_pdf_or_smtp(client, recipient, monkeypatch):
     data = fields(client)
@@ -207,3 +235,4 @@ def test_original_reference_photos_fit_email_budget(client):
     offer['reference_images'] = [{'path': str(ROOT / 'references' / 'Zerda_Gold_Rheinfelden_20260907_190456629.jpg'), 'title': 'Türstation'}] * 4
     pdf = module.make_pdf(offer).getvalue()
     assert pdf.startswith(b'%PDF-') and len(pdf) < 5 * 1024 * 1024
+

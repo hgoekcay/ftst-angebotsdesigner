@@ -103,7 +103,7 @@ def build_message(offer, recipient, subject, text, pdf, refs):
                          escape(part).replace('\n', '<br>') + '</p>' for part in text.split('\n\n'))
     reference_html = ('<h2 style="font-size:17px;margin-top:28px">Ausgewählte Kundenreferenzen</h2>'
                       '<table role="presentation" width="100%"><tr>' + cards + '</tr></table>') if cards else ''
-    html = ('<!doctype html><html lang="de"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    html = ('<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
             '<body style="margin:0;background:#f3f5f4;font-family:Arial,sans-serif;color:#202020">'
             '<table role="presentation" width="100%"><tr><td style="padding:20px 12px">'
             '<table role="presentation" width="100%" style="max-width:640px;margin:auto;background:#fff;border-top:5px solid #16803c">'
@@ -273,6 +273,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         msg = BytesParser(policy=policy.default).parsebytes(raw)
         if part == 'preview':
             html = msg.get_body(preferencelist=('html',)).get_content()
+            # Old frozen messages lack an HTML charset. Ingress/proxies may strip
+            # the HTTP charset, so the preview must also declare it in-document.
+            if not re.search(r'<meta\s+charset=', html, re.IGNORECASE):
+                html = html.replace('<head>', '<head><meta charset="utf-8">', 1)
             for image in msg.walk():
                 cid = str(image.get('Content-ID', '')).strip('<>')
                 if cid and image.get_content_type() == 'image/png':
@@ -337,3 +341,4 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                      '<label for="label_' + str(i) + '">Kunde / Standort</label><input id="label_' + str(i) + '" name="label_' + str(i) + '" maxlength="100" value="' + clean(item.get('label', '')) + '">')
         body += '<p><button class="btn" style="background:#16803c" name="action" value="references">Referenzleiste speichern</button></p></form></div>'
         return page('Mailzugang & Referenzlogos', body)
+
