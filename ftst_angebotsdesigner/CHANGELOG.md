@@ -1,3 +1,7 @@
+## 0.21.2
+
+- Eindeutige versionierte Pfade und No-Store-Header für die Versanddateien verhindern veraltete Skripte auch bei Proxies, die Query-Parameter ignorieren.
+
 # 0.21.1
 
 - Browserdateien sind an die App-Version gebunden, damit nach Updates keine veraltete Versandlogik geladen wird.

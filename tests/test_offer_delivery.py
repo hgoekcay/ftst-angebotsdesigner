@@ -38,8 +38,8 @@ def test_delivery_panel_on_offer_route(client):
     response = client.get('/offer/42', headers={'X-Ingress-Path': '/api/hassio_ingress/test'})
     assert response.status_code == 200
     from app import APP_VERSION
-    assert f'/api/hassio_ingress/test/static/offer-delivery.js?v={APP_VERSION}'.encode() in response.data
-    assert f'/api/hassio_ingress/test/static/pdf-download.js?v={APP_VERSION}'.encode() in response.data
+    assert f'/api/hassio_ingress/test/ui-assets/{APP_VERSION}/offer-delivery.js'.encode() in response.data
+    assert f'/api/hassio_ingress/test/ui-assets/{APP_VERSION}/pdf-download.js'.encode() in response.data
     assert b'/api/hassio_ingress/test/offer/42/pdf' in response.data
 
 
@@ -53,3 +53,14 @@ def test_customer_pdf_uses_leistungsvorschlag(client):
     text = '\n'.join(page.extract_text() for page in pdf.pages)
     assert 'LEISTUNGSVORSCHLAG' in text
     assert 'IHR PERSÖNLICHES ANGEBOT' not in text
+
+
+def test_versioned_asset_delivers_current_code_without_cache(client):
+    from app import APP_VERSION
+    response = client.get(f'/ui-assets/{APP_VERSION}/offer-delivery.js')
+    assert response.status_code == 200
+    assert b'#delivery-whatsapp-text' in response.data
+    assert b"querySelector('#delivery-text')" not in response.data
+    assert 'no-store' in response.headers['Cache-Control']
+    assert client.get('/ui-assets/old/offer-delivery.js').status_code == 404
+    assert client.get(f'/ui-assets/{APP_VERSION}/app.py').status_code == 404
