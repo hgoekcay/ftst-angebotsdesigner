@@ -58,6 +58,15 @@ def test_chat_script_uses_current_release_and_loads(chat):
     assert client.get(path).status_code == 200
 
 
+def test_article_search_keeps_full_catalogue_available(chat):
+    client, key, _, state = chat
+    state['rows'][0]['description'] = 'Unbekannte Bezeichnung'
+    send(chat)
+    page = client.get('/chat/' + key).get_data(as_text=True)
+    assert 'data-article-search="chat-article-0"' in page
+    assert 'value="1"' in page and 'Hub' in page
+
+
 def test_stale_revision_and_busy_job_rejected(chat, monkeypatch):
     assert send(chat, revision='old').status_code == 409
     queued = []
