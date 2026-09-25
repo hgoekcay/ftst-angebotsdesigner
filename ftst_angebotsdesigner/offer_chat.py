@@ -154,7 +154,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
                     attachment = next((a for a in chat.get('attachments', []) if a['id'] == form.get('photo_id')), None)
                     if not attachment:
                         raise ValueError('Bild nicht in diesem Chat gefunden.')
-                    result = project_photo.extract_photo(base64.b64decode(attachment['data']))
+                    image_record = store.record(identity, 'chat_image', key + ':' + attachment['id'])
+                    if not image_record:
+                        raise ValueError('Gespeichertes Bild fehlt.')
+                    result = project_photo.extract_photo(base64.b64decode(image_record['data']))
                     updates['photo_result'] = result['transcript']
                     updates['transcript'] = result['transcript'] if len(result['transcript']) <= 2000 else ''
                     message = 'Bildtext erkannt. Bitte Original und erkannten Text vergleichen, Mengen prüfen und den korrigierten Text als Nachricht senden.'
@@ -288,7 +291,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
         attachment = next((a for a in chat.get('attachments', []) if a['id'] == photo_id), None)
         if not attachment:
             abort(404)
-        response = send_file(BytesIO(base64.b64decode(attachment['data'])), mimetype='image/jpeg')
+        image_record = get_store().record(account(), 'chat_image', key + ':' + photo_id)
+        if not image_record:
+            abort(404)
+        response = send_file(BytesIO(base64.b64decode(image_record['data'])), mimetype='image/jpeg')
         response.headers['Cache-Control'] = 'private, no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
@@ -330,7 +336,9 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
                             raise RecordConflict('Chat inzwischen geändert. Bitte neu laden.')
                         if len(current.get('attachments', [])) + len(attachments) > 12:
                             raise ValueError('Höchstens zwölf Bilder je Chat. Bitte einen neuen Chat beginnen.')
-                        current.setdefault('attachments', []).extend(attachments)
+                        for attachment in attachments:
+                            db_put(_db, identity, 'chat_image', key + ':' + attachment['id'], attachment)
+                        current.setdefault('attachments', []).extend({'id': a['id']} for a in attachments)
                         current['messages'].append(dict(role='assistant', text=str(len(attachments)) + ' Bilder gespeichert. Bei Handzetteln bitte „Bildtext erkennen“ wählen und danach den Text prüfen. Objektfotos dienen als Unterlagen; daraus werden keine benötigten Mengen erfunden.'))
                         return dict(current, revision=uuid4().hex, at=stamp())
                     store.transact_record(identity, KIND, key, save_images)
