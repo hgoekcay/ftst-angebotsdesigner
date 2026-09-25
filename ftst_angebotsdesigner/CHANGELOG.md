@@ -1,3 +1,8 @@
+# 0.24.0
+
+- Mehrfach-Bildupload im Chat mit privaten Vorschaubildern.
+- Lokale Erkennung von Handzetteln mit Prüfung vor der Übernahme als Chatnachricht.
+
 # 0.23.3
 
 - Klare dreizeilige Kundenanschriften werden direkt übernommen, ohne erneute KI-Generierung; Positionen und Kontaktdaten bleiben erhalten.
