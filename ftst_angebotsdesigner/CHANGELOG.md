@@ -1,3 +1,7 @@
+# 0.23.2
+
+- Chat-Skript an die aktuelle App-Version gebunden: Ergebnisanzeige und Aufnahme funktionieren auch nach Versionsupdates.
+
 # 0.23.1
 
 - Im Live-Test erkannte Lücken bei Ajax-Türkontakten und getrennt geschriebenen Produktfamilien behoben.
