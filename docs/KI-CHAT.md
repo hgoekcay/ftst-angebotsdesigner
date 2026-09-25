@@ -31,3 +31,9 @@ Chat und Projekt sind auf das Billomat-Konto begrenzt. Formulare verwenden CSRF-
 
 Protokolle: [Wyoming](https://github.com/OHF-Voice/wyoming), [Billomat-Angebote und Abschluss](https://www.billomat.com/api/angebote/).
 
+
+## Bilder im Chat (0.24.0)
+
+Unter „Bilder hinzufügen“ bis vier JPG-, PNG- oder WebP-Dateien gemeinsam hochladen (zusammen 20 MB, maximal 25 Megapixel je Bild; zwölf Bilder je Chat). Die Vorschauen bleiben beim Chat. Sie werden nicht automatisch in Kunden-PDFs aufgenommen. HEIC bitte zuvor als JPG exportieren.
+
+Bei einem Handzettel „Bildtext erkennen“ wählen. Das vorhandene lokale Bildmodell liest den Text. Original und Ergebnis vergleichen, insbesondere Mengen und Strichlisten. Der Text steht zur Korrektur im Nachrichtenfeld bereit; erst „Nachricht senden“ übernimmt die geprüften Angaben. Bei mehr als 2000 Zeichen die relevanten Angaben aus der vollständigen Anzeige kopieren und kürzen. Die Bildauswertung verändert weder Kalkulation noch Billomat-Daten. Objektfotos können als Unterlagen gespeichert werden; sie erzeugen keine automatisch geschätzte Stückliste.

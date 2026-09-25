@@ -40,6 +40,16 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
     body += '</div>'
     if busy:
         body += '<p role="status">Ich bearbeite deine Anfrage. Du kannst diese Seite offen lassen; das Ergebnis erscheint automatisch.</p>'
+    body += '<details><summary>Bilder hinzufügen</summary><p>Bis vier Bilder gemeinsam, zusammen 20 MB. JPG, PNG oder WebP. Die Bilder bleiben im Chat und erscheinen nicht automatisch als Referenzbilder im Kunden-PDF.</p><form method="post" enctype="multipart/form-data">' + fields + '<label for="chat-images">Fotos oder Technikerzettel auswählen</label><input id="chat-images" name="images" type="file" multiple accept="image/jpeg,image/png,image/webp" required' + disabled + '><button class="btn" name="action" value="images"' + disabled + '>Bilder hochladen</button></form></details>'
+    if chat.get('attachments'):
+        body += '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">'
+        for index, attachment in enumerate(chat['attachments'], 1):
+            url = ingress('chat/' + key + '/images/' + attachment['id'])
+            body += '<div><a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="Chatbild ' + str(index) + '" loading="lazy" style="width:100%;height:150px;object-fit:contain"></a>'
+            body += form('photo', 'Bildtext erkennen', '<input type="hidden" name="photo_id" value="' + e(attachment['id']) + '">') + '</div>'
+        body += '</div>'
+    if chat.get('photo_result'):
+        body += '<details open><summary>Erkannter Bildtext – bitte prüfen</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + e(chat['photo_result']) + '</pre></details>'
     body += '<form method="post" data-chat-message>' + fields + '<label for="chat-message">Deine Nachricht</label><textarea id="chat-message" name="message" maxlength="2000" rows="5" placeholder="Erstelle einen Leistungsvorschlag für …: 6 Bewegungsmelder, 2 Türkontakte …" required' + disabled + '>' + e(chat.get('transcript', '')) + '</textarea><button class="btn" name="action" value="message"' + disabled + '>Nachricht senden</button></form>'
     body += '<details><summary>Sprachnotiz aufnehmen oder hochladen</summary><p>Bis 2 Minuten / 12 MB. Erkennung lokal mit Whisper. Den erkannten Text vor dem Senden prüfen.</p><form method="post" enctype="multipart/form-data" data-chat-audio>' + fields + '<input type="hidden" name="action" value="voice"><input type="file" name="audio" accept="audio/*,.m4a,.mp4,.webm" required' + disabled + '><div class="chat-voice"><button type="button" class="btn" data-record' + disabled + '>Aufnahme starten</button><button type="button" class="btn" data-stop disabled>Aufnahme beenden</button></div><p data-voice-status role="status"></p><button class="btn" type="submit"' + disabled + '>Sprachnotiz erkennen</button></form><p class="small">Falls das Mikrofon in der Home-Assistant-App nicht verfügbar ist: eine vorhandene Aufnahme hochladen oder die Diktierfunktion deiner Handytastatur verwenden.</p></details></section>'
     body += '<aside><section class="card"><h2>Dein Leistungsvorschlag</h2>'
@@ -106,4 +116,3 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
         body += '</section>'
     body += '</aside></div><script defer src="' + ingress('ui-assets/' + version + '/offer-chat.js') + '"></script>'
     return body
-
