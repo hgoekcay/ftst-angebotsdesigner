@@ -4,7 +4,7 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.22.0**
+**0.23.0**
 
 Kundendokumente heißen „Leistungsvorschlag“. E-Mail und WhatsApp haben getrennte bearbeitbare Texte. Nach „PDF für WhatsApp vorbereiten“ die Hauptaktion „PDF an WhatsApp teilen“ wählen und im Teilen-Menü WhatsApp samt Empfänger auswählen. Reine Empfängerlinks sind als Alternative ohne PDF gekennzeichnet. Direktversand über STRATO mit bestätigter Vorschau und PDF-Anhang ist optional verfügbar; Einrichtung siehe Versanddokumentation. Details: [Versand](../docs/ANGEBOTSVERSAND.md).
 
@@ -59,3 +59,8 @@ Die Technikeraufnahme enthält eine druckbare, ausfüllbare Ajax-Checkliste mit 
 ## Neuer Kunde direkt aus dem Angebot (0.19.0)
 
 Im Angebotsentwurf zuerst Änderungen speichern und **Kunden suchen oder neu anlegen** öffnen. Privatpersonen mit vollständigem Namen und Anschrift manuell erfassen; Webrecherche ist für öffentliche Firmendaten vorgesehen. Nach Vorschau und ausdrücklich bestätigter Kundenanlage zeigt Billomat die neue Kundennummer. **Kunden übernehmen und zurück zum Angebot** lädt die aktuellen Stammdaten und wählt diesen Kunden im ursprünglichen Entwurf. Vorhandene Positionen bleiben erhalten. Die Preis-/Steuerprüfung muss anschließend erneut erfolgen. Zwischenzeitlich geänderte oder bereits übertragene Angebote werden nicht überschrieben. Bei unklarem Kundenanlage-Status bleibt die Übernahme gesperrt; keinen zweiten Kunden anlegen.
+
+## KI-Chat
+
+Text und Sprachnotizen bis zum geprüften Leistungsvorschlag: siehe [KI-Chat](../docs/KI-CHAT.md). Lokale Verarbeitung mit Qwen und Whisper, konkrete Artikelwahl und separate Bestätigung von Anlage, Freigabe und E-Mail-Versand.
+
