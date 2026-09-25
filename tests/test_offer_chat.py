@@ -223,3 +223,43 @@ def test_model_unproven_data_and_actions_rejected(monkeypatch, change):
     with pytest.raises(ValueError):
         offer_chat_ai.extract(deepcopy(offer_chat_ai.EMPTY), [{'role': 'user', 'text': '1 Hub'}])
 
+
+def image_file():
+    from PIL import Image
+    output = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(output, 'PNG')
+    output.seek(0)
+    return output
+
+
+def test_multiple_images_private_and_review_only(chat, monkeypatch):
+    import project_photo
+    client, key, _, _ = chat
+    send(chat)
+    store = module.offer_store()
+    old_draft = deepcopy(store.record('test', 'quote', key))
+    response = send(chat, action='images', images=[(image_file(), 'a.png'), (image_file(), 'b.png')])
+    assert response.status_code == 303
+    current = store.record('test', 'offer_chat', key)
+    assert len(current['attachments']) == 2
+    photo_id = current['attachments'][0]['id']
+    url = '/chat/' + key + '/images/' + photo_id
+    assert client.get(url).mimetype == 'image/jpeg'
+    assert 'no-store' in client.get(url).headers['Cache-Control']
+    monkeypatch.setattr(project_photo, 'extract_photo', lambda data: {'transcript': '6 Bewegungsmelder'})
+    assert send(chat, action='photo', photo_id=photo_id).status_code == 303
+    current = store.record('test', 'offer_chat', key)
+    assert current['transcript'] == '6 Bewegungsmelder'
+    assert store.record('test', 'quote', key) == old_draft
+    assert not store.record('test', 'quote_transfer', key)
+    assert 'Bilder hochladen' in client.get('/chat/' + key).get_data(as_text=True)
+    monkeypatch.setenv('BILLOMAT_ID', 'another-account')
+    assert client.get(url).status_code == 404
+
+
+def test_image_validation_and_stale_upload(chat):
+    client, key, _, _ = chat
+    assert send(chat, action='images', images=(BytesIO(b'not an image'), 'fake.jpg')).status_code == 400
+    assert send(chat, action='images', revision='stale', images=(image_file(), 'a.png')).status_code == 409
+    assert send(chat, action='images', images=[(image_file(), str(i)+'.png') for i in range(5)]).status_code == 400
+    assert not module.offer_store().record('test', 'offer_chat', key).get('attachments')
