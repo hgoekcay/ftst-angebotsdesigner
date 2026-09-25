@@ -1,6 +1,17 @@
 (() => {
   const root = document.querySelector('[data-chat-status]');
   if (!root) return;
+  root.querySelectorAll('[data-article-search]').forEach(input => {
+    const select = document.getElementById(input.dataset.articleSearch);
+    if (!select) return;
+    const options = Array.from(select.options, option => option.cloneNode(true));
+    input.addEventListener('input', () => {
+      const chosen = select.value;
+      const query = input.value.trim().toLocaleLowerCase('de');
+      select.replaceChildren(...options.filter(option => !option.value || option.value === chosen || option.textContent.toLocaleLowerCase('de').includes(query)).map(option => option.cloneNode(true)));
+      select.value = chosen;
+    });
+  });
   const log = root.querySelector('.chat-log');
   if (log) log.scrollTop = log.scrollHeight;
   if (root.dataset.busy === '1') {
