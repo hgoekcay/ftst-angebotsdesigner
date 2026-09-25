@@ -24,12 +24,13 @@ import offer_cache
 import offer_followup
 import offer_delivery
 import offer_mail
+import offer_chat
 import quote_transfer
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.22.1"
+APP_VERSION = "0.23.0"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
 log = logging.getLogger("ftst.app")
@@ -38,7 +39,7 @@ app.config['FTST_DATA_DIR'] = str(data_directory())
 
 @app.get('/ui-assets/<version>/<filename>')
 def versioned_ui_asset(version, filename):
-    if version != APP_VERSION or filename not in {'offer-delivery.js', 'pdf-download.js'}:
+    if version != APP_VERSION or filename not in {'offer-delivery.js', 'pdf-download.js', 'offer-chat.js'}:
         abort(404)
     response = send_file(os.path.join(app.root_path, 'static', filename),
                          mimetype='application/javascript; charset=utf-8', conditional=False)
@@ -235,7 +236,7 @@ def apply_source(raw,src):
     return o
 
 def base(title,body):
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("chat")}">KI-Chat</a><a href="{ingress("offers")}">Angebote</a><a href="{ingress("projects")}">Projekte</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("customers")}">Kunden</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{body}</main><script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -256,7 +257,7 @@ def health():
 
 @app.get("/")
 def index():
-    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("projects")}">Projekte & Assistent</a><a class="btn light" href="{ingress("customers")}">Kunden finden & anlegen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a><a class="btn light" href="{ingress("ai")}">Lokale KI prüfen</a><a class="btn light" href="{ingress("mail")}">Antwortassistent</a></div>')
+    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><a class="btn" style="background:#16803c" href="{ingress("chat")}">Mit dem KI-Chat erstellen</a><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("projects")}">Projekte & Assistent</a><a class="btn light" href="{ingress("customers")}">Kunden finden & anlegen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a><a class="btn light" href="{ingress("ai")}">Lokale KI prüfen</a><a class="btn light" href="{ingress("mail")}">Antwortassistent</a></div>')
 
 @app.get("/offers")
 def offers():
@@ -340,6 +341,7 @@ quote_presentation.register(app, base, ingress, clean, offer_store)
 quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)
 offer_followup.register(app, offer_store, base, ingress, clean, date_de)
 offer_mail.register(app, base, ingress, clean, offer_store, get_offer, make_pdf)
+offer_chat.register(app, base, ingress, clean, offer_store, get_offer, make_pdf, detect_offer_type)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
 ai_status.register(app, base, ingress, clean)

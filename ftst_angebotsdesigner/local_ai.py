@@ -77,9 +77,9 @@ def extract_local(notes,image=None,audio=None):
     return request_local(notes, PROMPT, SCHEMA, validate)
 
 
-def request_local(notes, prompt, schema, validator):
+def request_local(notes, prompt, schema, validator, *, max_chars=4000, num_ctx=4096, num_predict=1200):
     """Shared bounded transport and concurrency gate for local text tasks."""
-    if not isinstance(notes,str) or not notes.strip() or len(notes)>4000:
+    if not isinstance(notes,str) or not notes.strip() or len(notes)>max_chars:
         raise AIError('Für die lokale Analyse bitte 1 bis 4000 Zeichen Text verwenden. Eingaben bleiben gespeichert.')
     url=endpoint()
     if not _busy.acquire(blocking=False):
@@ -87,7 +87,7 @@ def request_local(notes, prompt, schema, validator):
     try:
         response=_http.post(url+'/api/chat',json={'model':MODEL,'stream':False,'think':False,'keep_alive':'60s',
             'messages':[{'role':'system','content':prompt},{'role':'user','content':notes}],
-            'format':schema,'options':{'temperature':0,'num_ctx':4096,'num_predict':1200,'num_thread':2}},
+            'format':schema,'options':{'temperature':0,'num_ctx':num_ctx,'num_predict':num_predict,'num_thread':2}},
             timeout=(5,120),allow_redirects=False)
         if response.status_code!=200:
             raise AIError('Lokale KI nicht verfügbar. Dienst und Modell prüfen. Kein Cloud-Aufruf erfolgt.')
@@ -125,3 +125,4 @@ def status():
         return 'Lokaler KI-Dienst erreichbar. Modell '+MODEL+' wird noch benötigt.'
     except (requests.RequestException,ValueError,TypeError,AttributeError,AIError):
         return 'Lokaler KI-Dienst derzeit nicht erreichbar. App FTST Lokale KI prüfen.'
+

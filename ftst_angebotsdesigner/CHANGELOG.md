@@ -1,3 +1,10 @@
+## 0.23.0
+
+- Lokaler KI-Chat mit gespeichertem Verlauf, Rückfragen und korrigierbarer Billomat-Kalkulation.
+- Sprachnotizen lokal über Whisper erkennen und vor Übernahme prüfen.
+- PDF-Prüfung, bestätigte Kunden-/Entwurfsanlage und separate Billomat-Freigabe; bestehende E-Mail-Vorschau mit PDF-Anhang.
+- Handyansicht, Hintergrundverarbeitung, Revisionsprüfung und keine automatischen Versandaktionen.
+
 ## 0.22.0
 
 - Referenzfotos für PDF-Anhänge mit ausreichender Druckauflösung optimiert; Originaldateien bleiben unverändert.
@@ -236,3 +243,4 @@
 - Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
 - Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
 - Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.
+
