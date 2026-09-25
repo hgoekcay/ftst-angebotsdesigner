@@ -7,6 +7,34 @@ import pytest
 SOURCE = 'Für Hüseyin Beispiel, Hafenstraße 15, 68305 Mannheim. Mail kunde@example.org. Sechs Bewegungsmelder und zwei Türkontakte.'
 
 
+def test_address_block_preserves_draft_without_model(monkeypatch):
+    def unavailable(*args, **kwargs):
+        pytest.fail('Postal address must not require the model')
+    monkeypatch.setattr(chat_ai, 'request_local', unavailable)
+    previous = value()
+    original = deepcopy(previous)
+    result = chat_ai.extract(previous, [{'role': 'user', 'text':
+        'Hüseyin Beispiel\nBeispielstrasse 10\n12345 Beispielstadt'}])
+    assert result['name'] == 'Hüseyin Beispiel'
+    assert result['street'] == 'Beispielstrasse 10'
+    assert result['zip'] == '12345' and result['city'] == 'Beispielstadt'
+    assert result['rows'] == previous['rows']
+    assert result['recipient'] == previous['recipient']
+    assert result['country_code'] == ''
+    result['rows'][0]['quantity'] = 99
+    assert previous == original
+
+
+@pytest.mark.parametrize('text', [
+    '6 Bewegungsmelder\n2 Türkontakte\n1 Sirene',
+    'Testkunde\nBeispielstrasse 10\n12345 Beispielstadt\nstatt 6 jetzt 8 Bewegungsmelder',
+    'Testkunde\nUnbekannt\n12345 Beispielstadt',
+    'Testkunde\nBeispielstrasse 10\nBeispielstadt',
+])
+def test_ambiguous_or_mixed_message_still_requires_model(text):
+    assert chat_ai.address_update(chat_ai.EMPTY, text) is None
+
+
 def value():
     return deepcopy(chat_ai.EMPTY) | {
         'name': 'Hüseyin Beispiel', 'street': 'Hafenstraße 15', 'zip': '68305',
@@ -142,4 +170,3 @@ def test_previous_device_quantity_correction_preserved(monkeypatch):
     result = run(monkeypatch, model_value, SOURCE + ' Davon bitte acht.', state)
     assert result['rows'][0]['quantity'] == 8
     assert result['rows'][1] == state['rows'][1]
-
