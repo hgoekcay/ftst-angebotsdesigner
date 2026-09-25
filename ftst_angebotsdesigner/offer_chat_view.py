@@ -59,7 +59,11 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
                 selected = next((a for a in draft['catalog']['articles'] if str(a['id']) == row.get('article_id')), None)
                 if selected and selected not in matches:
                     matches.insert(0, selected)
+                # Keep every catalogue article reachable when names differ from the note.
+                suggested = {str(a['id']) for a in matches}
+                matches += sorted((a for a in draft['catalog']['articles'] if str(a['id']) not in suggested), key=lambda a: str(a.get('title') or '').casefold())
                 opts = option('', 'Bitte passende Variante wählen', row.get('article_id')) + ''.join(option(a['id'], str(a.get('article_number') or '') + ' · ' + str(a.get('title') or ''), row.get('article_id')) for a in matches)
+                content += '<label for="chat-search-' + str(i) + '">Artikel suchen</label><input type="search" id="chat-search-' + str(i) + '" data-article-search="chat-article-' + str(i) + '" placeholder="Artikelname oder Nummer">'
                 content += '<div class="chat-item"><p>' + e(row['description']) + '</p><label for="chat-qty-' + str(i) + '">Menge</label><input id="chat-qty-' + str(i) + '" name="quantity" inputmode="decimal" value="' + e(row['quantity']) + '"><label for="chat-article-' + str(i) + '">Artikelvariante</label><select id="chat-article-' + str(i) + '" name="article_id">' + opts + '</select></div>'
             content += '<label class="chat-check"><input type="checkbox" name="tax_confirmed" value="yes"' + (' checked' if draft.get('tax_confirmed') == 'yes' else '') + '> Bei länderabhängiger Steuerregel gelten die Artikelsteuersätze für diesen Auftrag.</label>'
             body += form('select', 'Auswahl übernehmen', content)
