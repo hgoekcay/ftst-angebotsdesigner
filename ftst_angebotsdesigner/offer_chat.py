@@ -63,7 +63,7 @@ def make_draft(state, project, old, catalog):
     articles = catalog['data']['articles']
     for row in state['rows']:
         description = row['description']
-        if any(word in description.casefold() for word in ('bewegungsmelder', 'magnetkontakt', 'sirene', 'bedienteil', 'alarmzentrale')) and 'ajax' not in description.casefold():
+        if any(word in description.casefold() for word in ('bewegungsmeld', 'magnetkontakt', 'türkontakt', 'tuerkontakt', 'öffnungsmeld', 'sirene', 'bedienteil', 'alarmzentrale')) and 'ajax' not in description.casefold():
             description = 'Ajax ' + description
         selected = next((r.get('article_id', '') for r in old.get('rows', []) if r['description'] == description), '')
         exact = [a for a in articles if customers.normalize(description) in

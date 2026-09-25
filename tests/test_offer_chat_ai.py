@@ -32,6 +32,20 @@ def test_valid_unicode_full_state_is_copied(monkeypatch):
     assert model_value['rows'][0]['quantity'] == 6
 
 
+def test_latest_explicit_correction_cannot_reuse_old_quantity(monkeypatch):
+    latest = 'Korrektur: statt 6 jetzt 8 Bewegungsmelder. Die 2 Türkontakte bleiben unverändert.'
+    model_value = value()
+    def request(context, prompt, schema, validator, **kwargs):
+        assert json.loads(context)['neueste_nachricht'] == latest
+        return validator(model_value, context)
+    monkeypatch.setattr(chat_ai, 'request_local', request)
+    messages = [{'role': 'user', 'text': SOURCE}, {'role': 'user', 'text': latest}]
+    with pytest.raises(ValueError, match='Mengenkorrektur'):
+        chat_ai.extract(value(), messages)
+    model_value['rows'][0].update(quantity=8, evidence='statt 6 jetzt 8 Bewegungsmelder')
+    assert chat_ai.extract(value(), messages)['rows'][0]['quantity'] == 8
+
+
 @pytest.mark.parametrize('key,text', [('name', 'Erfundene GmbH'), ('recipient', 'hacker@example.org'),
                                     ('street', 'Andere Straße 42'), ('zip', '99999'), ('city', 'Berlin')])
 def test_contact_must_come_from_user(monkeypatch, key, text):

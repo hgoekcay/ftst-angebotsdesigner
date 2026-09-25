@@ -1,3 +1,8 @@
+# 0.23.1
+
+- Im Live-Test erkannte Lücken bei Ajax-Türkontakten und getrennt geschriebenen Produktfamilien behoben.
+- Neueste Chatnachricht hat bei Korrekturen ausdrücklich Vorrang; veraltete Mengen bei klarer Korrektur werden abgewiesen.
+
 ## 0.23.0
 
 - Lokaler KI-Chat mit gespeichertem Verlauf, Rückfragen und korrigierbarer Billomat-Kalkulation.

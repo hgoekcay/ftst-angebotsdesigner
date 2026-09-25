@@ -72,7 +72,7 @@ def candidates(description, articles):
     if 'ajax' in terms:
         if 'bm' in terms or any(word.startswith('bewegungsmeld') for word in terms):
             families.update(('motionprotect', 'motioncam'))
-        if 'mk' in terms or any(word.startswith('magnetkontakt') for word in terms):
+        if 'mk' in terms or any(word.startswith(('magnetkontakt', 'türkontakt', 'tuerkontakt', 'öffnungsmeld', 'oeffnungsmeld')) for word in terms):
             families.add('doorprotect')
         if any(word.startswith('sirene') or word.startswith(('innensirene', 'aussensirene')) for word in terms):
             families.update(('homesiren', 'streetsiren'))
@@ -86,7 +86,10 @@ def candidates(description, articles):
     accessories = ('halter', 'halterung', 'montageplatte', 'batterie', 'abdeckung', 'blende', 'hood')
     ranked = []
     for article in articles:
-        title = tokens(article.get('title', ''))
+        # Catalogues also spell Ajax families as "Motion Protect" / "Door Protect".
+        title_text = re.sub(r'\b(motion|door|fire)\s+(protect|cam)\b', r'\1\2', str(article.get('title', '')).casefold())
+        title_text = re.sub(r'\b(home|street)\s+siren\b', r'\1siren', title_text)
+        title = tokens(title_text)
         score = sum(2 if word in title else 1 if any(
             len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))
             for term in title) else 0 for word in wanted)
@@ -378,3 +381,4 @@ def register(app, base, ingress, escape, get_store):
         transfer_label = 'Billomat-Übertragung öffnen' if transfer else 'Übergabe an Billomat prüfen'
         transfer_link = f'<p><a class="btn" href="{ingress("projects/"+key+"/quote/transfer")}">{transfer_label}</a></p>'
         return base('Angebotsentwurf', guide + body + '<div class="card">' + export + transfer_link + '</div>'), status
+

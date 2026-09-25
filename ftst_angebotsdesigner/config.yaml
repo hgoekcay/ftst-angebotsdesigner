@@ -1,5 +1,5 @@
 name: "FTST AngebotsDesigner"
-version: "0.23.0"
+version: "0.23.1"
 slug: "ftst_angebotsdesigner"
 description: "Professioneller AngebotsDesigner für FT Sicherheitstechnik mit Billomat-Anbindung und PDF-Erstellung."
 arch:

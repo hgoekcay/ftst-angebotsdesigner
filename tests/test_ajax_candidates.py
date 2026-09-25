@@ -26,6 +26,15 @@ def titles(query, articles):
     return [row['title'] for row in candidates(query, articles)]
 
 
+def test_spoken_door_contacts_and_spaced_catalogue_titles():
+    rows = [dict(id=str(i), title=t) for i, t in enumerate([
+        'Door Protect weiß', 'Motion Protect weiß', 'Motion Cam Outdoor',
+        'Motion Protect Halterung', 'Home Siren', 'Street Siren'])]
+    assert [r['id'] for r in candidates('Ajax Türkontakte', rows)] == ['0']
+    assert {r['id'] for r in candidates('Ajax Bewegungsmelder', rows)} == {'1', '2'}
+    assert {r['id'] for r in candidates('Ajax Sirene', rows)} == {'4', '5'}
+
+
 @pytest.mark.parametrize(('query', 'expected'), [
     ('Ajax Bewegungsmelder', {'Ajax MotionProtect weiß', 'Ajax MotionCam PhOD schwarz',
                              'Ajax MotionProtect Outdoor', 'Ajax MotionProtect Indoor'}),
@@ -110,3 +119,4 @@ def test_quote_dropdown_shows_ajax_suggestions_but_no_automatic_selection(monkey
     assert 'MotionProtect' in options and 'MotionCam' in options and 'Hub 2' not in options
     assert re.findall(r'<option value="([^"]*)" selected>', options) == ['']
     assert store.record('ajax-test', 'quote', 'one') == draft
+
