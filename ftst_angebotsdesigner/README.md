@@ -4,7 +4,7 @@ Interner AngebotsDesigner für FT Sicherheitstechnik.
 
 ## Aktuelle Version
 
-**0.23.0**
+**0.23.1**
 
 Kundendokumente heißen „Leistungsvorschlag“. E-Mail und WhatsApp haben getrennte bearbeitbare Texte. Nach „PDF für WhatsApp vorbereiten“ die Hauptaktion „PDF an WhatsApp teilen“ wählen und im Teilen-Menü WhatsApp samt Empfänger auswählen. Reine Empfängerlinks sind als Alternative ohne PDF gekennzeichnet. Direktversand über STRATO mit bestätigter Vorschau und PDF-Anhang ist optional verfügbar; Einrichtung siehe Versanddokumentation. Details: [Versand](../docs/ANGEBOTSVERSAND.md).
 
