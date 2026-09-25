@@ -1,3 +1,7 @@
+# 0.23.3
+
+- Klare dreizeilige Kundenanschriften werden direkt übernommen, ohne erneute KI-Generierung; Positionen und Kontaktdaten bleiben erhalten.
+
 # 0.23.2
 
 - Chat-Skript an die aktuelle App-Version gebunden: Ergebnisanzeige und Aufnahme funktionieren auch nach Versionsupdates.
@@ -252,4 +256,3 @@
 - Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
 - Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
 - Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.
-
