@@ -1,5 +1,7 @@
 """Persistent chat orchestrator. Only explicit, revision-bound UI actions write externally."""
 import json
+import base64
+from io import BytesIO
 import hashlib
 import secrets
 import threading
@@ -147,7 +149,18 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
                     raise RecordConflict('Billomat-Vorschau inzwischen geändert. Bitte neu laden.')
                 if action in ('message', 'select', 'catalog', 'customer', 'review') and transfer:
                     raise ValueError('Dieser Entwurf wurde bereits an Billomat übergeben. Für einen anderen Leistungsumfang bitte einen neuen Chat beginnen. Den vorhandenen Vorgang kannst du unten fertigstellen.')
-                if action == 'voice':
+                if action == 'photo':
+                    import project_photo
+                    attachment = next((a for a in chat.get('attachments', []) if a['id'] == form.get('photo_id')), None)
+                    if not attachment:
+                        raise ValueError('Bild nicht in diesem Chat gefunden.')
+                    result = project_photo.extract_photo(base64.b64decode(attachment['data']))
+                    updates['photo_result'] = result['transcript']
+                    updates['transcript'] = result['transcript'] if len(result['transcript']) <= 2000 else ''
+                    message = 'Bildtext erkannt. Bitte Original und erkannten Text vergleichen, Mengen prüfen und den korrigierten Text als Nachricht senden.'
+                    if len(result['transcript']) > 2000:
+                        message += ' Der Text ist lang: Bitte die relevanten Angaben in die Nachricht kopieren (maximal 2000 Zeichen).'
+                elif action == 'voice':
                     from chat_voice import transcribe
                     updates['transcript'] = transcribe(audio[0], audio[1])
                     message = 'Sprachnotiz erkannt. Bitte den Text im Eingabefeld prüfen und als Nachricht senden.'
@@ -269,8 +282,20 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
                 return dict(current, job=None, revision=uuid4().hex, at=stamp())
             store.transact_record(identity, KIND, key, finish)
 
+    @app.get('/chat/<key>/images/<photo_id>')
+    def chat_image(key, photo_id):
+        chat = load(key)
+        attachment = next((a for a in chat.get('attachments', []) if a['id'] == photo_id), None)
+        if not attachment:
+            abort(404)
+        response = send_file(BytesIO(base64.b64decode(attachment['data'])), mimetype='image/jpeg')
+        response.headers['Cache-Control'] = 'private, no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
     @app.route('/chat/<key>', methods=['GET', 'POST'])
     def chat_detail(key):
+        request.max_content_length = 21 * 1024 * 1024
         chat = load(key)
         store, identity = get_store(), account()
         if request.method == 'POST':
@@ -282,8 +307,38 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
             text = form.get('message', '').strip()
             if action == 'message' and (not text or len(text) > 2000):
                 abort(400, 'Bitte 1 bis 2000 Zeichen pro Nachricht verwenden.')
-            if action not in {'message', 'voice', 'select', 'review', 'create', 'release', 'release_status', 'transfer_status', 'catalog', 'mail', 'customer'}:
+            if action not in {'message', 'voice', 'select', 'review', 'create', 'release', 'release_status', 'transfer_status', 'catalog', 'mail', 'customer', 'images', 'photo'}:
                 abort(400)
+            if action == 'images':
+                from project_intake import photo_bytes
+                uploads = [u for u in request.files.getlist('images') if u.filename]
+                if not 1 <= len(uploads) <= 4:
+                    abort(400, 'Bitte ein bis vier Bilder auswählen.')
+                if request.content_length and request.content_length > 21 * 1024 * 1024:
+                    abort(413, 'Zusammen höchstens 20 MB pro Upload.')
+                attachments = []
+                total_bytes = 0
+                try:
+                    for upload in uploads:
+                        data = photo_bytes(upload)
+                        total_bytes += upload.stream.tell()
+                        if total_bytes > 20 * 1024 * 1024:
+                            abort(413, 'Zusammen höchstens 20 MB pro Upload.')
+                        attachments.append(dict(id=uuid4().hex, data=base64.b64encode(data).decode('ascii')))
+                    def save_images(current, _db):
+                        if not current or current['revision'] != form.get('revision') or current.get('job'):
+                            raise RecordConflict('Chat inzwischen geändert. Bitte neu laden.')
+                        if len(current.get('attachments', [])) + len(attachments) > 12:
+                            raise ValueError('Höchstens zwölf Bilder je Chat. Bitte einen neuen Chat beginnen.')
+                        current.setdefault('attachments', []).extend(attachments)
+                        current['messages'].append(dict(role='assistant', text=str(len(attachments)) + ' Bilder gespeichert. Bei Handzetteln bitte „Bildtext erkennen“ wählen und danach den Text prüfen. Objektfotos dienen als Unterlagen; daraus werden keine benötigten Mengen erfunden.'))
+                        return dict(current, revision=uuid4().hex, at=stamp())
+                    store.transact_record(identity, KIND, key, save_images)
+                except RecordConflict as exc:
+                    abort(409, str(exc))
+                except ValueError as exc:
+                    abort(400, str(exc))
+                return redirect(ingress('chat/' + key), code=303)
             audio = None
             if action == 'voice':
                 upload = request.files.get('audio')
@@ -355,4 +410,3 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
         response = send_file(document, mimetype='application/pdf', download_name='FTST-Chat-Entwurf.pdf')
         response.headers['Cache-Control'] = 'no-store'
         return response
-
