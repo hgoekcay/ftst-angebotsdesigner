@@ -1,3 +1,7 @@
+# 0.24.2
+
+- Vollständig strukturierte Erstnachrichten mit Kundenanschrift und x/h-Mengenliste direkt übernehmen; unklare Bezeichnungen bleiben Rückfragen. Gemischte oder nicht vollständig lesbare Eingaben gehen weiterhin zur lokalen KI.
+
 # 0.24.1
 
 - Mengenprüfung akzeptiert übliche Kurzformen wie 3x Bewegungsmelder und 3h Arbeit, ohne Zahlen in Artikelkennungen zu übernehmen.

@@ -170,3 +170,23 @@ def test_previous_device_quantity_correction_preserved(monkeypatch):
     result = run(monkeypatch, model_value, SOURCE + ' Davon bitte acht.', state)
     assert result['rows'][0]['quantity'] == 8
     assert result['rows'][1] == state['rows'][1]
+
+
+def test_complete_compact_initial_request_does_not_need_model(monkeypatch):
+    monkeypatch.setattr(chat_ai, 'request_local', lambda *a, **kw: pytest.fail('No model required'))
+    text = 'erstelle ein angebot für Testkunde Beispiel Beispielstraße 53, 12345 Beispielstadt\n\n3x Bewegungsmelder 2x Sirenen 1x Türkontakt 1x aussenbedienteil 2x chiops 3h arbneit'
+    result = chat_ai.extract(deepcopy(chat_ai.EMPTY), [{'role': 'user', 'text': text}])
+    assert result['name'] == 'Testkunde Beispiel'
+    assert result['street'] == 'Beispielstraße 53'
+    assert result['zip'] == '12345' and result['city'] == 'Beispielstadt'
+    assert [r['quantity'] for r in result['rows']] == [3, 2, 1, 1, 2, 3]
+    assert result['rows'][-1]['description'] == 'arbneit (Stunden)'
+    assert any('chiops' in q for q in result['questions'])
+    assert any('Sirenen' in q for q in result['questions'])
+    assert result['country_code'] == ''
+
+
+@pytest.mark.parametrize('items', ['3x Bewegungsmelder aber keine Sirenen', '3x Bewegungsmelder 2 Kameras', '3x Bewegungsmelder statt 6', '3x Modell123', '0x Sirenen'])
+def test_direct_initial_request_never_discards_mixed_prose(items):
+    text = 'erstelle ein angebot für Testkunde Beispiel Beispielstraße 53, 12345 Beispielstadt\n' + items
+    assert chat_ai.initial_request(chat_ai.EMPTY, text) is None
