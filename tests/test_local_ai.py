@@ -135,3 +135,17 @@ def test_quantity_must_appear_in_evidence():
     value=json.loads(json.dumps(VALUE))
     value['components'][0]['quantity']=400
     with pytest.raises(ValueError): local_ai.validate(value,NOTES)
+
+
+@pytest.mark.parametrize('evidence,quantity', [('3x Bewegungsmelder', 3), ('2x Sirenen', 2), ('1x Türkontakt', 1), ('1x aussenbedienteil', 1), ('2x chiops', 2), ('3h arbneit', 3), ('1,5h Arbeit', 1.5), ('2× Kontakte', 2), ('3 Std. Arbeit', 3)])
+def test_compact_quantity_notation(evidence, quantity):
+    row = dict(description='Vom Benutzer genannte Leistung', quantity=quantity, evidence=evidence)
+    result = local_ai.validate(dict(summary='', components=[row], questions=[]), evidence)
+    assert result['components'][0]['quantity'] == quantity
+
+
+@pytest.mark.parametrize('evidence', ['ART-3x', '3x4 Meter', '3hours', 'Typ3h', '3hertz', '3xyz'])
+def test_compact_numbers_inside_identifiers_are_not_quantities(evidence):
+    row = dict(description='Komponente', quantity=3, evidence=evidence)
+    with pytest.raises(ValueError):
+        local_ai.validate(dict(summary='', components=[row], questions=[]), evidence)
