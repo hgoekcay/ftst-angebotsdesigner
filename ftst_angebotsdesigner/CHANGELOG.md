@@ -1,3 +1,8 @@
+# 0.24.1
+
+- Mengenprüfung akzeptiert übliche Kurzformen wie 3x Bewegungsmelder und 3h Arbeit, ohne Zahlen in Artikelkennungen zu übernehmen.
+- Chat-Anweisung für wörtliche Belege und Rückfragen zu unklaren Produktbezeichnungen verbessert.
+
 # 0.24.0
 
 - Mehrfach-Bildupload im Chat mit privaten Vorschaubildern.
