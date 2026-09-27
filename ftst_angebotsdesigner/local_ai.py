@@ -64,6 +64,10 @@ def validate(value, notes):
             raise ValueError('Invalid quantity')
         if qty is not None:
             numbers={float(n.replace(',','.')) for n in re.findall(r'(?<![\w.,])\d+(?:[.,]\d+)?(?![\w.,])',row['evidence'])}
+            # Common field notation: 3x devices / 3h work. Never match inside an SKU.
+            numbers.update(float(n.replace(',', '.')) for n in re.findall(
+                r'(?<![\w.,-])(\d+(?:[.,]\d+)?)\s*(?:[x×]|h|Std\.?)(?=\s|$)',
+                row['evidence'], re.I))
             words={'ein':1,'eine':1,'einen':1,'einem':1,'eins':1,'zwei':2,'drei':3,'vier':4,'fünf':5,'sechs':6,'sieben':7,'acht':8,'neun':9,'zehn':10,'elf':11,'zwölf':12}
             numbers.update(words[w] for w in re.findall(r'\w+',row['evidence'].lower()) if w in words)
             if qty not in numbers:
@@ -125,4 +129,3 @@ def status():
         return 'Lokaler KI-Dienst erreichbar. Modell '+MODEL+' wird noch benötigt.'
     except (requests.RequestException,ValueError,TypeError,AttributeError,AIError):
         return 'Lokaler KI-Dienst derzeit nicht erreichbar. App FTST Lokale KI prüfen.'
-
