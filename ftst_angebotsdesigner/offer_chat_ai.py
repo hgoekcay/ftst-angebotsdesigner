@@ -55,9 +55,55 @@ def address_update(state, text):
     return result
 
 
+def initial_request(state, text):
+    """Parse a fully covered initial address + compact list; never guess missing text."""
+    if state.get('rows') or state.get('name'):
+        return None
+    header, separator, items = text.strip().partition('\n')
+    if not separator:
+        return None
+    address = re.fullmatch(
+        r"(?:erstelle\s+(?:ein(?:en)?\s+)?(?:angebot|leistungsvorschlag)\s+für)\s+"
+        r"(?P<name>[^\d\n,;:!?@<>]+?)\s+"
+        r"(?P<street>[\w'-]+(?:straße|strasse|str\.|weg|platz|allee|gasse|ring)\s+\d+[a-zA-Z]?)\s*,\s*"
+        r"(?P<zip>\d{5})\s+(?P<city>[^\d\n,;:!?@<>]+)", header, re.I)
+    if not address:
+        return None
+    items = items.strip()
+    markers = list(re.finditer(r'(?<!\S)(\d+(?:[.,]\d+)?)([x×h])\s+', items, re.I))
+    if not markers or markers[0].start() != 0 or len(markers) > 20:
+        return None
+    rows, questions = [], []
+    known = ('bewegungsmelder', 'sirene', 'sirenen', 'türkontakt', 'tuerkontakt',
+             'magnetkontakt', 'aussenbedienteil', 'außenbedienteil', 'bedienteil',
+             'chips', 'transponder', 'kamera', 'kameras', 'arbeit', 'arbeitszeit')
+    for index, match in enumerate(markers):
+        end = markers[index + 1].start() if index + 1 < len(markers) else len(items)
+        label = items[match.end():end].strip()
+        # Reject mixed prose, negations, corrections and any unconsumed numbers.
+        if not re.fullmatch(r'[A-Za-zÄÖÜäöüß-]+', label):
+            return None
+        qty = float(match[1].replace(',', '.'))
+        if not 0 < qty <= 100000:
+            return None
+        description = label + (' (Stunden)' if match[2].lower() == 'h' else '')
+        rows.append(dict(description=description, quantity=qty, evidence=items[match.start():end].strip()))
+        if label.casefold() not in known:
+            questions.append('Was ist mit „' + label + '“ gemeint? Bitte die Bezeichnung bestätigen oder korrigieren.')
+        if label.casefold() in ('sirene', 'sirenen'):
+            questions.append('Sind die Sirenen für innen oder außen vorgesehen?')
+    result = deepcopy(state)
+    result.update({key: value.strip() for key, value in address.groupdict().items()})
+    result.update(rows=rows, questions=questions, title='Ihr Leistungsvorschlag')
+    return result
+
+
 def extract(state, messages):
     source = '\n'.join(m['text'] for m in messages if m['role'] == 'user')
     latest = next((m['text'] for m in reversed(messages) if m['role'] == 'user'), '')
+    initial = initial_request(state, latest)
+    if initial is not None:
+        return initial
     address = address_update(state, latest)
     if address is not None:
         return address
