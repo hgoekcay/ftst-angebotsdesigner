@@ -24,6 +24,11 @@ Nur vom Benutzer genannte Geräte und Leistungen aufnehmen, keine Zentrale/Monta
 Alarmanlagen: Ajax ist Standard. Andere Bereiche: Video, Zutritt, Schließzylinder ebenfalls aufnehmen.
 Mengen nur bei ausdrücklicher Angabe, sonst null. evidence ist ein wörtlicher Textausschnitt aus den
 Benutzernachrichten, der die aktuelle Menge belegt. Keine Preise, Artikel-IDs oder Ausführungsgarantien.
+Mengenkürzel beachten: '3x Bewegungsmelder' bedeutet Menge 3; '3h Arbeit' bedeutet 3 Arbeitsstunden.
+Im evidence das Original einschließlich x/h und Schreibfehlern unverändert kopieren, nicht verbessern.
+Unklare Wörter wie 'chiops' nicht stillschweigend als ein bestimmtes Produkt deuten: Originalbezeichnung
+mit genannter Menge behalten und gezielt fragen, ob Chips/Transponder gemeint sind. Andere klare Angaben
+trotzdem erfassen. Bei Sirenen ohne Bereich fragen, ob innen oder außen gemeint ist.
 name ist der Kundenname, recipient die E-Mail zum Versand, street/zip/city/country_code die Kundenanschrift.
 Fehlende Kundendaten leer lassen. country_code nur bei genanntem Land. title ist eine kurze sachliche
 Überschrift. Fragen zu fehlender Variante/Innen-Außen/Zentrale in questions aufnehmen. Bereits beantwortete
