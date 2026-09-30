@@ -32,6 +32,7 @@ class OfferCache:
     def __init__(self, store, account, client):
         self.store, self.account, self.client = store, account, client
         self.lock = threading.Lock()
+        self.refresh_lock = threading.Lock()
         self.thread = None
         self.stop = threading.Event()
 
@@ -39,6 +40,14 @@ class OfferCache:
         return self.store.record(self.account, 'offer_list', 'recent') or {}
 
     def refresh(self):
+        if not self.refresh_lock.acquire(blocking=False):
+            return dict(self.snapshot(), refreshing=True)
+        try:
+            return self._refresh()
+        finally:
+            self.refresh_lock.release()
+
+    def _refresh(self):
         previous = self.snapshot()
         now = time.time()
         try:
@@ -102,7 +111,7 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
     cache.start()
     refresh = ''
     if number == 1 and not search and not selected_status:
-        snapshot = cache.snapshot()
+        snapshot = cache.refresh() if request.args.get('refresh') == '1' else cache.snapshot()
         data = snapshot.get('rows', [])
         if snapshot.get('updated_at'):
             note = 'Letzte 30 Angebote · Datenstand: ' + clean(data_time(snapshot['updated_at']))
@@ -115,6 +124,11 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
             if snapshot.get('error'):
                 note = 'Billomat derzeit nicht erreichbar. Automatischer neuer Versuch in einer Minute.'
             refresh = '<meta http-equiv="refresh" content="10">'
+        if snapshot.get('refreshing'):
+            note += ' · Aktualisierung läuft …'
+            refresh = '<meta http-equiv="refresh" content="5;url=' + ingress('offers') + '">'
+        elif request.args.get('refresh') == '1' and not snapshot.get('error'):
+            note += ' · Jetzt manuell aktualisiert.'
     else:
         try:
             parameters = {'page': number}
@@ -158,7 +172,8 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
         links += '<a class="btn light" href="' + page_link(number+1) + '">Weitere 30 Angebote</a>'
     options = '<option value="">Alle Status</option>' + ''.join('<option value="' + key + '"' + (' selected' if key == selected_status else '') + '>' + label + '</option>' for key, label in STATUSES.items())
     form = ('<form method="get"><div class="grid"><div class="field"><label for="offer-search">Angebotsnummer suchen</label><input id="offer-search" name="search" value="' + clean(search) + '"></div>' +
-            '<div class="field"><label for="offer-status">Billomat-Status</label><select id="offer-status" name="status">' + options + '</select></div></div><button class="btn">Angebote filtern</button></form>')
+            '<div class="field"><label for="offer-status">Billomat-Status</label><select id="offer-status" name="status">' + options + '</select></div></div><button class="btn">Angebote filtern</button></form>' +
+            '<p><a class="btn" style="background:#16803c" href="' + page_link(number) + '&amp;refresh=1">Jetzt aktualisieren</a></p>')
     # Keep reminders reachable after their offers leave the newest thirty entries.
     scheduled = sorted(((key, value) for key, value in followups.items() if value.get('due_date')),
                        key=lambda entry: (entry[1]['due_date'], entry[0]))
