@@ -84,3 +84,29 @@ def test_valid_empty_result_replaces_old_snapshot(tmp_path):
     assert cache.refresh()['rows'] == []
     client.list_offers.return_value = [{'bad': 'malformed'}]
     assert cache.refresh()['error']
+
+
+def test_manual_refresh_updates_snapshot_and_retains_data_on_failure(tmp_path, monkeypatch):
+    monkeypatch.setitem(module.app.config, 'FTST_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('BILLOMAT_ID', 'refresh-test')
+    monkeypatch.setenv('BILLOMAT_API_KEY', 'test')
+    monkeypatch.setattr(offer_cache.OfferCache, 'start', lambda self: None)
+    api = Mock(return_value=[{'id': '123', 'title': 'Frisch geladen'}])
+    monkeypatch.setattr(BillomatClient, 'list_offers', api)
+    client = module.app.test_client()
+    result = client.get('/offers?refresh=1', headers={'X-Ingress-Path': '/ingress/test'})
+    assert result.status_code == 200
+    assert 'Frisch geladen' in result.text and 'Jetzt manuell aktualisiert' in result.text
+    assert '/ingress/test/offers?page=1&amp;search=&amp;refresh=1' in result.text
+    api.assert_called_once_with()
+    api.side_effect = RuntimeError('private error')
+    failed = client.get('/offers?refresh=1')
+    assert 'Frisch geladen' in failed.text and 'Aktualisierung derzeit nicht' in failed.text
+    assert 'private error' not in failed.text
+
+
+def test_parallel_manual_refresh_does_not_duplicate_request(tmp_path):
+    cache = offer_cache.OfferCache(OfferStore(tmp_path), 'test', Mock())
+    with cache.refresh_lock:
+        assert cache.refresh()['refreshing'] is True
+    cache.client.list_offers.assert_not_called()
