@@ -1,3 +1,7 @@
+# 0.24.3
+
+- Grüner Button Jetzt aktualisieren in der Angebotsübersicht lädt Billomat-Daten auf Wunsch sofort. Automatische Aktualisierung und gespeicherte Daten bei Verbindungsfehlern bleiben erhalten.
+
 # 0.24.2
 
 - Vollständig strukturierte Erstnachrichten mit Kundenanschrift und x/h-Mengenliste direkt übernehmen; unklare Bezeichnungen bleiben Rückfragen. Gemischte oder nicht vollständig lesbare Eingaben gehen weiterhin zur lokalen KI.
