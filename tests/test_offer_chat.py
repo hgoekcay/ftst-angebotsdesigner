@@ -96,6 +96,19 @@ def test_fuzzy_article_never_selected_automatically(chat):
     assert module.offer_store().record('test', 'quote', key)['rows'][0]['article_id'] == ''
 
 
+def test_customer_conditions_visible_before_tax_confirmation(chat):
+    client, key, _, _ = chat
+    send(chat)
+    store = module.offer_store()
+    draft = store.record('test', 'quote', key)
+    draft['catalog']['clients'][0].update(price_group='0', tax_rule='COUNTRY')
+    store.put_record('test', 'quote', key, draft)
+    page = client.get('/chat/' + key).text
+    assert 'Preisgruppe <strong>0</strong>' in page
+    assert 'Länderabhängig – fachliche Prüfung erforderlich' in page
+    assert not store.record('test', 'quote', key)['tax_confirmed']
+
+
 def test_natural_language_send_does_not_call_external_api(chat, monkeypatch):
     def forbidden():
         pytest.fail('Natural language must not execute external operations')
