@@ -1,3 +1,9 @@
+# 0.24.4
+
+- Eindeutige Rückfragen zu Sirene innen/außen und Ajax Hub direkt übernehmen; Mengen bleiben erhalten und zugehörige Rückfragen werden entfernt.
+- Land und E-Mail in klaren Antworten ergänzen, ohne die gesamte Aufnahme neu von der KI erzeugen zu lassen. Mehrdeutige oder gemischte Nachrichten werden weiterhin geprüft.
+- Durchgängiger Test von Ajax-Aufnahme und Rückantwort über Artikelwahl und Kalkulation bis zur PDF ergänzt.
+
 # 0.24.3
 
 - Grüner Button Jetzt aktualisieren in der Angebotsübersicht lädt Billomat-Daten auf Wunsch sofort. Automatische Aktualisierung und gespeicherte Daten bei Verbindungsfehlern bleiben erhalten.
