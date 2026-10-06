@@ -123,11 +123,45 @@ def test_send_uses_frozen_bytes_requires_confirmation_and_never_repeats(client, 
     data['confirm'] = 'yes'
     result = client.post(url, data=data)
     assert result.status_code == 200
-    assert 'Vom Mailserver angenommen' in result.text
+    assert 'An Mailserver übergeben' in result.text
     assert 'Zustellung nicht bestätigt' in result.text
+    assert 'Übergabe bestätigt:' in result.text and 'Bitte nicht erneut senden' in result.text
+    assert 'Jetzt per E-Mail senden' not in result.text
+    assert 'eine Stunde sendefähig' not in result.text
     assert calls == [('kunde@example.org', raw_eml)]
     assert client.post(url, data=data).status_code == 409
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('status', ['prepared', 'sending', 'accepted', 'failed', 'uncertain'])
+def test_delivery_status_time_and_recipient_are_persistent_and_read_only(client, monkeypatch, status):
+    url = prepared(client)
+    key = url.rsplit('/', 1)[-1]
+    store = module.offer_store()
+    record = store.record('test', offer_mail.KIND, key)
+    record.update(status=status, finished_at='2026-10-06T14:30:00+00:00', attempted_at='2026-10-06T14:29:00+00:00')
+    store.put_record('test', offer_mail.KIND, key, record)
+    monkeypatch.setattr(offer_smtp, 'deliver', lambda *a: pytest.fail('Reading status must never send'))
+    page = module.app.test_client().get(url).text
+    assert offer_mail.STATUS[status] in page and 'kunde@example.org' in page
+    assert store.record('test', offer_mail.KIND, key) == record
+    if status == 'accepted':
+        assert offer_mail.display_time(record['finished_at']) in page
+        assert 'Übergabe bestätigt:' in page
+        assert 'Jetzt per E-Mail senden' not in page
+        assert offer_mail.display_time(record['finished_at']) in client.get('/offer/42/email').text
+    else:
+        assert 'Übergabe bestätigt:' not in page
+
+
+def test_delivery_time_does_not_invent_missing_or_naive_timestamp():
+    for value in (None, '', 'invalid', '2026-10-06T14:30:00'):
+        assert offer_mail.display_time(value) == 'Zeitpunkt nicht gespeichert'
+
+
+def test_delivery_time_uses_berlin_daylight_saving_time():
+    assert offer_mail.display_time('2026-10-06T14:30:00+00:00') == '06.10.2026, 16:30:00 CEST'
+    assert offer_mail.display_time('2026-12-06T14:30:00+00:00') == '06.12.2026, 15:30:00 CET'
 
 
 def test_expired_preview_and_disabled_sender_cannot_send(client, monkeypatch):
@@ -235,4 +269,3 @@ def test_original_reference_photos_fit_email_budget(client):
     offer['reference_images'] = [{'path': str(ROOT / 'references' / 'Zerda_Gold_Rheinfelden_20260907_190456629.jpg'), 'title': 'Türstation'}] * 4
     pdf = module.make_pdf(offer).getvalue()
     assert pdf.startswith(b'%PDF-') and len(pdf) < 5 * 1024 * 1024
-
