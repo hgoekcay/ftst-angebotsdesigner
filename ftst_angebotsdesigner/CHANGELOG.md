@@ -1,3 +1,9 @@
+# 0.24.5
+
+- Deutliche E-Mail-Statusanzeige mit Empfänger und gespeichertem Zeitpunkt der Serverannahme. Serverannahme bleibt ausdrücklich von bestätigter Zustellung getrennt; kein erneuter Versand beim Öffnen.
+- Versandverlauf zeigt die neuesten Vorgänge zuerst und Zeitangaben in deutscher Ortszeit mit Zeitzone.
+- Gespeicherte Billomat-Preisgruppe und Steuerregel im Chat sichtbar, bevor Konditionen fachlich bestätigt werden.
+
 # 0.24.4
 
 - Eindeutige Rückfragen zu Sirene innen/außen und Ajax Hub direkt übernehmen; Mengen bleiben erhalten und zugehörige Rückfragen werden entfernt.
