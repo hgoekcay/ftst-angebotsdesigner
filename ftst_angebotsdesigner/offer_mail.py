@@ -14,6 +14,7 @@ from email.parser import BytesParser
 from email.utils import formatdate, make_msgid
 from html import escape
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import abort, redirect, request, session, Response
 from PIL import Image, ImageOps
@@ -29,13 +30,47 @@ MAX_PDF = 15 * 1024 * 1024
 MAX_EML = 24 * 1024 * 1024
 STATUS = {'prepared': 'Vorbereitet – noch nicht versendet',
           'sending': 'Versand läuft oder Ergebnis noch ungeklärt – nicht erneut senden',
-          'accepted': 'Vom Mailserver angenommen – Zustellung nicht bestätigt',
+          'accepted': 'An Mailserver übergeben – Zustellung nicht bestätigt',
           'failed': 'Nicht versendet – Mailserver oder Zugang prüfen',
           'uncertain': 'Versandergebnis unklar – vor erneutem Versand beim Empfänger prüfen'}
 
 
 def now():
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def display_time(value):
+    try:
+        instant = datetime.fromisoformat(value)
+        if instant.tzinfo is None:
+            return 'Zeitpunkt nicht gespeichert'
+        try:
+            zone = ZoneInfo('Europe/Berlin')
+        except ZoneInfoNotFoundError:
+            zone = timezone.utc
+        return instant.astimezone(zone).strftime('%d.%m.%Y, %H:%M:%S %Z')
+    except (ValueError, TypeError):
+        return 'Zeitpunkt nicht gespeichert'
+
+
+def delivery_status(record):
+    status = record['status']
+    color = {'accepted': '#16803c', 'failed': '#a31d1d', 'prepared': '#526056'}.get(status, '#8a5a00')
+    explanation = {
+        'accepted': 'Die E-Mail mit PDF wurde vom Mailserver angenommen. Bitte nicht erneut senden. '
+                    'Eine Bestätigung des Empfangs oder Lesens liegt nicht vor.',
+        'prepared': 'Die E-Mail ist vorbereitet. Erst die bestätigte Senden-Aktion verschickt sie.',
+        'sending': 'Die Übergabe wurde begonnen. Das Ergebnis ist noch nicht bestätigt. Bitte nicht erneut senden.',
+        'failed': 'Der Versand ist fehlgeschlagen. Bitte Mailzugang und Fehlermeldung prüfen.',
+        'uncertain': 'Es ist unklar, ob die E-Mail angenommen wurde. Vor einem neuen Versand den Vorgang prüfen.'}
+    label, timestamp = ('Vorbereitet', record.get('created_at')) if status == 'prepared' else (
+        ('Übergabe bestätigt', record.get('finished_at')) if status == 'accepted' else (
+        ('Versand begonnen', record.get('attempted_at')) if status == 'sending' else
+        ('Letztes Versandergebnis', record.get('finished_at'))))
+    return ('<section role="status" style="border:2px solid ' + color + ';border-radius:10px;padding:18px;margin:18px 0">'
+            '<strong style="display:block;font-size:22px;color:' + color + '">' + escape(STATUS[status]) + '</strong>'
+            '<p>Empfänger: <strong>' + escape(record['recipient']) + '</strong><br>' + label + ': ' +
+            escape(display_time(timestamp)) + '</p><p>' + explanation[status] + '</p></section>')
 
 
 def validate(values):
@@ -214,9 +249,11 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 return redirect(ingress('email-delivery/' + record['id']), code=303)
             except (ValueError, OSError):
                 error = 'Bitte gültige Empfängeradresse, Betreff und Text prüfen. Die PDF und Bilder müssen verfügbar sein (PDF maximal 15 MB).'
-        history = [v for v in get_store().records(account(), KIND).values() if v.get('offer_id') == oid][:10]
-        rows = ''.join('<li><a href="' + ingress('email-delivery/' + x['id']) + '">' + clean(x['created_at']) +
-                       ' · ' + clean(x['recipient']) + '</a><br>' + clean(STATUS.get(x['status'], x['status'])) + '</li>' for x in history)
+        history = sorted((v for v in get_store().records(account(), KIND).values() if v.get('offer_id') == oid),
+                         key=lambda v: v.get('created_at', ''), reverse=True)[:10]
+        rows = ''.join('<li><a href="' + ingress('email-delivery/' + x['id']) + '">' + clean(display_time(x['created_at'])) +
+                       ' · ' + clean(x['recipient']) + '</a><br>' + clean(STATUS.get(x['status'], x['status'])) +
+                       ('<br>Übergabe bestätigt: ' + clean(display_time(x.get('finished_at'))) if x['status'] == 'accepted' else '') + '</li>' for x in history)
         body = '<div class="card"><h1>Leistungsvorschlag per E-Mail</h1><p>Absender: FT Sicherheitstechnik · info@ftst.eu</p>'
         if not offer_smtp.configured():
             body += '<p>Direktversand noch nicht eingerichtet. Vorschau und EML-Datei können Sie bereits vorbereiten.</p>'
@@ -227,7 +264,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                  '<p>Die Vorschau enthält die aktuelle PDF, das FT-Logo und die hinterlegten Kundenlogos. Es wird noch nichts versendet.</p>'
                  '<button class="btn" style="background:#16803c">E-Mail mit PDF prüfen</button></form>'
                  '<p><a href="' + ingress('email-settings') + '">Mailzugang & Referenzlogos</a> · <a href="' + ingress('offer/' + oid) + '">Zurück zum Leistungsvorschlag</a></p></div>'
-                 '<div class="card"><h2>Versandverlauf</h2><ul>' + rows + '</ul><p>Zeitangaben in UTC. Eine Serverannahme ist keine Empfangsbestätigung. Unklare Vorgänge nicht erneut versenden.</p></div>')
+                 '<div class="card"><h2>Versandverlauf</h2><ul>' + rows + '</ul><p>Neueste Vorgänge zuerst. Die Zeitzone steht am Zeitpunkt. Eine Serverannahme ist keine Empfangsbestätigung. Unklare Vorgänge nicht erneut versenden.</p></div>')
         return page('E-Mail vorbereiten', body, 400 if error else 200)
 
     @app.route('/email-delivery/<key>', methods=['GET', 'POST'])
@@ -247,8 +284,8 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
             record = load_record(key)
         path = 'email-delivery/' + key
         body = ('<div class="card"><h1>E-Mail prüfen & senden</h1><p><b>Von:</b> FT Sicherheitstechnik · info@ftst.eu<br>'
-                '<b>An:</b> ' + clean(record['recipient']) + '<br><b>Betreff:</b> ' + clean(record['subject']) + '</p><p role="status">' +
-                clean(STATUS[record['status']]) + '</p><p role="alert">' + clean(error) + '</p>'
+                '<b>An:</b> ' + clean(record['recipient']) + '<br><b>Betreff:</b> ' + clean(record['subject']) + '</p>' +
+                delivery_status(record) + '<p role="alert">' + clean(error) + '</p>'
                 '<a class="btn light" href="' + ingress(path + '/pdf') + '">Genauen PDF-Anhang prüfen</a>'
                 '<a class="btn light" href="' + ingress(path + '/eml') + '">E-Mail-Datei herunterladen</a>'
                 '<iframe title="E-Mail-Vorschau" sandbox="" style="display:block;width:100%;height:780px;border:1px solid #ddd;margin:20px 0" src="' + ingress(path + '/preview') + '"></iframe>')
@@ -259,8 +296,9 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                          '<button class="btn" style="background:#16803c">Jetzt per E-Mail senden</button></form>')
             else:
                 body += '<p>Direktversand noch nicht eingerichtet. Unter <a href="' + ingress('email-settings') + '">Mailzugang & Referenzlogos</a> finden Sie die nächsten Schritte.</p>'
-        body += ('<p>Die Vorschau bleibt eine Stunde sendefähig. Änderungen am Leistungsvorschlag erfordern eine neue Vorschau. Gespeicherte Nachrichten werden nicht automatisch erneut versendet.</p>'
-                 '<a href="' + ingress('offer/' + record['offer_id'] + '/email') + '">Zur E-Mail-Vorbereitung</a> · '
+        if record['status'] == 'prepared':
+            body += '<p>Die Vorschau bleibt eine Stunde sendefähig. Änderungen am Leistungsvorschlag erfordern eine neue Vorschau.</p>'
+        body += ('<p>Gespeicherte Nachrichten werden nicht automatisch erneut versendet.</p><a href="' + ingress('offer/' + record['offer_id'] + '/email') + '">Zur E-Mail-Vorbereitung</a> · '
                  '<a href="' + ingress('offer/' + record['offer_id'] + '/followup') + '">Wiedervorlage festlegen</a></div>')
         return page('E-Mail prüfen', body, 409 if error else 200)
 
@@ -341,4 +379,3 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                      '<label for="label_' + str(i) + '">Kunde / Standort</label><input id="label_' + str(i) + '" name="label_' + str(i) + '" maxlength="100" value="' + clean(item.get('label', '')) + '">')
         body += '<p><button class="btn" style="background:#16803c" name="action" value="references">Referenzleiste speichern</button></p></form></div>'
         return page('Mailzugang & Referenzlogos', body)
-
