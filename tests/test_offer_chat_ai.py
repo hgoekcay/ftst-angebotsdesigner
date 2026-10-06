@@ -190,3 +190,57 @@ def test_complete_compact_initial_request_does_not_need_model(monkeypatch):
 def test_direct_initial_request_never_discards_mixed_prose(items):
     text = 'erstelle ein angebot für Testkunde Beispiel Beispielstraße 53, 12345 Beispielstadt\n' + items
     assert chat_ai.initial_request(chat_ai.EMPTY, text) is None
+
+
+def clarification_state():
+    return deepcopy(chat_ai.EMPTY) | {
+        'name': 'Testkunde',
+        'rows': [dict(description='Sirene', quantity=2, evidence='2x Sirene'),
+                 dict(description='Zentrale', quantity=1, evidence='1x Zentrale'),
+                 dict(description='Bewegungsmelder', quantity=6, evidence='6x Bewegungsmelder')],
+        'questions': ['Sind die Sirenen für innen oder außen vorgesehen?',
+                      'Was ist mit „Zentrale“ gemeint? Bitte die Bezeichnung bestätigen oder korrigieren.',
+                      'Welche Farbe sollen die Geräte haben?']}
+
+
+def test_answered_questions_update_items_and_keep_quantity_evidence_without_model(monkeypatch):
+    monkeypatch.setattr(chat_ai, 'request_local', lambda *a, **kw: pytest.fail('Clear replies need no model'))
+    state = clarification_state()
+    before = deepcopy(state)
+    reply = ('Die Sirene ist für außen. Mit Zentrale meine ich einen Ajax Hub. '
+             'Das Land ist Deutschland. Die E-Mail ist test@example.com.')
+    result = chat_ai.extract(state, [{'role': 'user', 'text': reply}])
+    assert [r['description'] for r in result['rows']] == ['Ajax Außensirene', 'Ajax Hub', 'Bewegungsmelder']
+    assert [(r['quantity'], r['evidence']) for r in result['rows']] == [(r['quantity'], r['evidence']) for r in before['rows']]
+    assert result['country_code'] == 'DE' and result['recipient'] == 'test@example.com'
+    assert result['questions'] == ['Welche Farbe sollen die Geräte haben?']
+    assert state == before
+    assert chat_ai.clarification_update(result, reply) == result
+    assert chat_ai.clarification_update(result, 'Sirene: innen')['rows'][0]['description'] == 'Ajax Innensirene'
+
+
+@pytest.mark.parametrize('reply', [
+    'Die Sirene ist nicht für außen.', 'Die Sirene ist für außen oder innen.',
+    'Sirene: außen. Sirene: innen.', 'Sirene: außen. Außerdem 3 Kameras.',
+    'Mit Zentrale meine ich einen Ajax Hub 2.', 'E-Mail: a@example.com und b@example.com',
+    'Land: Deutschland. Land: Österreich.', 'Sirene: außen. Bitte sofort versenden.',
+])
+def test_unclear_or_partially_understood_reply_never_changes_state(reply):
+    state = clarification_state()
+    before = deepcopy(state)
+    assert chat_ai.clarification_update(state, reply) is None
+    assert state == before
+
+
+def test_multiple_siren_rows_require_clarification():
+    state = clarification_state()
+    state['rows'].append(dict(description='Sirene', quantity=1, evidence='1 Sirene'))
+    assert chat_ai.clarification_update(state, 'Sirene: außen') is None
+    assert chat_ai.clarification_update(chat_ai.EMPTY, 'Sirene: außen') is None
+
+
+def test_clear_central_label_is_known_but_variant_not_invented():
+    result = chat_ai.initial_request(chat_ai.EMPTY,
+        'erstelle ein angebot für Testkunde Beispiel Beispielstraße 1, 12345 Beispielstadt\n1x Zentrale')
+    assert result['rows'][0]['description'] == 'Zentrale'
+    assert result['questions'] == []

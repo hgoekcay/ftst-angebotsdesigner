@@ -76,7 +76,8 @@ def initial_request(state, text):
     rows, questions = [], []
     known = ('bewegungsmelder', 'sirene', 'sirenen', 'türkontakt', 'tuerkontakt',
              'magnetkontakt', 'aussenbedienteil', 'außenbedienteil', 'bedienteil',
-             'chips', 'transponder', 'kamera', 'kameras', 'arbeit', 'arbeitszeit')
+             'chips', 'transponder', 'kamera', 'kameras', 'arbeit', 'arbeitszeit',
+             'zentrale', 'alarmzentrale', 'hub', 'außensirene', 'aussensirene', 'innensirene')
     for index, match in enumerate(markers):
         end = markers[index + 1].start() if index + 1 < len(markers) else len(items)
         label = items[match.end():end].strip()
@@ -98,6 +99,63 @@ def initial_request(state, text):
     return result
 
 
+def clarification_update(state, text):
+    """Apply only fully understood replies to a single unambiguous existing item.
+
+    Keep the original quantity evidence. Never infer a product variant or apply
+    a partial message: mixed prose, multiple possible rows and contradictions
+    go through the model instead.
+    """
+    parts = [p.strip() for p in re.split(r'[.;](?=\s|$)|\n', text.strip()) if p.strip()]
+    if not parts or len(parts) > 8:
+        return None
+    result = deepcopy(state)
+    changes = {}
+    countries = {'deutschland': 'DE', 'österreich': 'AT', 'schweiz': 'CH', 'frankreich': 'FR'}
+    answered = set()
+    for part in parts:
+        siren = re.fullmatch(r'(?:die\s+)?sirene(?:n)?\s*(?::|(?:ist|sind)\s+(?:für\s+)?)\s*(innen|außen|aussen)', part, re.I)
+        hub = re.fullmatch(r'(?:mit\s+(?:alarm)?zentrale\s+meine\s+ich\s+(?:einen?\s+)?|(?:alarm)?zentrale\s*:\s*)(Ajax\s+Hub)', part, re.I)
+        country = re.fullmatch(r'(?:das\s+)?land\s*(?::|ist)\s*(Deutschland|Österreich|Schweiz|Frankreich)', part, re.I)
+        email = re.fullmatch(r'(?:die\s+)?(?:e-mail|email)\s*(?::|ist)\s*([^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>.]+)', part, re.I)
+        if siren or hub:
+            pattern = (r'(?:Ajax\s+)?(?:(?:innen|außen|aussen)?sirenen?)' if siren
+                       else r'(?:Ajax\s+)?(?:Zentrale|Alarmzentrale|Hub)')
+            indices = [i for i, row in enumerate(result['rows'])
+                       if re.fullmatch(pattern, row['description'], re.I)]
+            if len(indices) != 1:
+                return None
+            index = indices[0]
+            description = ('Ajax Innensirene' if siren and siren[1].casefold() == 'innen'
+                           else 'Ajax Außensirene' if siren else 'Ajax Hub')
+            key, value = ('row', index), description
+            answered.add('siren' if siren else 'hub')
+        elif country:
+            key, value = 'country_code', countries[country[1].casefold()]
+        elif email:
+            key, value = 'recipient', email[1]
+            if len(value) > 240:
+                return None
+        else:
+            return None
+        if key in changes and changes[key] != value:
+            return None
+        changes[key] = value
+    for key, value in changes.items():
+        if isinstance(key, tuple):
+            result['rows'][key[1]]['description'] = value
+        else:
+            result[key] = value
+    resolved = set()
+    if 'siren' in answered:
+        resolved.add('Sind die Sirenen für innen oder außen vorgesehen?')
+    if 'hub' in answered:
+        resolved.update('Was ist mit „' + label + '“ gemeint? Bitte die Bezeichnung bestätigen oder korrigieren.'
+                        for label in ('Zentrale', 'zentrale', 'Alarmzentrale', 'alarmzentrale'))
+    result['questions'] = [q for q in result['questions'] if q not in resolved]
+    return result
+
+
 def extract(state, messages):
     source = '\n'.join(m['text'] for m in messages if m['role'] == 'user')
     latest = next((m['text'] for m in reversed(messages) if m['role'] == 'user'), '')
@@ -107,6 +165,9 @@ def extract(state, messages):
     address = address_update(state, latest)
     if address is not None:
         return address
+    clarification = clarification_update(state, latest)
+    if clarification is not None:
+        return clarification
     context = json.dumps({'bisher': state, 'Benutzernachrichten': source, 'neueste_nachricht': latest}, ensure_ascii=False)
     if len(context) > 12000:
         raise ValueError('Dieser Chat ist sehr umfangreich. Bitte die Auswahl im Entwurf fertigstellen oder einen neuen Chat beginnen.')
