@@ -64,6 +64,13 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
                 if str(c.get('archived')) != '1':
                     opts += option(c['id'], str(c.get('client_number') or '') + ' · ' + client_name(c), draft.get('client_id'))
             content = '<label for="chat-customer">Billomat-Kunde</label><select name="client_id" id="chat-customer">' + opts + '</select>'
+            selected_customer = next((c for c in draft['catalog']['clients'] if str(c['id']) == draft.get('client_id')), None)
+            if selected_customer:
+                group = selected_customer.get('price_group')
+                tax = selected_customer.get('tax_rule')
+                tax_label = {'TAX': 'Artikelsteuersätze', 'NO_TAX': 'Steuerfrei',
+                             'COUNTRY': 'Länderabhängig – fachliche Prüfung erforderlich'}.get(tax, 'Unbekannt')
+                content += '<p class="small">Gespeicherte Billomat-Konditionen: Preisgruppe <strong>' + e(str(group) if group not in (None, '') else 'nicht angegeben') + '</strong> · Steuerregel: ' + e(tax_label) + '.</p>'
             for i, row in enumerate(draft['rows']):
                 matches = quotes.candidates(row['description'], draft['catalog']['articles'])
                 selected = next((a for a in draft['catalog']['articles'] if str(a['id']) == row.get('article_id')), None)
