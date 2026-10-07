@@ -96,6 +96,14 @@ def test_fuzzy_article_never_selected_automatically(chat):
     assert module.offer_store().record('test', 'quote', key)['rows'][0]['article_id'] == ''
 
 
+def test_explicit_dahua_component_is_not_rebranded_ajax(chat):
+    _, key, _, state = chat
+    state['rows'][0]['description'] = 'Dahua Türkontakt'
+    assert send(chat).status_code == 303
+    draft = module.offer_store().record('test', 'quote', key)
+    assert draft['rows'][0]['description'] == 'Dahua Türkontakt'
+
+
 def test_customer_conditions_visible_before_tax_confirmation(chat):
     client, key, _, _ = chat
     send(chat)
@@ -295,4 +303,3 @@ def test_image_validation_and_stale_upload(chat):
     assert send(chat, action='images', revision='stale', images=(image_file(), 'a.png')).status_code == 409
     assert send(chat, action='images', images=[(image_file(), str(i)+'.png') for i in range(5)]).status_code == 400
     assert not module.offer_store().record('test', 'offer_chat', key).get('attachments')
-

@@ -10,17 +10,20 @@ Stand 07.10.2026. Dieses Protokoll ersetzt veraltete Versionsangaben in den Übe
 - 0.24.7: Geänderte Empfängeradresse, Betreff und Nachricht werden vom Versandbereich zur E-Mail-Prüfung übergeben. PR 42 integriert (b65d0ac706da66d76b8f614066821b8cdb86bef2). Zehn CI-Prüfungen erfolgreich. Backup c45cb3bd vor Installation. Live-Test mit pruefung@example.com erfolgreich; keine Testmail gesendet und keine Billomat-Stammdaten geändert.
 - Türsprechanlagenbogen: zwei A4-Seiten, 57 interaktive Felder; Layout und Feldstruktur geprüft. Google Drive: https://drive.google.com/file/d/1U6DsbUExijAxFDKRrgbhDRkBxTeB6x3P/view
 
-## Aktueller Schritt: 0.24.8
+## Weitere abgeschlossene Schritte
 
-Alle fünf vorhandenen Bögen direkt in der App bereitstellen. Die Vorlagenseite verändert keine Kunden, Angebote oder Kalkulationen. Stand der Veröffentlichung und Installation nach Abschluss ergänzen.
+- 0.24.8: Alle fünf ausfüllbaren Aufnahmebögen direkt in der App. PR 43, zehn CI-Prüfungen erfolgreich, Backup 1a271ef7; Installation und PDF-Zugriff geprüft.
+- 0.24.9: Entwürfe standardmäßig ausgeblendet, über Statusfilter weiterhin erreichbar. Kein Löschen von Billomat-Daten. PR 44, zehn CI-Prüfungen erfolgreich, Backup 189a1602; Installation und beide Filteransichten geprüft.
+
+## Aktueller Schritt: 0.25.0
+
+Strukturierte Aufnahme für Alarm, Video, Zutritt, Schließzylinder und Türsprechanlagen. Die gespeicherte Systemwahl steuert Hinweise, Rückfragen, Schnellbausteine und PDF-Link. Ein Wechsel erfordert Speichern und erneute Prüfung; vorhandene Komponenten bleiben erhalten. Ajax bleibt Alarmstandard; andere Hersteller und genaue Modelle werden ausdrücklich ausgewählt. Explizite Dahua-Bezeichnungen und Montageleistungen erhalten keinen falschen Ajax-Präfix.
+
+Veröffentlichung und Installation werden nach Tests und bestätigter Sicherung durchgeführt; den abgeschlossenen Stand dokumentiert die Statusdatei im übergeordneten outputs-Verzeichnis.
 
 ## Nächste fachliche Grenze
 
-Die strukturierte Technikeraufnahme und ihre Rückfragen sind weiterhin auf Ajax-Alarmanlagen ausgelegt. Vor einer Erweiterung für Video, Zutritt und Türsprechanlagen muss die herstellerspezifische Zuordnung festgelegt werden. Die Formulare selbst sind herstellerneutral; Artikel und Preise dürfen nur aus dem tatsächlichen Billomat-Katalog kommen.
-
-Danach: Aufnahme je Systemtyp, Prüfung von Pflichtangaben, manuelle Artikelwahl, Kalkulation und Montageübersicht durchgängig verbinden. Ausgefüllte PDF-Dateien werden noch nicht automatisch importiert. Fotos und Text bleiben die bestehenden Eingänge.
-
+Artikel und Preise kommen aus dem tatsächlichen Billomat-Katalog. Die Systemauswahl ersetzt keine technische Auslegung oder Modellprüfung. Ausgefüllte PDF-Dateien werden noch nicht automatisch importiert; Fotos und Text bleiben die bestehenden Eingänge. Eine genaue Standardserie für Zutritt, Türsprechanlagen und Schließzylinder ist noch nicht festgelegt.
 ## Arbeitsregeln
 
 Keine Kundenkommunikation oder echte Billomat-Anlage zu Testzwecken. Veröffentlichung und Home-Assistant-Installation sind autorisiert, jeweils nach passenden Prüfungen und Sicherung. Keine automatischen verbindlichen Zusagen oder erfundenen technischen Varianten.
-

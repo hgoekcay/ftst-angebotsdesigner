@@ -26,10 +26,9 @@ def register(app, base, ingress, escape):
                  '<p>Die ausgefüllte PDF wird noch nicht automatisch eingelesen. Angaben können '
                  'im KI-Chat als Text oder lesbares Foto eingebracht werden. Erkannte Mengen, '
                  'Kunde und konkrete Billomat-Artikel anschließend prüfen.</p>'
-                 '<p>Die bestehende strukturierte Technikeraufnahme ist auf Ajax-Alarmanlagen '
-                 'ausgerichtet. Andere Systeme werden durch diese Vorlagen nicht automatisch '
-                 'als Ajax-Anlage zugeordnet.</p>'
+                 '<p>In der Technikeraufnahme des Projekts zuerst die Systemart wählen und speichern. '
+                 'Danach Komponenten, Mengen, Hersteller und technische Details erfassen. '
+                 'Die Übernahme zur Kalkulation erfolgt erst nach Ihrer Prüfung.</p>'
                  f'<a class="btn light" href="{ingress("chat")}">Zum KI-Chat</a>'
                  f'<a class="btn light" href="{ingress("projects")}">Zu den Projekten</a></div>')
         return base('Aufnahmebögen', body)
-
