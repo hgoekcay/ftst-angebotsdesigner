@@ -14,6 +14,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from materials import account
 from project_ai import AIError
 from storage import RecordConflict
+from intake_systems import SYSTEMS, system_key, profile, with_manufacturer
 
 MAX_PHOTO_BYTES = 20 * 1024 * 1024
 KIND = 'project_intake'
@@ -31,7 +32,8 @@ AJAX_COMPONENTS = {
 TEXT_FIELDS = {'manufacturer': ('Hersteller', 100), 'customer_name': ('Kunde', 200),
                'object_address': ('Objektadresse', 500), 'variant': ('Ajax-Variante / Serie', 200),
                'installation': ('Montage / Arbeitsumfang', 1000), 'travel': ('Anfahrt / Einsatzort', 500),
-               'notes': ('Notizen zum Foto / Projekt', 6000)}
+               'notes': ('Notizen zum Foto / Projekt', 6000),
+               'system_details': ('Systemdetails / technische Anforderungen', 1500)}
 CHOICES = {'central': ('Zentrale vorhanden?', {'unknown': 'Unklar', 'yes': 'Ja', 'no': 'Nein'}),
            'siren': ('Sirene vorhanden / gewünscht?', {'unknown': 'Unklar', 'yes': 'Ja', 'no': 'Nein'}),
            'area': ('Bereiche', {'unknown': 'Unklar', 'inside': 'Innen', 'outside': 'Außen', 'both': 'Innen und außen'})}
@@ -47,7 +49,7 @@ def initial(project):
     fields = {key: '' for key in TEXT_FIELDS}
     fields.update(manufacturer='Ajax', customer_name=project.get('customer_name', ''),
                   object_address=project.get('object_address', ''), notes=project.get('notes', ''),
-                  central='unknown', siren='unknown', area='unknown')
+                  central='unknown', siren='unknown', area='unknown', system_type='alarm')
     return {'fields': fields, 'components': [], 'summary': '', 'questions': [], 'revision': '',
             'source_project': fingerprint(project), 'status': 'editing', 'slots': 3}
 
@@ -67,14 +69,19 @@ def quantity(value, required=False):
 
 def open_questions(fields, questions=()):
     required = []
-    if fields.get('central') == 'unknown':
+    alarm = system_key(fields) == 'alarm'
+    if alarm and fields.get('central') == 'unknown':
         required.append('Ist eine Ajax-Zentrale vorhanden oder wird eine neue benötigt?')
-    if fields.get('siren') == 'unknown':
+    if alarm and fields.get('siren') == 'unknown':
         required.append('Ist eine Sirene vorhanden oder gewünscht?')
     if not fields.get('installation', '').strip():
         required.append('Welcher Montageumfang ist vorgesehen?')
     if not fields.get('variant', '').strip():
-        required.append('Welche Ajax-Variante / Serie wird benötigt?')
+        required.append('Welche Ajax-Variante / Serie wird benötigt?' if alarm else 'Welche konkrete Variante / Serie wird benötigt?')
+    if not alarm and not fields.get('manufacturer', '').strip():
+        required.append('Welcher Hersteller ist vorgesehen?')
+    if not alarm and not fields.get('system_details', '').strip():
+        required.append(profile(fields)[3])
     combined = list(dict.fromkeys([str(q).strip() for q in questions if str(q).strip()] + required))
     if len(combined) > 30 or len('\n'.join(combined)) > 6000:
         raise ValueError('Bitte Rückfragen kürzen: einschließlich offener Pflichtangaben höchstens 30 Zeilen und 6000 Zeichen.')
@@ -84,12 +91,22 @@ def open_questions(fields, questions=()):
 def parse_form(form, current, *, confirm=False):
     value = deepcopy(current)
     fields = {}
+    selected = form.get('system_type', system_key(current['fields']))
+    if selected not in SYSTEMS:
+        raise ValueError('Bitte eine gültige Systemart auswählen.')
+    changed = selected != system_key(current['fields'])
+    if changed and confirm:
+        raise ValueError('Bitte die Systemauswahl zuerst speichern und anschließend Komponenten und Hersteller erneut prüfen.')
     for key, (_, limit) in TEXT_FIELDS.items():
         text = form.get(key, '').strip()
         if len(text) > limit:
             raise ValueError(f'Die Angabe „{TEXT_FIELDS[key][0]}“ ist zu lang.')
         fields[key] = text
-    fields['manufacturer'] = fields['manufacturer'] or 'Ajax'
+    fields['system_type'] = selected
+    if changed and fields['manufacturer'] == current['fields'].get('manufacturer', ''):
+        fields['manufacturer'] = SYSTEMS[selected][1]
+    if selected == 'alarm':
+        fields['manufacturer'] = fields['manufacturer'] or 'Ajax'
     for key, (label, choices) in CHOICES.items():
         fields[key] = form.get(key, 'unknown')
         if fields[key] not in choices:
@@ -115,8 +132,12 @@ def parse_form(form, current, *, confirm=False):
     questions = form.get('questions', '').strip()
     if len(summary) > 4000 or len(questions) > 6000 or len(questions.splitlines()) > 30:
         raise ValueError('Zusammenfassung oder Rückfragen sind zu lang.')
+    question_lines = questions.splitlines()
+    if changed:
+        previous_generated = set(open_questions(current['fields']))
+        question_lines = [q for q in question_lines if q.strip() not in previous_generated]
     value.update(fields=fields, components=components, summary=summary,
-                 questions=open_questions(fields, questions.splitlines()), status='editing')
+                 questions=open_questions(fields, question_lines), status='editing')
     value.pop('error', None)
     return value
 
@@ -125,7 +146,7 @@ def attempted_form(form, current):
     """Keep failed edits visible without treating them as validated saved data."""
     value = deepcopy(current)
     value['fields'] = dict(current['fields'])
-    for key in (*TEXT_FIELDS, *CHOICES):
+    for key in (*TEXT_FIELDS, *CHOICES, 'system_type'):
         if key in form:
             value['fields'][key] = form.get(key, '')[:20000]
     value['summary'] = form.get('summary', '')[:20000]
@@ -141,8 +162,10 @@ def attempted_form(form, current):
 
 def source_notes(value):
     fields = value['fields']
-    lines = [label + ': ' + (fields.get(key) or 'Offen') for key, (label, _) in TEXT_FIELDS.items()]
-    lines += [label + ' ' + choices[fields.get(key, 'unknown')] for key, (label, choices) in CHOICES.items()]
+    lines = ['Systemart: ' + profile(fields)[0]]
+    lines += [('Variante / Serie' if key == 'variant' else label) + ': ' + (fields.get(key) or 'Offen') for key, (label, _) in TEXT_FIELDS.items()]
+    lines += [label + ' ' + choices[fields.get(key, 'unknown')] for key, (label, choices) in CHOICES.items()
+              if system_key(fields) == 'alarm' or key == 'area']
     lines += ['Offen: ' + question for question in open_questions(fields, value.get('questions', []))]
     return '\n'.join(lines)
 
@@ -208,8 +231,7 @@ def confirmed_components(value):
     rows = []
     for row in value['components']:
         description = row['description']
-        if manufacturer.casefold() not in description.casefold():
-            description = manufacturer + ' ' + description
+        description = with_manufacturer(description, manufacturer)
         if row.get('location'):
             description += ' · Raum / Montageort: ' + row['location']
         if len(description) > 300:
@@ -277,6 +299,10 @@ def register(app, base, ingress, escape, get_store):
         csrf = session.setdefault('project_intake_csrf', secrets.token_urlsafe(32))
         revision = value.get('revision', '')
         fields = value['fields']
+        selected_system = system_key(fields)
+        system_title, _, pdf_suffix, system_hint, shortcuts = profile(fields)
+        if selected_system == 'alarm':
+            shortcuts = AJAX_COMPONENTS
         hidden = (f'<input type="hidden" name="csrf" value="{escape(csrf)}">'
                   f'<input type="hidden" name="account" value="{escape(identity)}">'
                   f'<input type="hidden" name="revision" value="{escape(revision)}">'
@@ -288,7 +314,7 @@ def register(app, base, ingress, escape, get_store):
                  'tragen Sie die Mengen ein und bestätigen Sie die Übernahme. Danach öffnet sich die Kalkulation für Billomat-Kunde, Artikel und Preise.</p>'
                  '<p>Kundenname und Adresse dürfen bei der Aufnahme noch fehlen. Sie können später ergänzt werden. '
                  'Ein Name in diesem Formular legt keinen Billomat-Kunden an und wählt noch keinen aus.</p>'
-                 f'<p><a class="btn light" data-pdf="FTST-Technikeraufnahme-Ajax.pdf" href="{ingress("static/FTST-Technikeraufnahme-Ajax.pdf")}">Checkliste als ausfüllbare PDF</a></p>'
+                 f'<p><a class="btn light" data-pdf="FTST-Technikeraufnahme-{pdf_suffix}.pdf" href="{ingress("static/FTST-Technikeraufnahme-" + pdf_suffix + ".pdf")}">Checkliste als ausfüllbare PDF</a></p>'
                  f'<p><a href="{ingress("intake-templates")}">Alle Aufnahmebögen: Alarm, Video, Zutritt, Schließzylinder und Türsprechanlagen</a></p>'
                  '<p class="muted">Vorlage drucken oder digital ausfüllen. In dieser Aufnahme werden JPG, PNG und WebP unterstützt; '
                  'für die Fotoauswertung Seite 1 fotografieren und Ergänzungen von Seite 2 manuell eintragen. Kein PDF-Dateiimport.</p>')
@@ -315,23 +341,35 @@ def register(app, base, ingress, escape, get_store):
         body += '<label for="intake-photo">Merkzettel / Objektfoto (optional)</label><input id="intake-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp"><p class="muted">JPG, PNG oder WebP, höchstens 20 MB und 25 Megapixel. Bleibt beim Projekt; kein Referenzfoto.</p><button class="btn light" name="action" value="upload">Foto und Angaben speichern</button>'
         if value.get('photo'):
             body += f'<img style="max-height:320px;object-fit:contain" src="{ingress("projects/" + key + "/intake/photo")}" alt="Gespeichertes Projektfoto">'
+        system_options = ''.join(f'<option value="{key}"' + (' selected' if selected_system == key else '') + '>' + escape(value[0]) + '</option>' for key, value in SYSTEMS.items())
+        body += ('<h2>Systemart</h2><label for="intake-system_type">Welche Anlage wird erfasst?</label>'
+                 f'<select id="intake-system_type" name="system_type">{system_options}</select>'
+                 '<button class="btn light" name="action" value="upload">Systemauswahl und Angaben speichern</button>'
+                 '<p>Bei einem Wechsel bleiben vorhandene Komponenten erhalten. Hersteller, Varianten und Mengen anschließend erneut prüfen. '
+                 'Ajax ist Standard für Alarmanlagen; Dahua und Ajax sind bevorzugte Hersteller für die weitere Artikelauswahl.</p>'
+                 f'<p><strong>{escape(system_title)}:</strong> {escape(system_hint)}</p>')
         body += '<h2>Kunde und Objekt</h2><div class="grid">'
         for field, (label, limit) in TEXT_FIELDS.items():
-            control = ('<textarea' if field in ('notes', 'installation') else '<input')
+            if field == 'variant' and selected_system != 'alarm':
+                label = 'Variante / Serie'
+            control = ('<textarea' if field in ('notes', 'installation', 'system_details') else '<input')
             if control == '<textarea':
                 control += f' id="intake-{field}" name="{field}" maxlength="{limit}">{escape(fields.get(field, ""))}</textarea>'
             else:
                 control += f' id="intake-{field}" name="{field}" maxlength="{limit}" value="{escape(fields.get(field, ""))}">'
             body += f'<div class="field"><label for="intake-{field}">{label}</label>{control}</div>'
         for field, (label, choices) in CHOICES.items():
+            if selected_system != 'alarm' and field != 'area':
+                body += f'<input type="hidden" name="{field}" value="{escape(fields.get(field, "unknown"))}">'
+                continue
             options = ''.join(f'<option value="{key}"' + (' selected' if fields.get(field) == key else '') + '>' + title + '</option>' for key, title in choices.items())
             body += f'<div class="field"><label for="intake-{field}">{label}</label><select id="intake-{field}" name="{field}">{options}</select></div>'
         body += '</div>'
         body += '<h2 id="intake-components">Komponenten prüfen</h2><p>Mengen und Varianten prüfen. Leere Zeilen werden ignoriert; maximal 30 Komponenten.</p>'
         rows = value.get('components', [])
         slots = min(30, max(len(rows), value.get('slots', 3)))
-        body += '<details><summary>Ajax-Komponente schnell ergänzen</summary><p>Ein Klick ergänzt nur den gewählten Komponententyp. Menge, genaue Variante und Raum tragen Sie anschließend ein.</p><div style="display:flex;flex-wrap:wrap;gap:8px">'
-        for component, label in AJAX_COMPONENTS.items():
+        body += '<details><summary>' + ('Ajax-Komponente' if selected_system == 'alarm' else 'Komponente') + ' schnell ergänzen</summary><p>Ein Klick ergänzt nur den gewählten Komponententyp. Menge, genaue Variante und Raum tragen Sie anschließend ein.</p><div style="display:flex;flex-wrap:wrap;gap:8px">'
+        for component, label in shortcuts.items():
             disabled = ' disabled' if len(rows) >= MAX_COMPONENTS else ''
             body += f'<button class="btn light" style="flex:1 1 180px;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere" name="action" value="add_component:{component}"{disabled}>{label} ergänzen</button>'
         body += '</div></details>'
@@ -350,7 +388,7 @@ def register(app, base, ingress, escape, get_store):
         body += f'<label for="intake-summary">Zusammenfassung</label><textarea id="intake-summary" name="summary" maxlength="4000">{escape(value.get("summary", ""))}</textarea>'
         questions = '\n'.join(value.get('questions', []))
         body += f'<label for="intake-questions">Offene Rückfragen (eine pro Zeile)</label><textarea id="intake-questions" name="questions" maxlength="6000">{escape(questions)}</textarea><p class="muted">Montage und Anfahrt bleiben freie Angaben. Preise werden später geprüft; offene Angaben werden nicht geschätzt.</p>'
-        body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen und Ajax-Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben übernehmen und zur Kalkulation</button></fieldset></form></div>'
+        body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen, Hersteller und Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben übernehmen und zur Kalkulation</button></fieldset></form></div>'
         body += f'<script defer src="{ingress("static/project_intake.js")}"></script>'
         body += '<div class="card"><h2>Lokaler Fotovorschlag</h2><p>Nur das gespeicherte Foto und die gespeicherten Angaben werden lokal ausgewertet. Für die Analyse höchstens 4000 Zeichen einschließlich Feldangaben und Rückfragen; längere Aufnahmen können manuell bearbeitet werden. Der Vorschlag wird erst nach Ihrer Prüfung übernommen.</p>'
         if not value.get('photo'):
@@ -379,7 +417,8 @@ def register(app, base, ingress, escape, get_store):
             abort(409, 'Das Konto wurde geändert. Bitte neu öffnen.')
         action = request.form.get('action')
         component = action.removeprefix('add_component:') if action and action.startswith('add_component:') else ''
-        if action not in ('upload', 'add_row', 'apply', 'analyze') and component not in AJAX_COMPONENTS:
+        shortcuts = AJAX_COMPONENTS if system_key(current['fields']) == 'alarm' else profile(current['fields'])[4]
+        if action not in ('upload', 'add_row', 'apply', 'analyze') and component not in shortcuts:
             abort(400)
         expected = request.form.get('revision', '')
         project_revision = request.form.get('project_revision', '')
@@ -407,9 +446,12 @@ def register(app, base, ingress, escape, get_store):
                 return redirect(ingress('projects/' + key + '/intake'), code=303)
             value = parse_form(request.form, current, confirm=action == 'apply')
             if component:
+                if system_key(value['fields']) != system_key(current['fields']):
+                    raise ValueError('Bitte die Systemauswahl zuerst speichern; danach eine passende Komponente ergänzen.')
                 if len(value['components']) >= MAX_COMPONENTS:
                     raise ValueError('Es sind bereits 30 Komponenten erfasst. Bitte zuerst eine nicht benötigte Zeile vollständig leeren.')
-                value['components'].append({'description': 'Ajax ' + AJAX_COMPONENTS[component],
+                description = ('Ajax ' if system_key(value['fields']) == 'alarm' else '') + shortcuts[component]
+                value['components'].append({'description': description,
                                             'quantity': '', 'evidence': '', 'location': ''})
                 value['slots'] = max(current.get('slots', 3), len(value['components']))
             if current.get('fields') != value['fields']:
@@ -480,4 +522,3 @@ def register(app, base, ingress, escape, get_store):
         result = send_file(path, mimetype='image/jpeg')
         result.headers['Cache-Control'] = 'no-store'
         return result
-

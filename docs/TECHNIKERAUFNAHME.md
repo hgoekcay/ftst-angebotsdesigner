@@ -4,7 +4,11 @@
 
 Unter **Aufnahmebögen** in der Hauptnavigation stehen fünf ausfüllbare PDFs bereit: Alarmanlage / Ajax, Videoüberwachung, Zutrittssysteme, Schließzylinder und Türsprechanlagen. Sie sind auch aus der Technikeraufnahme erreichbar. Die Vorlagen können digital ausgefüllt oder gedruckt werden. Die Downloads verwenden die bestehende PDF-Vorbereitung innerhalb der angemeldeten App.
 
-Die strukturierte Aufnahme darunter ist weiterhin auf Ajax ausgelegt. Die zusätzlichen Formulare schalten keine andere automatische Artikelzuordnung frei. Kein PDF-Dateiimport; Texte oder lesbare Fotos können im Chat eingebracht und anschließend geprüft werden.
+## Systemauswahl ab 0.25.0
+
+Die Technikeraufnahme unterstützt Alarmanlage, Videoüberwachung, Zutrittssystem, Schließzylinder und Türsprechanlage. Zuerst die Systemart auswählen und **Systemauswahl und Angaben speichern** betätigen. Danach passen Checkliste, Schnellauswahl und technische Hinweise zur Systemart. Unter **Systemdetails** Blickbereiche, Rufzuordnung, Zylindermaße oder andere angefragte Details erfassen. Bei einem Wechsel bleiben vorhandene Komponenten erhalten und müssen erneut geprüft werden. Eine direkte bestätigte Übernahme während des Systemwechsels wird abgewiesen.
+
+Bestehende Aufnahmen ohne Systemart bleiben Alarmaufnahmen. Ajax bleibt Alarmstandard. Für andere Systeme bleibt der Hersteller zunächst offen; Dahua und Ajax sind Nutzerpräferenzen, keine pauschale Zuordnung jeder Komponente. Ausdrücklich genannte Hersteller werden bewahrt. Artikelwahl und technische Kompatibilität müssen weiterhin geprüft werden. Kein PDF-Dateiimport; Texte oder lesbare Fotos können eingebracht und anschließend geprüft werden.
 
 Stand 0.16.0. Die Aufnahme lässt sich am Handy ohne KI direkt ausfüllen. Ein Handzettelfoto bleibt als ergänzende Quelle möglich.
 
@@ -25,4 +29,3 @@ Alle Anzeigen lesen lokale gespeicherte Daten. Die Schnellauswahl und Übersicht
 ## Anschließende Konzeptstufe
 
 Die räumliche Zuordnung bildet die Grundlage für eine spätere Montageübersicht und bearbeitbare Kamera-/Alarmpläne. Ein Grundrisseditor, automatische Geräteplatzierung und eine automatische technische Freigabe sind in dieser Version noch nicht enthalten. Materialreservierung und interne Terminvorschläge werden weiterhin über **Material & Termine** nach dokumentierter Beauftragung bearbeitet.
-

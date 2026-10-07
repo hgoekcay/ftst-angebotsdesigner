@@ -1,3 +1,9 @@
+# 0.25.0
+
+- Technikeraufnahme mit ausdrücklicher Systemauswahl für Alarmanlage, Videoüberwachung, Zutritt, Schließzylinder und Türsprechanlage. Passende PDF, Komponententypen und Erfassungshinweise; Mengen und konkrete Modelle werden nicht vorgegeben.
+- Systemwechsel erst speichern und erneut prüfen. Bestehende Komponenten bleiben erhalten; nur bisher automatisch erzeugte Rückfragen werden beim Wechsel durch passende Fragen ersetzt. Andere Systeme erhalten keine Ajax-Zentralen-/Sirenenfragen.
+- Explizit genannte Dahua-/Ajax-/FTronics-/Falke-Geräte und Montageleistungen werden bei der Übernahme nicht mit einem widersprüchlichen Herstellerpräfix versehen. Auch der Chat bewahrt eine ausdrücklich genannte Dahua-Marke.
+
 # 0.24.9
 
 - Angebotsübersicht zeigt standardmäßig keine Billomat-Entwürfe. Über den Statusfilter können ausschließlich Entwürfe oder alle Status einschließlich Entwürfen angezeigt werden. Daten und Wiedervorlagen bleiben erhalten; die Seitennavigation berücksichtigt auch ausgeblendete Einträge.
@@ -304,4 +310,3 @@
 - Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
 - Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
 - Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.
-

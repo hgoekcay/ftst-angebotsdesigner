@@ -19,6 +19,7 @@ import quote_drafts as quotes
 import quote_transfer
 from materials import account
 from storage import RecordConflict, StorageError
+from intake_systems import with_manufacturer
 from project_ai import AIError
 
 KIND = 'offer_chat'
@@ -66,7 +67,7 @@ def make_draft(state, project, old, catalog):
     for row in state['rows']:
         description = row['description']
         if any(word in description.casefold() for word in ('bewegungsmeld', 'magnetkontakt', 'türkontakt', 'tuerkontakt', 'öffnungsmeld', 'sirene', 'bedienteil', 'alarmzentrale')) and 'ajax' not in description.casefold():
-            description = 'Ajax ' + description
+            description = with_manufacturer(description, 'Ajax')
         selected = next((r.get('article_id', '') for r in old.get('rows', []) if r['description'] == description), '')
         exact = [a for a in articles if customers.normalize(description) in
                  (customers.normalize(a.get('article_number') or ''), customers.normalize(a.get('title') or ''))]
@@ -418,4 +419,3 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
         response = send_file(document, mimetype='application/pdf', download_name='FTST-Chat-Entwurf.pdf')
         response.headers['Cache-Control'] = 'no-store'
         return response
-
