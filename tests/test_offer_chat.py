@@ -105,7 +105,9 @@ def test_customer_conditions_visible_before_tax_confirmation(chat):
     store.put_record('test', 'quote', key, draft)
     page = client.get('/chat/' + key).text
     assert 'Preisgruppe <strong>0</strong>' in page
-    assert 'Länderabhängig – fachliche Prüfung erforderlich' in page
+    assert 'Länderabhängig' in page
+    assert 'kein Sonderrabatt · 19 % Mehrwertsteuer' in page
+    assert 'name="tax_confirmed"' not in page
     assert not store.record('test', 'quote', key)['tax_confirmed']
 
 
@@ -116,6 +118,23 @@ def test_natural_language_send_does_not_call_external_api(chat, monkeypatch):
     assert send(chat, message='Ja passt, erstelle und schicke an kunde@example.org').status_code == 303
     _, key, _, _ = chat
     assert module.offer_store().record('test', 'quote_transfer', key) is None
+
+
+def test_legacy_draft_only_switches_commercial_terms_on_edit(chat):
+    client, key, _, _ = chat
+    send(chat)
+    store = module.offer_store()
+    draft = store.record('test', 'quote', key)
+    draft.pop('pricing_policy')
+    draft['reviewed'] = True
+    store.put_record('test', 'quote', key, draft)
+    assert offer_chat.quotes.calculate(draft)['total']['gross'] == '85.68'
+    assert client.get('/chat/' + key).status_code == 200
+    assert store.record('test', 'quote', key) == draft
+    assert send(chat, action='select', client_id='3', article_id=['1'], quantity=['1']).status_code == 303
+    updated = store.record('test', 'quote', key)
+    assert not updated['reviewed']
+    assert offer_chat.quotes.calculate(updated)['total']['gross'] == '119.00'
 
 
 def test_review_create_requires_separate_explicit_confirmation(chat, monkeypatch):
@@ -276,3 +295,4 @@ def test_image_validation_and_stale_upload(chat):
     assert send(chat, action='images', revision='stale', images=(image_file(), 'a.png')).status_code == 409
     assert send(chat, action='images', images=[(image_file(), str(i)+'.png') for i in range(5)]).status_code == 400
     assert not module.offer_store().record('test', 'offer_chat', key).get('attachments')
+

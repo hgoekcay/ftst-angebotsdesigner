@@ -1,3 +1,8 @@
+# 0.24.6
+
+- Neue und erneut bearbeitete Kalkulationen verwenden den normalen Billomat-Verkaufspreis ohne Sonderrabatt und 19 % Mehrwertsteuer. Bestehende Entwürfe behalten bis zur erneuten Bearbeitung ihre Konditionen; eine Umstellung hebt die bisherige Prüfung auf.
+- Alarmanlagen-Aufnahmebogen auf beiden Seiten eindeutig als Alarmanlage - Technikeraufnahme bezeichnet; alle 70 Formularfelder bleiben ausfüllbar.
+
 # 0.24.5
 
 - Deutliche E-Mail-Statusanzeige mit Empfänger und gespeichertem Zeitpunkt der Serverannahme. Serverannahme bleibt ausdrücklich von bestätigter Zustellung getrennt; kein erneuter Versand beim Öffnen.
@@ -286,3 +291,4 @@
 - Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
 - Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
 - Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.
+
