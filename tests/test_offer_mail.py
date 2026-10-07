@@ -29,6 +29,41 @@ def prepared(client):
     return result.headers['Location']
 
 
+def test_detail_edits_reach_mail_review_and_frozen_message_without_sending(client, monkeypatch):
+    from html import unescape
+    monkeypatch.setattr(offer_smtp, 'deliver', lambda *a: pytest.fail('Review must not send'))
+    page = client.get('/offer/42', headers={'X-Ingress-Path': '/api/hassio_ingress/test'}).text
+    assert '<form method="post" action="/api/hassio_ingress/test/offer/42/email">' in page
+    for field_id, name in [('delivery-email', 'recipient'), ('delivery-subject', 'subject'), ('delivery-email-text', 'text')]:
+        assert f'id="{field_id}" name="{name}"' in page
+    assert 'type="submit" name="action" value="edit"' in page
+    data = dict(csrf=re.search(r'name="csrf" value="([^"]+)"', page)[1], account='test')
+    data.update(action='edit', recipient='geaendert@example.org', subject='Geänderter Betreff', text='Grüße und neue Angaben.')
+    review = client.post('/offer/42/email', data=data)
+    assert review.status_code == 200
+    for name in ('recipient', 'subject'):
+        assert unescape(re.search(r'name="' + name + r'"[^>]*value="([^"]*)"', review.text)[1]) == data[name]
+    assert data['text'] in review.text
+    assert not module.offer_store().records('test', offer_mail.KIND)
+    data.pop('action')
+    prepared_response = client.post('/offer/42/email', data=data)
+    assert prepared_response.status_code == 303
+    msg = BytesParser(policy=policy.default).parsebytes(client.get(prepared_response.location + '/eml').data)
+    assert str(msg['To']) == data['recipient']
+    assert str(msg['Subject']) == data['subject']
+    assert data['text'] in msg.get_body(preferencelist=('plain',)).get_content()
+
+
+def test_edit_handoff_keeps_empty_address_and_checks_identity(client):
+    data = fields(client)
+    data.update(action='edit', recipient='')
+    response = client.post('/offer/42/email', data=data)
+    assert response.status_code == 200
+    assert 'name="recipient" type="email" required maxlength="254" value=""' in response.text
+    data['csrf'] = 'invalid'
+    assert client.post('/offer/42/email', data=data).status_code == 400
+
+
 def test_preview_has_real_pdf_inline_logo_and_safe_html(client):
     url = prepared(client)
     eml = client.get(url + '/eml')
@@ -269,3 +304,4 @@ def test_original_reference_photos_fit_email_budget(client):
     offer['reference_images'] = [{'path': str(ROOT / 'references' / 'Zerda_Gold_Rheinfelden_20260907_190456629.jpg'), 'title': 'Türstation'}] * 4
     pdf = module.make_pdf(offer).getvalue()
     assert pdf.startswith(b'%PDF-') and len(pdf) < 5 * 1024 * 1024
+
