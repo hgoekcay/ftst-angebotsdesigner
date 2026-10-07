@@ -29,6 +29,34 @@ def test_zero_group_price_is_not_missing(draft):
     assert calculate(draft)['lines'][0]['price']=='0'
 
 
+@pytest.mark.parametrize('group,tax_rule', [('0', 'COUNTRY'), ('5', 'NO_TAX'), ('2', 'TAX')])
+def test_ftst_standard_uses_base_price_no_discount_and_19_percent(draft, group, tax_rule):
+    from quote_drafts import PRICING_POLICY
+    draft['pricing_policy'] = PRICING_POLICY
+    draft['catalog']['clients'][0].update(price_group=group, tax_rule=tax_rule, reduction='35')
+    draft['catalog']['taxes'][0]['rate'] = '7'
+    before = deepcopy(draft)
+    result = calculate(draft)
+    assert result['total'] == dict(net='210.00', tax='39.90', gross='249.90')
+    assert result['group'] == '1' and result['reduction'] == '0'
+    assert all(line['price_field'] == 'sales_price' and line['tax_rate'] == '19' for line in result['lines'])
+    assert draft == before
+
+
+def test_ftst_standard_never_uses_special_price_when_base_missing(draft):
+    from quote_drafts import PRICING_POLICY
+    draft['pricing_policy'] = PRICING_POLICY
+    draft['catalog']['articles'][0]['sales_price'] = None
+    assert calculate(draft)['total'] is None
+
+
+def test_ftst_standard_rejects_gross_basis(draft):
+    from quote_drafts import PRICING_POLICY
+    draft['pricing_policy'] = PRICING_POLICY
+    draft['catalog']['settings']['net_gross'] = 'GROSS'
+    assert calculate(draft)['total'] is None
+
+
 @pytest.mark.parametrize('quantity',['','0','-1','NaN','Infinity','1000001'])
 def test_invalid_quantity_never_produces_partial_total(draft,quantity):
     draft['rows'][0]['quantity']=quantity
@@ -124,13 +152,13 @@ def test_draft_browser_persistence_stale_notes_and_failed_refresh(monkeypatch,ca
     from werkzeug.datastructures import MultiDict
     payload=MultiDict([('action','save'),('revision',old),('client_id','3'),('description','Hub'),('quantity','1'),('article_id','1'),('description','FireProtect'),('quantity','11'),('article_id','2')])
     assert client.post(url,data=payload).status_code==302
-    assert '203,49' in module.app.test_client().get(url).text
+    assert '249,90' in module.app.test_client().get(url).text
     assert client.post(url,data=payload).status_code==409
     def fail(self):
         raise RuntimeError('timeout')
     monkeypatch.setattr(BillomatClient,'draft_catalog',fail)
     assert client.post(url,data={'action':'catalog','revision':revision()}).status_code==503
-    assert '203,49' in client.get(url).text
+    assert '249,90' in client.get(url).text
     client.post(location,data={'notes':'12 FireProtect'})
     page=client.get(url).text
     assert 'Projektnotizen wurden geändert' in page
@@ -157,3 +185,4 @@ def test_tax_confirmation_does_not_hide_missing_article_selections(draft):
     assert result['total'] is None
     assert any('Steuerregel' in p for p in result['problems'])
     assert 'Position 1: Artikel auswählen.' in result['problems']
+

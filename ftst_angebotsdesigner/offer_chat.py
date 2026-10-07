@@ -79,7 +79,7 @@ def make_draft(state, project, old, catalog):
     if not cid and len(matches) == 1:
         cid = str(matches[0]['id'])
     return dict(rows=rows, client_id=cid, chat_customer=state['name'], catalog=catalog['data'], catalog_at=catalog['at'],
-                source=quotes.fingerprint(project), revision=uuid4().hex, reviewed=False, tax_confirmed='',
+                source=quotes.fingerprint(project), revision=uuid4().hex, reviewed=False, tax_confirmed='', pricing_policy=quotes.PRICING_POLICY,
                 presentation={'title': state['title'] or 'Ihr Leistungsvorschlag', 'intro': '', 'summary': ''})
 
 
@@ -196,7 +196,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
                     cid = form.get('client_id', '')
                     if cid not in {str(c['id']) for c in draft['catalog']['clients'] if str(c.get('archived')) != '1'} | {''}:
                         raise ValueError('Kunde nicht im Katalog.')
-                    draft.update(client_id=cid, tax_confirmed='yes' if form.get('tax_confirmed') == 'yes' else '', reviewed=False, revision=uuid4().hex)
+                    draft.update(client_id=cid, tax_confirmed='', pricing_policy=quotes.PRICING_POLICY, reviewed=False, revision=uuid4().hex)
                     # Manual quantities become explicit user facts for subsequent corrections.
                     state = deepcopy(chat['state'])
                     state['rows'] = [dict(description=r['description'], quantity=float(r['quantity']) if r['quantity'] else None,
@@ -418,3 +418,4 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf, infer_ty
         response = send_file(document, mimetype='application/pdf', download_name='FTST-Chat-Entwurf.pdf')
         response.headers['Cache-Control'] = 'no-store'
         return response
+

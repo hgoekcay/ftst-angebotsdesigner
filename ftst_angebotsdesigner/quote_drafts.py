@@ -12,6 +12,13 @@ from billomat_client import BillomatClient
 from materials import account
 from storage import StorageError, RecordConflict
 
+PRICING_POLICY = 'ftst-standard-19-v1'
+PRICING_LABEL = 'Normaler Billomat-Verkaufspreis · kein Sonderrabatt · 19 % Mehrwertsteuer'
+
+
+def standard_pricing(draft):
+    return draft.get('pricing_policy') == PRICING_POLICY
+
 
 def number(value, maximum='100000000'):
     try:
@@ -161,7 +168,8 @@ def calculate(draft):
         problems.append('Bruttopreisbasis oder unbekannte Preisbasis: Kalkulation in Billomat prüfen.')
     if not currency:
         problems.append('Währung fehlt.')
-    tax_rule = client.get('tax_rule')
+    standard = standard_pricing(draft)
+    tax_rule = 'TAX' if standard else client.get('tax_rule')
     if tax_rule not in ('TAX', 'NO_TAX', 'COUNTRY'):
         problems.append('Unbekannte oder fehlende Steuerregel: Kundendaten in Billomat prüfen.')
     elif tax_rule == 'COUNTRY' and draft.get('tax_confirmed') != 'yes':
@@ -174,10 +182,10 @@ def calculate(draft):
             problems.append('Mindestens eine Position ergänzen.')
         return {'problems':problems, 'lines':[], 'total':None, 'currency':currency}
     try:
-        group = str(client.get('price_group') or '1')
+        group = '1' if standard else str(client.get('price_group') or '1')
         if group not in ('1','2','3','4','5'):
             raise ValueError('Unbekannte Kundenpreisgruppe.')
-        reduction = number(client.get('reduction') or '0', '100')
+        reduction = Decimal(0) if standard else number(client.get('reduction') or '0', '100')
     except ValueError as exc:
         return {'problems':[str(exc)], 'lines':[], 'total':None}
     articles = {str(a['id']):a for a in catalog['articles']}
@@ -204,7 +212,9 @@ def calculate(draft):
             selected_tax = taxes.get(str(article.get('tax_id')))
             if not selected_tax and article.get('tax_id') in (None, '', 0, '0') and len(defaults) == 1:
                 selected_tax = defaults[0]
-            if tax_rule == 'NO_TAX':
+            if standard:
+                rate = Decimal(19)
+            elif tax_rule == 'NO_TAX':
                 rate = Decimal(0)
             elif selected_tax:
                 rate = number(selected_tax.get('rate'), '100')
@@ -260,7 +270,7 @@ def register(app, base, ingress, escape, get_store):
         draft = store.record(account(), 'quote', key)
         if draft is None:
             try:
-                draft = {'rows':components(project), 'source':fingerprint(project), 'revision':'', 'client_id':''}
+                draft = {'rows':components(project), 'source':fingerprint(project), 'revision':'', 'client_id':'', 'pricing_policy':PRICING_POLICY}
             except ValueError as exc:
                 abort(400, str(exc))
         notice = ''
@@ -305,6 +315,11 @@ def register(app, base, ingress, escape, get_store):
                     draft['reviewed'] = request.form.get('reviewed') == 'yes'
                 else:
                     abort(400)
+                if not standard_pricing(draft):
+                    # A changed commercial basis must be reviewed again, even
+                    # if an older form submitted a review checkbox.
+                    draft['pricing_policy'] = PRICING_POLICY
+                    draft['reviewed'] = False
                 if action != 'save':
                     draft['reviewed'] = False
                     draft['tax_confirmed'] = ''
@@ -372,8 +387,8 @@ def register(app, base, ingress, escape, get_store):
         if not draft.get('revision'):
             presentation_link = '<p>Kundentexte und Fotos können nach dem ersten Speichern gestaltet werden.</p>'
         body = f'''<div class="back"><a href="{ingress('projects/'+key)}">← Projekt</a></div><div class="card"><h1>Angebotsentwurf: {escape(project['title'])}</h1>{saved}{presentation_link}<p>{escape(notice)}</p><p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p><p>Notizen: {escape(project.get('notes'))}</p><form method="post">{revision}<button class="btn" name="action" value="catalog">Artikel und Kunden aus Billomat laden</button><button class="btn light" name="action" value="source">Positionen aus aktuellen Notizen neu übernehmen</button></form><p>Speichern sichert Ihre Auswahl. Der Knopf „Artikel und Kunden aus Billomat laden“ aktualisiert die Stammdaten.</p><p><a class="btn light" href="{ingress("customers")}?project={quote(key, safe="")}">Kunden suchen oder neu anlegen</a></p><p class="muted">Ungespeicherte Änderungen zuerst speichern. Nach der Kundenanlage können Sie den neuen Kunden direkt in diesen Entwurf übernehmen.</p><p>{len(draft.get("catalog",{}).get("articles",[]))} Artikel · {len(draft.get("catalog",{}).get("clients",[]))} Kunden geladen</p><p>Datenstand (UTC): {escape(draft.get('catalog_at') or 'Noch nicht geladen')}</p></div>
-        <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><label><input style="width:auto" type="checkbox" name="tax_confirmed" value="yes" {'checked' if draft.get('tax_confirmed')=='yes' else ''}> Bei länderabhängiger Steuerregel: Die Artikelsteuersätze gelten für diesen Auftrag.</label></p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
-        <div class="card"><h2>Kalkulation zur Prüfung</h2><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
+        <div class="card"><form method="post">{revision}<label for="client">Billomat-Kunde</label><select id="client" name="client_id">{customer_options}</select><p>Suchtext oder Menge ändern und speichern. Danach den passenden Artikel auswählen. Die letzte leere Zeile ergänzt eine Position; eine vollständig geleerte Zeile wird entfernt.</p><table>{rows}</table><p><strong>Beim Speichern:</strong> {escape(PRICING_LABEL)}. Billomat-Kundenstammdaten bleiben unverändert.</p><p><label><input style="width:auto" type="checkbox" name="reviewed" value="yes" {'checked' if draft.get('reviewed') else ''}> Varianten, Mengen, Montage, Anfahrt und Zubehör geprüft.</label></p><button class="btn" name="action" value="save">Auswahl und Mengen speichern</button></form></div>
+        <div class="card"><h2>Kalkulation zur Prüfung</h2><p>{escape(PRICING_LABEL) if standard_pricing(draft) else "Bisherige Konditionen – beim nächsten Speichern erfolgt die Umstellung mit erneuter Prüfung."}</p><ul>{problems}</ul><p>Preisgruppe: {escape(result.get('group'))} · Kundenrabatt: {escape(result.get('reduction'))} %. Skonto ist nicht abgezogen.</p><table><tr><th>Artikel</th><th>Menge</th><th>Einzelpreis netto</th><th>Steuer</th><th>Nach Rabatt netto</th></tr>{preview}</table>{totals}<p>{'Leistungsumfang als geprüft markiert.' if draft.get('reviewed') else 'Leistungsumfang noch prüfen: Montage, Anfahrt und Zubehör werden nicht automatisch ergänzt.'}</p><p>Rundung je Position; abschließende Summenprüfung erfolgt bei der späteren Übernahme in Billomat.</p></div>'''
         transfer = store.record(account(), 'quote_transfer', key)
         if transfer:
             body = body.replace('<p>Lokaler Entwurf zur Prüfung. In Billomat wird noch kein Angebot angelegt.</p>',

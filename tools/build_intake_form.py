@@ -9,7 +9,7 @@ OUT = ROOT / 'ftst_angebotsdesigner/static/FTST-Technikeraufnahme-Ajax.pdf'
 OUT.parent.mkdir(parents=True, exist_ok=True)
 LOGO = ROOT / 'ftst_angebotsdesigner/assets/branding/FTST-Registered-Original.jpg'
 c = canvas.Canvas(str(OUT), pagesize=A4)
-c.setTitle('FT Sicherheitstechnik - Technikeraufnahme Ajax')
+c.setTitle('Alarmanlage - Technikeraufnahme | FT Sicherheitstechnik')
 c.setAuthor('FT Sicherheitstechnik')
 W,H=A4
 red=HexColor('#cf1020'); ink=HexColor('#172126'); grey=HexColor('#657078'); line=HexColor('#ccd2d6')
@@ -41,10 +41,10 @@ def header(page,title,sub):
     text(36,H-119,title,23,True)
     text(36,H-139,sub,9,False,grey)
     c.setStrokeColor(line); c.line(36,35,W-36,35)
-    text(36,22,'FT Sicherheitstechnik | Aufnahme zur Angebotsvorbereitung | 21.09.2026',8,False,grey)
+    text(36,22,'FT Sicherheitstechnik | Aufnahme zur Angebotsvorbereitung | 07.10.2026',8,False,grey)
     text(W-74,22,f'{page} / 2',8,False,grey)
 
-header(1,'Bedarf vor Ort erfassen','Digital ausfüllen oder ausdrucken. Zahlen statt Strichlisten; Unbekanntes als offen kennzeichnen.')
+header(1,'Alarmanlage - Technikeraufnahme','Bedarf vor Ort erfassen. Digital ausfüllen oder ausdrucken; Unbekanntes als offen kennzeichnen.')
 section(674,'01','Kunde und Projekt')
 field('projekt',36,632,260,label='Projekt / Kunde (vorläufiger Name genügt)')
 field('datum',310,632,105,label='Datum')
@@ -75,7 +75,7 @@ text(36,77,'Bei mehreren Räumen oder weiteren Geräten: Detailzeilen auf Seite 
 text(36,59,'Eine Bedarfsliste ersetzt keine Prüfung von Modell, Einsatzort und Systemkompatibilität.',8,False,grey)
 c.showPage()
 
-header(2,'Montage und Rückfragen','Ergänzungsblatt: dieselbe Projektbezeichnung wie auf Seite 1 verwenden.')
+header(2,'Alarmanlage - Technikeraufnahme','Montage und Rückfragen. Ergänzungsblatt: dieselbe Projektbezeichnung wie auf Seite 1 verwenden.')
 field('projekt_seite2',36,658,523,label='Projekt / Kunde')
 section(628,'04','Details nach Raum / Einbauort')
 text(36,611,'Diese Zeilen präzisieren Seite 1. Gleiche Geräte nicht erneut zur Gesamtmenge addieren.',9,False,grey)
@@ -109,3 +109,4 @@ widgets=[a.get_object() for p in r.pages for a in p.get('/Annots',[]) if a.get_o
 assert len(widgets)==len(fields)
 assert all(a.get('/AP',{}).get('/N') for a in widgets)
 print(f'{OUT}: {len(r.pages)} pages, {len(fields)} interactive fields')
+

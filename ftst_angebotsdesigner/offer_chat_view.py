@@ -64,12 +64,15 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
                 if str(c.get('archived')) != '1':
                     opts += option(c['id'], str(c.get('client_number') or '') + ' · ' + client_name(c), draft.get('client_id'))
             content = '<label for="chat-customer">Billomat-Kunde</label><select name="client_id" id="chat-customer">' + opts + '</select>'
+            content += '<p class="small"><strong>FTST-Kalkulation:</strong> ' + e(quotes.PRICING_LABEL) + '.</p>'
+            if not quotes.standard_pricing(draft):
+                content += '<p>Dieser gespeicherte Entwurf verwendet noch die bisherigen Konditionen. Mit „Auswahl übernehmen“ auf die FTST-Kalkulation umstellen und anschließend erneut prüfen.</p>'
             selected_customer = next((c for c in draft['catalog']['clients'] if str(c['id']) == draft.get('client_id')), None)
             if selected_customer:
                 group = selected_customer.get('price_group')
                 tax = selected_customer.get('tax_rule')
                 tax_label = {'TAX': 'Artikelsteuersätze', 'NO_TAX': 'Steuerfrei',
-                             'COUNTRY': 'Länderabhängig – fachliche Prüfung erforderlich'}.get(tax, 'Unbekannt')
+                             'COUNTRY': 'Länderabhängig'}.get(tax, 'Unbekannt')
                 content += '<p class="small">Gespeicherte Billomat-Konditionen: Preisgruppe <strong>' + e(str(group) if group not in (None, '') else 'nicht angegeben') + '</strong> · Steuerregel: ' + e(tax_label) + '.</p>'
             for i, row in enumerate(draft['rows']):
                 matches = quotes.candidates(row['description'], draft['catalog']['articles'])
@@ -82,7 +85,7 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
                 opts = option('', 'Bitte passende Variante wählen', row.get('article_id')) + ''.join(option(a['id'], str(a.get('article_number') or '') + ' · ' + str(a.get('title') or ''), row.get('article_id')) for a in matches)
                 content += '<label for="chat-search-' + str(i) + '">Artikel suchen</label><input type="search" id="chat-search-' + str(i) + '" data-article-search="chat-article-' + str(i) + '" placeholder="Artikelname oder Nummer">'
                 content += '<div class="chat-item"><p>' + e(row['description']) + '</p><label for="chat-qty-' + str(i) + '">Menge</label><input id="chat-qty-' + str(i) + '" name="quantity" inputmode="decimal" value="' + e(row['quantity']) + '"><label for="chat-article-' + str(i) + '">Artikelvariante</label><select id="chat-article-' + str(i) + '" name="article_id">' + opts + '</select></div>'
-            content += '<label class="chat-check"><input type="checkbox" name="tax_confirmed" value="yes"' + (' checked' if draft.get('tax_confirmed') == 'yes' else '') + '> Bei länderabhängiger Steuerregel gelten die Artikelsteuersätze für diesen Auftrag.</label>'
+            content += '<p class="small">Beim Übernehmen gelten die FTST-Konditionen oben. Die Kundenstammdaten in Billomat bleiben unverändert.</p>'
             body += form('select', 'Auswahl übernehmen', content)
             body += form('catalog', 'Billomat-Daten aktualisieren')
         for line in result['lines']:
@@ -123,3 +126,4 @@ def render(chat, key, draft, project, transfer, release, mail, csrf, identity, i
         body += '</section>'
     body += '</aside></div><script defer src="' + ingress('ui-assets/' + version + '/offer-chat.js') + '"></script>'
     return body
+
