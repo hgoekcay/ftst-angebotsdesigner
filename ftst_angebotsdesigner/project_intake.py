@@ -289,6 +289,7 @@ def register(app, base, ingress, escape, get_store):
                  '<p>Kundenname und Adresse dürfen bei der Aufnahme noch fehlen. Sie können später ergänzt werden. '
                  'Ein Name in diesem Formular legt keinen Billomat-Kunden an und wählt noch keinen aus.</p>'
                  f'<p><a class="btn light" data-pdf="FTST-Technikeraufnahme-Ajax.pdf" href="{ingress("static/FTST-Technikeraufnahme-Ajax.pdf")}">Checkliste als ausfüllbare PDF</a></p>'
+                 f'<p><a href="{ingress("intake-templates")}">Alle Aufnahmebögen: Alarm, Video, Zutritt, Schließzylinder und Türsprechanlagen</a></p>'
                  '<p class="muted">Vorlage drucken oder digital ausfüllen. In dieser Aufnahme werden JPG, PNG und WebP unterstützt; '
                  'für die Fotoauswertung Seite 1 fotografieren und Ergänzungen von Seite 2 manuell eintragen. Kein PDF-Dateiimport.</p>')
         if error or value.get('error'):
@@ -479,3 +480,4 @@ def register(app, base, ingress, escape, get_store):
         result = send_file(path, mimetype='image/jpeg')
         result.headers['Cache-Control'] = 'no-store'
         return result
+

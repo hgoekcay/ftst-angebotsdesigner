@@ -1,3 +1,8 @@
+# 0.24.8
+
+- Zentrale Seite Aufnahmebögen mit fünf ausfüllbaren PDFs für Alarmanlagen, Videoüberwachung, Zutrittssysteme, Schließzylinder und Türsprechanlagen. Aus Navigation und Technikeraufnahme erreichbar; Downloads laufen innerhalb der angemeldeten App.
+- Die Vorlagen erweitern nicht automatisch die bisher auf Ajax ausgerichtete strukturierte Aufnahme. PDF-Dateiimport bleibt ausdrücklich als noch nicht verfügbar gekennzeichnet.
+
 # 0.24.7
 
 - Geänderte E-Mail-Adresse, Betreff und Nachrichtentext aus dem Versandbereich werden in die E-Mail-Prüfung übernommen. Der Übergang erfolgt als sitzungsgeschütztes Formular ohne Versand und ohne Änderung der Billomat-Stammdaten.

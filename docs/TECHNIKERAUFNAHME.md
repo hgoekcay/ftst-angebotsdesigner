@@ -1,5 +1,11 @@
 # Vom Techniker zum Angebotsentwurf
 
+## Aufnahmebögen ab 0.24.8
+
+Unter **Aufnahmebögen** in der Hauptnavigation stehen fünf ausfüllbare PDFs bereit: Alarmanlage / Ajax, Videoüberwachung, Zutrittssysteme, Schließzylinder und Türsprechanlagen. Sie sind auch aus der Technikeraufnahme erreichbar. Die Vorlagen können digital ausgefüllt oder gedruckt werden. Die Downloads verwenden die bestehende PDF-Vorbereitung innerhalb der angemeldeten App.
+
+Die strukturierte Aufnahme darunter ist weiterhin auf Ajax ausgelegt. Die zusätzlichen Formulare schalten keine andere automatische Artikelzuordnung frei. Kein PDF-Dateiimport; Texte oder lesbare Fotos können im Chat eingebracht und anschließend geprüft werden.
+
 Stand 0.16.0. Die Aufnahme lässt sich am Handy ohne KI direkt ausfüllen. Ein Handzettelfoto bleibt als ergänzende Quelle möglich.
 
 1. Unter **Projekte** ein Projekt anlegen oder öffnen. **Ihr Weg zum Angebot** zeigt den gespeicherten Stand und den nächsten Schritt.
@@ -19,3 +25,4 @@ Alle Anzeigen lesen lokale gespeicherte Daten. Die Schnellauswahl und Übersicht
 ## Anschließende Konzeptstufe
 
 Die räumliche Zuordnung bildet die Grundlage für eine spätere Montageübersicht und bearbeitbare Kamera-/Alarmpläne. Ein Grundrisseditor, automatische Geräteplatzierung und eine automatische technische Freigabe sind in dieser Version noch nicht enthalten. Materialreservierung und interne Terminvorschläge werden weiterhin über **Material & Termine** nach dokumentierter Beauftragung bearbeitet.
+
