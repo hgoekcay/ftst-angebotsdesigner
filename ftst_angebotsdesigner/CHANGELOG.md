@@ -1,3 +1,7 @@
+# 0.24.7
+
+- Geänderte E-Mail-Adresse, Betreff und Nachrichtentext aus dem Versandbereich werden in die E-Mail-Prüfung übernommen. Der Übergang erfolgt als sitzungsgeschütztes Formular ohne Versand und ohne Änderung der Billomat-Stammdaten.
+
 # 0.24.6
 
 - Neue und erneut bearbeitete Kalkulationen verwenden den normalen Billomat-Verkaufspreis ohne Sonderrabatt und 19 % Mehrwertsteuer. Bestehende Entwürfe behalten bis zur erneuten Bearbeitung ihre Konditionen; eine Umstellung hebt die bisherige Prüfung auf.

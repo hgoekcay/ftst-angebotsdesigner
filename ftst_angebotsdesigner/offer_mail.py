@@ -194,9 +194,16 @@ def submit(store, identity, key):
     return store.transact_record(identity, KIND, key, lambda value, _db: dict(value, status=outcome, finished_at=now()))
 
 
+def csrf():
+    return session.setdefault('offer_mail_csrf', secrets.token_urlsafe(32))
+
+
+def form_identity():
+    return ('<input type="hidden" name="csrf" value="' + escape(csrf(), quote=True) +
+            '"><input type="hidden" name="account" value="' + escape(account(), quote=True) + '">')
+
+
 def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
-    def csrf():
-        return session.setdefault('offer_mail_csrf', secrets.token_urlsafe(32))
 
     def check_post():
         if (not hmac.compare_digest(request.form.get('csrf', '').encode(), csrf().encode())
@@ -242,7 +249,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         values = request.form if request.method == 'POST' else dict(
             recipient=customer.get('email') or customer.get('email_address') or '', subject=subject, text=text)
         error = ''
-        if request.method == 'POST':
+        if request.method == 'POST' and request.form.get('action') != 'edit':
             try:
                 validate(values)
                 record = freeze(get_store(), account(), oid, values, offer, make_pdf(offer).getvalue())
@@ -379,3 +386,4 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                      '<label for="label_' + str(i) + '">Kunde / Standort</label><input id="label_' + str(i) + '" name="label_' + str(i) + '" maxlength="100" value="' + clean(item.get('label', '')) + '">')
         body += '<p><button class="btn" style="background:#16803c" name="action" value="references">Referenzleiste speichern</button></p></form></div>'
         return page('Mailzugang & Referenzlogos', body)
+

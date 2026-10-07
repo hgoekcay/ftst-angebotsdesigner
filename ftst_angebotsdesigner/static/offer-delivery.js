@@ -44,7 +44,7 @@
       }
     } catch (error) { status.textContent = error.message; return; }
     busy = true;
-    panel.querySelectorAll('[data-deliver], input, textarea').forEach(node => { node.disabled = true; });
+    panel.querySelectorAll('[data-deliver], button[type=submit], input, textarea').forEach(node => { node.disabled = true; });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 90000);
     status.textContent = 'PDF wird für den Versand vorbereitet …';
@@ -103,8 +103,9 @@
       status.textContent = error.name === 'AbortError' ? 'PDF-Abruf hat zu lange gedauert. Bitte erneut versuchen.' : error.message;
     } finally {
       clearTimeout(timer); busy = false;
-      panel.querySelectorAll('[data-deliver], input, textarea').forEach(node => { node.disabled = false; });
+      panel.querySelectorAll('[data-deliver], button[type=submit], input, textarea').forEach(node => { node.disabled = false; });
     }
   });
   window.addEventListener('pagehide', event => { if (!event.persisted && objectUrl) URL.revokeObjectURL(objectUrl); });
 })();
+

@@ -30,7 +30,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.24.6"
+APP_VERSION = "0.24.7"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
@@ -306,7 +306,7 @@ def detail(o):
         body = body.replace('Ihr persönliches Angebot', 'Ihr Angebotsentwurf').replace('Ihr Festpreis', 'Entwurfsbetrag')
     else:
         body = body.replace('Ihr persönliches Angebot', 'Ihr persönlicher Leistungsvorschlag').replace('data-pdf="FTST-Angebot-', 'data-pdf="FTST-Leistungsvorschlag-')
-    body = body.replace('<div class="grid">', offer_delivery.panel(o, ingress) + '<div class="grid">', 1)
+    body = body.replace('<div class="grid">', offer_delivery.panel(o, ingress, offer_mail.form_identity()) + '<div class="grid">', 1)
     body += '<script defer src="' + ingress('ui-assets/'+APP_VERSION+'/offer-delivery.js') + '"></script>'
     return base("FTST Angebotsentwurf" if o.get('is_draft') else "FTST Leistungsvorschlag",body)
 
