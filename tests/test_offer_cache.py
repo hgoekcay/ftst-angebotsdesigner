@@ -110,3 +110,29 @@ def test_parallel_manual_refresh_does_not_duplicate_request(tmp_path):
     with cache.refresh_lock:
         assert cache.refresh()['refreshing'] is True
     cache.client.list_offers.assert_not_called()
+
+
+def test_drafts_hidden_reversibly_without_mutating_cache_and_pagination(tmp_path, monkeypatch):
+    monkeypatch.setitem(module.app.config, 'FTST_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('BILLOMAT_ID', 'draft-filter')
+    monkeypatch.setenv('BILLOMAT_API_KEY', 'test')
+    monkeypatch.setattr(offer_cache.OfferCache, 'start', lambda self: None)
+    rows = [{'id': str(i + 1), 'status': 'DRAFT', 'title': 'Hidden draft'} for i in range(30)]
+    store = OfferStore(tmp_path)
+    store.put_record('draft-filter', 'offer_list', 'recent', {'rows': rows, 'updated_at': '2026-10-07'})
+    api = Mock(return_value=[{'id': '31', 'status': 'OPEN', 'title': 'Visible offer'}])
+    monkeypatch.setattr(BillomatClient, 'list_offers', api)
+    client = module.app.test_client()
+    hidden = client.get('/offers').text
+    assert 'Hidden draft' not in hidden and 'Entwürfe ausgeblendet (30' in hidden
+    assert 'Weitere 30 Angebote' in hidden
+    shown = client.get('/offers?status=ALL').text
+    assert 'Hidden draft' in shown and 'status=ALL' in shown
+    api.assert_not_called()
+    assert store.record('draft-filter', 'offer_list', 'recent')['rows'] == rows
+    assert 'Visible offer' in client.get('/offers?page=2').text
+    api.assert_called_once_with('', page=2)
+    api.reset_mock()
+    client.get('/offers?page=2&status=ALL')
+    api.assert_called_once_with('', page=2)
+

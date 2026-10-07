@@ -1,3 +1,7 @@
+# 0.24.9
+
+- Angebotsübersicht zeigt standardmäßig keine Billomat-Entwürfe. Über den Statusfilter können ausschließlich Entwürfe oder alle Status einschließlich Entwürfen angezeigt werden. Daten und Wiedervorlagen bleiben erhalten; die Seitennavigation berücksichtigt auch ausgeblendete Einträge.
+
 # 0.24.8
 
 - Zentrale Seite Aufnahmebögen mit fünf ausfüllbaren PDFs für Alarmanlagen, Videoüberwachung, Zutrittssysteme, Schließzylinder und Türsprechanlagen. Aus Navigation und Technikeraufnahme erreichbar; Downloads laufen innerhalb der angemeldeten App.
