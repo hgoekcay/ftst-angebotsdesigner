@@ -105,12 +105,12 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
         return base('Angebote', '<div class="card"><h1>Ungültige Angebotsseite</h1></div>'), 400
     search = request.args.get('search', '').strip()[:100]
     selected_status = request.args.get('status', '').strip()
-    if selected_status and selected_status not in STATUSES:
+    if selected_status and selected_status not in (*STATUSES, 'ALL'):
         return base('Angebote', '<div class="card"><h1>Ungültiger Angebotsstatus</h1></div>'), 400
     cache = worker(store, account, client)
     cache.start()
     refresh = ''
-    if number == 1 and not search and not selected_status:
+    if number == 1 and not search and selected_status in ('', 'ALL'):
         snapshot = cache.refresh() if request.args.get('refresh') == '1' else cache.snapshot()
         data = snapshot.get('rows', [])
         if snapshot.get('updated_at'):
@@ -126,20 +126,25 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
             refresh = '<meta http-equiv="refresh" content="10">'
         if snapshot.get('refreshing'):
             note += ' · Aktualisierung läuft …'
-            refresh = '<meta http-equiv="refresh" content="5;url=' + ingress('offers') + '">'
+            refresh = '<meta http-equiv="refresh" content="5;url=' + ingress('offers') + ('?status=ALL' if selected_status == 'ALL' else '') + '">'
         elif request.args.get('refresh') == '1' and not snapshot.get('error'):
             note += ' · Jetzt manuell aktualisiert.'
     else:
         try:
             parameters = {'page': number}
-            if selected_status:
+            if selected_status in STATUSES:
                 parameters['status'] = selected_status
             data = client.list_offers(search, **parameters)
             note = f'Seite {number} · bis zu 30 Angebote direkt aus Billomat · Datenstand: ' + data_time(datetime.now(timezone.utc).isoformat())
-            if selected_status:
+            if selected_status in STATUSES:
                 note += ' · Statusfilter für alle Billomat-Angebote: ' + STATUSES[selected_status]
         except Exception:
             return base('Angebote', '<div class="card"><h1>Billomat derzeit nicht erreichbar</h1><p>Bitte später erneut versuchen.</p><a class="btn" href="' + ingress('offers') + '">Gespeicherte Angebote</a></div>'), 502
+    source_count = len(data)
+    if not selected_status:
+        data = [row for row in data if row.get('status') != 'DRAFT']
+        hidden = source_count - len(data)
+        note += f' · Entwürfe ausgeblendet ({hidden} auf dieser Seite). Über den Statusfilter wieder anzeigen.'
     followups = store.records(account, offer_followup.KIND)
 
     def followup_cell(oid):
@@ -168,9 +173,9 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
 
     if number > 1:
         links += '<a class="btn light" href="' + page_link(number-1) + '">Vorherige Seite</a>'
-    if len(data) == 30:
+    if source_count == 30:
         links += '<a class="btn light" href="' + page_link(number+1) + '">Weitere 30 Angebote</a>'
-    options = '<option value="">Alle Status</option>' + ''.join('<option value="' + key + '"' + (' selected' if key == selected_status else '') + '>' + label + '</option>' for key, label in STATUSES.items())
+    options = '<option value="">Ohne Entwürfe</option><option value="ALL"' + (' selected' if selected_status == 'ALL' else '') + '>Alle Status (mit Entwürfen)</option>' + ''.join('<option value="' + key + '"' + (' selected' if key == selected_status else '') + '>' + label + '</option>' for key, label in STATUSES.items())
     form = ('<form method="get"><div class="grid"><div class="field"><label for="offer-search">Angebotsnummer suchen</label><input id="offer-search" name="search" value="' + clean(search) + '"></div>' +
             '<div class="field"><label for="offer-status">Billomat-Status</label><select id="offer-status" name="status">' + options + '</select></div></div><button class="btn">Angebote filtern</button></form>' +
             '<p><a class="btn" style="background:#16803c" href="' + page_link(number) + '&amp;refresh=1">Jetzt aktualisieren</a></p>')
@@ -187,3 +192,4 @@ def page(request, store, account, client, base, ingress, clean, money, date_de):
     return base('Angebote', refresh + '<div class="card"><div class="eyebrow">Billomat</div><h1>Ihre Angebote</h1><p class="muted">' + note + '</p>' + form +
                 '<table><thead><tr><th>Nr.</th><th>Datum</th><th>Titel</th><th>Billomat-Status</th><th>Brutto</th><th>Wiedervorlage</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
                 ('<p>Keine Angebote auf dieser Seite.</p>' if not data and not refresh else '') + links + '</div>' + reminders)
+
