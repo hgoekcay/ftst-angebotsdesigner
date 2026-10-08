@@ -67,11 +67,13 @@ def tokens(value):
 
 def candidates(description, articles):
     # Quantity and connecting prose must not suggest unrelated products.
-    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück', 'ajax'}
+    brands = {'ajax', 'dahua'}
+    ignored = {'mit', 'und', 'für', 'fur', 'eine', 'einen', 'einem', 'einer', 'der', 'die', 'das', 'von', 'stk', 'stück'} | brands
     # The intake's visible room annotation is installation context, not a
     # product term. Keep it on the requirement, but out of article matching.
     description = description.partition(' · Raum / Montageort: ')[0]
     terms = tokens(description)
+    requested_brands = terms & brands
     wanted = {word for word in terms if not word.isdigit() and word not in ignored}
     # These are search synonyms only. BM/MK require the explicitly confirmed
     # Ajax context; product variants still require a manual article selection.
@@ -79,7 +81,7 @@ def candidates(description, articles):
     if 'ajax' in terms:
         if 'bm' in terms or any(word.startswith('bewegungsmeld') for word in terms):
             families.update(('motionprotect', 'motioncam'))
-        if 'mk' in terms or any(word.startswith(('magnetkontakt', 'türkontakt', 'tuerkontakt', 'öffnungsmeld', 'oeffnungsmeld')) for word in terms):
+        if 'mk' in terms or any(word.startswith(('magnetkontakt', 'türkontakt', 'tuerkontakt', 'fensterkontakt', 'öffnungsmeld', 'oeffnungsmeld')) for word in terms):
             families.add('doorprotect')
         if any(word.startswith('sirene') or word.startswith(('innensirene', 'aussensirene')) for word in terms):
             families.update(('homesiren', 'streetsiren'))
@@ -101,6 +103,10 @@ def candidates(description, articles):
             len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))
             for term in title) else 0 for word in wanted)
         exact_number = bool(article.get('article_number')) and str(article['article_number']).casefold() == description.casefold()
+        # An explicitly different supported manufacturer is not a suggestion
+        # for this requirement. Brandless catalogue entries stay searchable.
+        if not exact_number and requested_brands and title & brands and not requested_brands & title:
+            continue
         if families and not exact_number:
             family_match = any(term.startswith(family) for term in title for family in families)
             # A location or the brand name alone must not make an unrelated
