@@ -31,7 +31,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.26.1"
+APP_VERSION = "0.26.2"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")

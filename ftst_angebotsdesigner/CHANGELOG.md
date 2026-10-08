@@ -1,3 +1,9 @@
+# 0.26.2
+
+- Ajax-Tür-/Fensterkontakte aus den Aufnahmebögen finden jetzt auch die DoorProtect-Artikelfamilie im Billomat-Katalog.
+- Dahua als Herstellername allein erzeugt keine unpassenden Artikeltreffer mehr. Ausdrücklich anders benannte Ajax-/Dahua-Artikel werden bei vorgegebenem Hersteller ausgefiltert; Artikelnummernsuche bleibt möglich.
+- Vorschläge bleiben zur manuellen Variantenprüfung; keine automatische Artikelzuordnung oder Preisänderung.
+
 # 0.26.1
 
 - Automatische Rückfragen in der Technikeraufnahme verschwinden nach dem Speichern beantworteter Angaben. Werden Angaben wieder entfernt, erscheinen die passenden Fragen erneut.

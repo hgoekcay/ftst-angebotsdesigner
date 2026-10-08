@@ -34,7 +34,13 @@ PDF-Import der fünf digitalen FTST-Bögen: bekannte Formularstruktur, Systemerk
 
 PR 46 integriert, 931 Tests und zehn CI-Prüfungen bestanden; Backup f4112c11. Version 0.26.0 installiert und digital ausgefüllter Testbogen bis zur lokalen Kalkulation geprüft.
 
-## Aktueller Schritt: 0.26.1
+## Abgeschlossen: 0.26.1
 
 Standardrückfragen anhand aktueller Angaben bereinigen, freie Fragen erhalten und bei gelöschten Angaben Standardfragen erneut öffnen. Alle fünf Systemarten, alte Aufnahmen und Projektübernahme berücksichtigt. 938 Tests erfolgreich. Veröffentlichung und Installation nach Sicherung; Abschluss im Statusprotokoll.
+
+PR 47 integriert, zehn CI-Prüfungen bestanden; Backup 5c461781. Version 0.26.1 installiert und Fragebereinigung/Wiederöffnung live im Testprojekt geprüft.
+
+## Aktueller Schritt: 0.26.2
+
+Artikelsuche: PDF-Bezeichnung Tür-/Fensterkontakt der Ajax-Kontaktfamilie zuordnen. Herstellername Dahua allein darf keine beliebigen Treffer liefern; ausdrücklich abweichende Ajax-/Dahua-Hersteller ausschließen. Keine automatische Modellwahl. Veröffentlichung, Sicherung und Live-Prüfung im separaten Statusprotokoll.
 
