@@ -15,15 +15,19 @@ Stand 07.10.2026. Dieses Protokoll ersetzt veraltete Versionsangaben in den Übe
 - 0.24.8: Alle fünf ausfüllbaren Aufnahmebögen direkt in der App. PR 43, zehn CI-Prüfungen erfolgreich, Backup 1a271ef7; Installation und PDF-Zugriff geprüft.
 - 0.24.9: Entwürfe standardmäßig ausgeblendet, über Statusfilter weiterhin erreichbar. Kein Löschen von Billomat-Daten. PR 44, zehn CI-Prüfungen erfolgreich, Backup 189a1602; Installation und beide Filteransichten geprüft.
 
-## Aktueller Schritt: 0.25.0
+## Abgeschlossen: 0.25.0
 
 Strukturierte Aufnahme für Alarm, Video, Zutritt, Schließzylinder und Türsprechanlagen. Die gespeicherte Systemwahl steuert Hinweise, Rückfragen, Schnellbausteine und PDF-Link. Ein Wechsel erfordert Speichern und erneute Prüfung; vorhandene Komponenten bleiben erhalten. Ajax bleibt Alarmstandard; andere Hersteller und genaue Modelle werden ausdrücklich ausgewählt. Explizite Dahua-Bezeichnungen und Montageleistungen erhalten keinen falschen Ajax-Präfix.
 
-Veröffentlichung und Installation werden nach Tests und bestätigter Sicherung durchgeführt; den abgeschlossenen Stand dokumentiert die Statusdatei im übergeordneten outputs-Verzeichnis.
+PR 45 integriert, 920 Tests und zehn CI-Prüfungen bestanden; Backup 100ee9fe, Version 0.25.0 installiert. Live-Test der Türsprechanlagenaufnahme bis zur lokalen Kalkulation erfolgreich.
 
 ## Nächste fachliche Grenze
 
-Artikel und Preise kommen aus dem tatsächlichen Billomat-Katalog. Die Systemauswahl ersetzt keine technische Auslegung oder Modellprüfung. Ausgefüllte PDF-Dateien werden noch nicht automatisch importiert; Fotos und Text bleiben die bestehenden Eingänge. Eine genaue Standardserie für Zutritt, Türsprechanlagen und Schließzylinder ist noch nicht festgelegt.
+Artikel und Preise kommen aus dem tatsächlichen Billomat-Katalog. Die Systemauswahl ersetzt keine technische Auslegung oder Modellprüfung. Ab 0.26.0 werden digital ausgefüllte FTST-Bögen ausgelesen; Scans bleiben Fotoeingaben. Eine genaue Standardserie für Zutritt, Türsprechanlagen und Schließzylinder ist noch nicht festgelegt.
 ## Arbeitsregeln
 
 Keine Kundenkommunikation oder echte Billomat-Anlage zu Testzwecken. Veröffentlichung und Home-Assistant-Installation sind autorisiert, jeweils nach passenden Prüfungen und Sicherung. Keine automatischen verbindlichen Zusagen oder erfundenen technischen Varianten.
+
+## Aktueller Schritt: 0.26.0
+
+PDF-Import der fünf digitalen FTST-Bögen: bekannte Formularstruktur, Systemerkennung, Mengen von Seite 1, Details beider Seiten als Notizen. Nullmengen entfallen, unklare Mengen bleiben offen. Ersetzt nach ausdrücklicher Wahl nur die Aufnahme; bestätigte Projektübernahme und Artikel-/Kundenauswahl bleiben separate Schritte. Verarbeitung in zeitbegrenztem Unterprozess. Tests, Sicherung, Veröffentlichung und Live-Prüfung werden im Statusprotokoll festgehalten.

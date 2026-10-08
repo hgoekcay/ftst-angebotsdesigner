@@ -1,3 +1,9 @@
+# 0.26.0
+
+- Digital ausgefüllte FTST-Aufnahmebögen für alle fünf Systeme direkt in der Technikeraufnahme einlesen. Systemart, Kunden-/Objektangaben und Bedarfsmengen werden zur Prüfung vorbereitet; Kontakt- und Detailangaben beider Seiten bleiben in den Notizen.
+- Mengen nur aus der Bedarfsliste von Seite 1 übernehmen; Detailmengen von Seite 2 nicht doppelt addieren. Nullmengen auslassen, unklare Mengen leer zur Prüfung lassen. Ein angekreuztes Prüffeld im PDF ersetzt keine erneute Prüfung in der App.
+- Import ersetzt Aufnahmedaten erst nach ausdrücklicher Auswahl; Projekt/Kalkulation werden erst nach geprüfter Übernahme aktualisiert. Fehler und veraltete Formulare überschreiben keine Daten.
+- PDF-Verarbeitung lokal in einem zeitbegrenzten separaten Prozess; höchstens 5 MB, bekannte zweiseitige Formularstruktur, unter Linux Speicher-/CPU-Grenzen. Kein Cloud-Aufruf und keine Ausführung von PDF-Aktionen. Scans, verschlüsselte oder leere Bögen werden verständlich abgewiesen.
 # 0.25.0
 
 - Technikeraufnahme mit ausdrücklicher Systemauswahl für Alarmanlage, Videoüberwachung, Zutritt, Schließzylinder und Türsprechanlage. Passende PDF, Komponententypen und Erfassungshinweise; Mengen und konkrete Modelle werden nicht vorgegeben.
@@ -310,3 +316,4 @@
 - Optionaler Hintergrundabruf und lokale KI-Vorschläge; kein Versand und keine automatische Übernahme von Kategorien oder Antworten.
 - Atomarer Import, Duplikaterkennung und Schutz gleichzeitiger manueller Änderungen.
 - Bestehender direkter STRATO-Lesepilot bleibt verfügbar, ohne automatischen Anbieterwechsel.
+

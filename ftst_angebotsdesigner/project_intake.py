@@ -317,7 +317,19 @@ def register(app, base, ingress, escape, get_store):
                  f'<p><a class="btn light" data-pdf="FTST-Technikeraufnahme-{pdf_suffix}.pdf" href="{ingress("static/FTST-Technikeraufnahme-" + pdf_suffix + ".pdf")}">Checkliste als ausfüllbare PDF</a></p>'
                  f'<p><a href="{ingress("intake-templates")}">Alle Aufnahmebögen: Alarm, Video, Zutritt, Schließzylinder und Türsprechanlagen</a></p>'
                  '<p class="muted">Vorlage drucken oder digital ausfüllen. In dieser Aufnahme werden JPG, PNG und WebP unterstützt; '
-                 'für die Fotoauswertung Seite 1 fotografieren und Ergänzungen von Seite 2 manuell eintragen. Kein PDF-Dateiimport.</p>')
+                 'für die Fotoauswertung Seite 1 fotografieren und Ergänzungen von Seite 2 manuell eintragen. '
+                 'Digital ausgefüllte FTST-PDFs können unten direkt eingelesen werden.</p>')
+        if not live:
+            body += (f'<details><summary>Ausgefüllten PDF-Aufnahmebogen einlesen</summary><p>Alle fünf digitalen FTST-Vorlagen, '
+                     'höchstens 5 MB. Beide Seiten werden eingelesen. Mengen stammen nur aus der Bedarfsliste auf Seite 1; '
+                     'Detailzeilen bleiben in den Notizen. Scans bitte als Foto erfassen. Ältere Hinweise im PDF zum fehlenden Import sind überholt.</p>'
+                     f'<form method="post" enctype="multipart/form-data">{hidden}'
+                     '<label for="intake-pdf">Ausgefüllte FTST-PDF</label><input id="intake-pdf" type="file" name="intake_pdf" accept="application/pdf" required>'
+                     '<label><input type="checkbox" name="replace_intake" value="yes" required> '
+                     'Aufnahmedaten und Foto dieser Aufnahme durch die PDF-Angaben ersetzen. Projekt und Kalkulation bleiben bis zur geprüften Übernahme unverändert.</label>'
+                     '<button class="btn light" name="action" value="import_pdf">PDF einlesen und prüfen</button></form></details>')
+        if value.get('pdf_import'):
+            body += '<p class="success">PDF-Felder eingelesen. Kontakt- und Detailangaben beider Seiten stehen in den Notizen. Mengen und Hersteller vor der Übernahme prüfen.</p>'
         if error or value.get('error'):
             body += '<p role="alert">' + escape(error or value['error']) + '</p>'
             body += f'<a class="btn light" href="{ingress("projects/" + key + "/intake")}">Aktuellen Stand öffnen</a>'
@@ -418,7 +430,7 @@ def register(app, base, ingress, escape, get_store):
         action = request.form.get('action')
         component = action.removeprefix('add_component:') if action and action.startswith('add_component:') else ''
         shortcuts = AJAX_COMPONENTS if system_key(current['fields']) == 'alarm' else profile(current['fields'])[4]
-        if action not in ('upload', 'add_row', 'apply', 'analyze') and component not in shortcuts:
+        if action not in ('upload', 'add_row', 'apply', 'analyze', 'import_pdf') and component not in shortcuts:
             abort(400)
         expected = request.form.get('revision', '')
         project_revision = request.form.get('project_revision', '')
@@ -444,7 +456,14 @@ def register(app, base, ingress, escape, get_store):
                     _active[job_key(store, identity, key)] = thread
                     thread.start()
                 return redirect(ingress('projects/' + key + '/intake'), code=303)
-            value = parse_form(request.form, current, confirm=action == 'apply')
+            if action == 'import_pdf':
+                from intake_pdf import read_upload, proposal
+                pdf = request.files.get('intake_pdf')
+                if request.form.get('replace_intake') != 'yes' or not pdf or not pdf.filename:
+                    raise ValueError('Bitte eine ausgefüllte PDF wählen und das Ersetzen der Aufnahmedaten bestätigen.')
+                value = proposal(read_upload(pdf), project)
+            else:
+                value = parse_form(request.form, current, confirm=action == 'apply')
             if component:
                 if system_key(value['fields']) != system_key(current['fields']):
                     raise ValueError('Bitte die Systemauswahl zuerst speichern; danach eine passende Komponente ergänzen.')
@@ -493,7 +512,7 @@ def register(app, base, ingress, escape, get_store):
         except (ValueError, RecordConflict) as exc:
             if new_file:
                 new_file.unlink(missing_ok=True)
-            attempted = attempted_form(request.form, current) if action != 'analyze' else deepcopy(current)
+            attempted = attempted_form(request.form, current) if action not in ('analyze', 'import_pdf') else deepcopy(current)
             attempted['revision'] = expected
             return response(key, project, attempted, identity, error=str(exc),
                             status=409 if isinstance(exc, RecordConflict) else 400,
@@ -522,3 +541,4 @@ def register(app, base, ingress, escape, get_store):
         result = send_file(path, mimetype='image/jpeg')
         result.headers['Cache-Control'] = 'no-store'
         return result
+
