@@ -1,3 +1,10 @@
+## Digitalen Aufnahmebogen einlesen ab 0.26.0
+
+Im Projekt die Technikeraufnahme öffnen und **Ausgefüllten PDF-Aufnahmebogen einlesen** aufklappen. Eine digital ausgefüllte FTST-Vorlage wählen, das Ersetzen der bisherigen Aufnahmedaten bestätigen und **PDF einlesen und prüfen** drücken. Der Import erkennt die Systemart über die Formularstruktur, nicht über den Dateinamen. Beide Seiten müssen vorhanden sein; maximal 5 MB. Ein Scan oder als Bild gedrucktes PDF enthält keine auslesbaren Formularfelder und wird als Foto erfasst.
+
+Die Bedarfsliste von Seite 1 liefert Komponenten und Mengen. Nullmengen entfallen; unklare Mengen bleiben leer und behalten den Originaltext im Beleg. Detailzeilen von Seite 2 werden als Notizen übernommen und nicht doppelt addiert. Alle befüllten Felder stehen mit ihren Bezeichnungen in den Notizen, einschließlich Kontaktinformationen. Diese wählen keinen Billomat-Kunden und keinen E-Mail-Empfänger aus. Unbekannte Hersteller/Modelle manuell ergänzen. PDF-Prüfhäkchen bestätigen keine Übernahme in der App.
+
+Der Import ersetzt nur die Aufnahme einschließlich ihrer Fotozuordnung. Projekt und Kalkulation bleiben bis zur explizit geprüften Übernahme unverändert. Fehlgeschlagene oder überlange Importe überschreiben keine Daten. Ältere gedruckte Hinweise, dass PDF-Import noch fehlt, sind mit dieser Version überholt. Fremde Formulare, Passwortschutz und gescannte Bögen werden nicht automatisch ausgelesen.
 # Vom Techniker zum Angebotsentwurf
 
 ## Aufnahmebögen ab 0.24.8
@@ -8,7 +15,7 @@ Unter **Aufnahmebögen** in der Hauptnavigation stehen fünf ausfüllbare PDFs b
 
 Die Technikeraufnahme unterstützt Alarmanlage, Videoüberwachung, Zutrittssystem, Schließzylinder und Türsprechanlage. Zuerst die Systemart auswählen und **Systemauswahl und Angaben speichern** betätigen. Danach passen Checkliste, Schnellauswahl und technische Hinweise zur Systemart. Unter **Systemdetails** Blickbereiche, Rufzuordnung, Zylindermaße oder andere angefragte Details erfassen. Bei einem Wechsel bleiben vorhandene Komponenten erhalten und müssen erneut geprüft werden. Eine direkte bestätigte Übernahme während des Systemwechsels wird abgewiesen.
 
-Bestehende Aufnahmen ohne Systemart bleiben Alarmaufnahmen. Ajax bleibt Alarmstandard. Für andere Systeme bleibt der Hersteller zunächst offen; Dahua und Ajax sind Nutzerpräferenzen, keine pauschale Zuordnung jeder Komponente. Ausdrücklich genannte Hersteller werden bewahrt. Artikelwahl und technische Kompatibilität müssen weiterhin geprüft werden. Kein PDF-Dateiimport; Texte oder lesbare Fotos können eingebracht und anschließend geprüft werden.
+Bestehende Aufnahmen ohne Systemart bleiben Alarmaufnahmen. Ajax bleibt Alarmstandard. Für andere Systeme bleibt der Hersteller zunächst offen; Dahua und Ajax sind Nutzerpräferenzen, keine pauschale Zuordnung jeder Komponente. Ausdrücklich genannte Hersteller werden bewahrt. Artikelwahl und technische Kompatibilität müssen weiterhin geprüft werden. Ab 0.26.0 können außerdem digital ausgefüllte FTST-PDFs importiert werden.
 
 Stand 0.16.0. Die Aufnahme lässt sich am Handy ohne KI direkt ausfüllen. Ein Handzettelfoto bleibt als ergänzende Quelle möglich.
 
@@ -29,3 +36,4 @@ Alle Anzeigen lesen lokale gespeicherte Daten. Die Schnellauswahl und Übersicht
 ## Anschließende Konzeptstufe
 
 Die räumliche Zuordnung bildet die Grundlage für eine spätere Montageübersicht und bearbeitbare Kamera-/Alarmpläne. Ein Grundrisseditor, automatische Geräteplatzierung und eine automatische technische Freigabe sind in dieser Version noch nicht enthalten. Materialreservierung und interne Terminvorschläge werden weiterhin über **Material & Termine** nach dokumentierter Beauftragung bearbeitet.
+

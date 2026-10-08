@@ -23,8 +23,8 @@ def register(app, base, ingress, escape):
         body += ('</div><div class="card"><h2>Von der Aufnahme zum Leistungsvorschlag</h2>'
                  '<p>Nur neu benötigte Mengen eintragen und offene Angaben kennzeichnen. '
                  'Fotos und Typenschilder den jeweiligen Einbauorten zuordnen.</p>'
-                 '<p>Die ausgefüllte PDF wird noch nicht automatisch eingelesen. Angaben können '
-                 'im KI-Chat als Text oder lesbares Foto eingebracht werden. Erkannte Mengen, '
+                 '<p>Digital ausgefüllte FTST-PDFs können in der Technikeraufnahme eines Projekts eingelesen werden. '
+                 'Handschriftliche Bögen als lesbares Foto erfassen. Erkannte Mengen, '
                  'Kunde und konkrete Billomat-Artikel anschließend prüfen.</p>'
                  '<p>In der Technikeraufnahme des Projekts zuerst die Systemart wählen und speichern. '
                  'Danach Komponenten, Mengen, Hersteller und technische Details erfassen. '
@@ -32,3 +32,4 @@ def register(app, base, ingress, escape):
                  f'<a class="btn light" href="{ingress("chat")}">Zum KI-Chat</a>'
                  f'<a class="btn light" href="{ingress("projects")}">Zu den Projekten</a></div>')
         return base('Aufnahmebögen', body)
+
