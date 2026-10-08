@@ -67,7 +67,7 @@ def quantity(value, required=False):
     return format(number, 'f')
 
 
-def open_questions(fields, questions=()):
+def required_questions(fields):
     required = []
     alarm = system_key(fields) == 'alarm'
     if alarm and fields.get('central') == 'unknown':
@@ -82,7 +82,16 @@ def open_questions(fields, questions=()):
         required.append('Welcher Hersteller ist vorgesehen?')
     if not alarm and not fields.get('system_details', '').strip():
         required.append(profile(fields)[3])
-    combined = list(dict.fromkeys([str(q).strip() for q in questions if str(q).strip()] + required))
+    return required
+
+
+def open_questions(fields, questions=()):
+    # Rebuild only our exact standard questions, including stale legacy entries.
+    # Free-form and reworded technician questions must remain untouched.
+    generated = {q for key in SYSTEMS for q in required_questions(
+        {'system_type': key, 'central': 'unknown', 'siren': 'unknown'})}
+    custom = [str(q).strip() for q in questions if str(q).strip() and str(q).strip() not in generated]
+    combined = list(dict.fromkeys(custom + required_questions(fields)))
     if len(combined) > 30 or len('\n'.join(combined)) > 6000:
         raise ValueError('Bitte Rückfragen kürzen: einschließlich offener Pflichtangaben höchstens 30 Zeilen und 6000 Zeichen.')
     return combined
@@ -133,9 +142,6 @@ def parse_form(form, current, *, confirm=False):
     if len(summary) > 4000 or len(questions) > 6000 or len(questions.splitlines()) > 30:
         raise ValueError('Zusammenfassung oder Rückfragen sind zu lang.')
     question_lines = questions.splitlines()
-    if changed:
-        previous_generated = set(open_questions(current['fields']))
-        question_lines = [q for q in question_lines if q.strip() not in previous_generated]
     value.update(fields=fields, components=components, summary=summary,
                  questions=open_questions(fields, question_lines), status='editing')
     value.pop('error', None)
@@ -398,7 +404,14 @@ def register(app, base, ingress, escape, get_store):
         if slots < 30:
             body += '<button class="btn light" name="action" value="add_row">Weitere Komponente</button>'
         body += f'<label for="intake-summary">Zusammenfassung</label><textarea id="intake-summary" name="summary" maxlength="4000">{escape(value.get("summary", ""))}</textarea>'
-        questions = '\n'.join(value.get('questions', []))
+        display_questions = value.get('questions', [])
+        if not error:
+            try:
+                display_questions = open_questions(fields, display_questions)
+            except ValueError:
+                # Keep oversized legacy lists editable so the user can shorten them.
+                pass
+        questions = '\n'.join(display_questions)
         body += f'<label for="intake-questions">Offene Rückfragen (eine pro Zeile)</label><textarea id="intake-questions" name="questions" maxlength="6000">{escape(questions)}</textarea><p class="muted">Montage und Anfahrt bleiben freie Angaben. Preise werden später geprüft; offene Angaben werden nicht geschätzt.</p>'
         body += '<button class="btn light" name="action" value="upload">Foto und Angaben speichern</button><label><input type="checkbox" name="reviewed" value="yes"> Mengen, Bezeichnungen, Hersteller und Varianten geprüft. Offene Angaben bleiben als Rückfragen stehen.</label><button class="btn" name="action" value="apply">Geprüfte Angaben übernehmen und zur Kalkulation</button></fieldset></form></div>'
         body += f'<script defer src="{ingress("static/project_intake.js")}"></script>'
