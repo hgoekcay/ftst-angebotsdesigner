@@ -96,8 +96,8 @@ def candidates(description, articles):
     ranked = []
     for article in articles:
         # Catalogues also spell Ajax families as "Motion Protect" / "Door Protect".
-        title_text = re.sub(r'\b(motion|door|fire)\s+(protect|cam)\b', r'\1\2', str(article.get('title', '')).casefold())
-        title_text = re.sub(r'\b(home|street)\s+siren\b', r'\1siren', title_text)
+        title_text = re.sub(r'\b(motion|door|fire)[\s-]+(protect|cam)\b', r'\1\2', str(article.get('title', '')).casefold())
+        title_text = re.sub(r'\b(home|street)[\s-]+siren\b', r'\1siren', title_text)
         title = tokens(title_text)
         score = sum(2 if word in title else 1 if any(
             len(word) >= 4 and len(term) >= 4 and (word.startswith(term) or term.startswith(word))

@@ -1,3 +1,7 @@
+# 0.26.3
+
+- Auch getrennte Katalogschreibweisen wie DOOR-PROTECT werden bei der Ajax-Gerätefamilie gefunden. Im Live-Katalog als ART-1035 geprüft.
+
 # 0.26.2
 
 - Ajax-Tür-/Fensterkontakte aus den Aufnahmebögen finden jetzt auch die DoorProtect-Artikelfamilie im Billomat-Katalog.
