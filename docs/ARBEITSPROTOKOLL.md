@@ -28,6 +28,13 @@ Artikel und Preise kommen aus dem tatsächlichen Billomat-Katalog. Die Systemaus
 
 Keine Kundenkommunikation oder echte Billomat-Anlage zu Testzwecken. Veröffentlichung und Home-Assistant-Installation sind autorisiert, jeweils nach passenden Prüfungen und Sicherung. Keine automatischen verbindlichen Zusagen oder erfundenen technischen Varianten.
 
-## Aktueller Schritt: 0.26.0
+## Abgeschlossen: 0.26.0
 
 PDF-Import der fünf digitalen FTST-Bögen: bekannte Formularstruktur, Systemerkennung, Mengen von Seite 1, Details beider Seiten als Notizen. Nullmengen entfallen, unklare Mengen bleiben offen. Ersetzt nach ausdrücklicher Wahl nur die Aufnahme; bestätigte Projektübernahme und Artikel-/Kundenauswahl bleiben separate Schritte. Verarbeitung in zeitbegrenztem Unterprozess. Tests, Sicherung, Veröffentlichung und Live-Prüfung werden im Statusprotokoll festgehalten.
+
+PR 46 integriert, 931 Tests und zehn CI-Prüfungen bestanden; Backup f4112c11. Version 0.26.0 installiert und digital ausgefüllter Testbogen bis zur lokalen Kalkulation geprüft.
+
+## Aktueller Schritt: 0.26.1
+
+Standardrückfragen anhand aktueller Angaben bereinigen, freie Fragen erhalten und bei gelöschten Angaben Standardfragen erneut öffnen. Alle fünf Systemarten, alte Aufnahmen und Projektübernahme berücksichtigt. 938 Tests erfolgreich. Veröffentlichung und Installation nach Sicherung; Abschluss im Statusprotokoll.
+

@@ -1,3 +1,9 @@
+# 0.26.1
+
+- Automatische Rückfragen in der Technikeraufnahme verschwinden nach dem Speichern beantworteter Angaben. Werden Angaben wieder entfernt, erscheinen die passenden Fragen erneut.
+- Eigene Rückfragen bleiben erhalten; auch alte gespeicherte Standardfragen werden beim Öffnen und Übernehmen anhand der aktuellen Angaben bereinigt. Gilt für alle fünf Systemarten.
+- Zu lange Fragenlisten bleiben bei Validierungsfehlern bearbeitbar und führen nicht zu einem Serverfehler.
+
 # 0.26.0
 
 - Digital ausgefüllte FTST-Aufnahmebögen für alle fünf Systeme direkt in der Technikeraufnahme einlesen. Systemart, Kunden-/Objektangaben und Bedarfsmengen werden zur Prüfung vorbereitet; Kontakt- und Detailangaben beider Seiten bleiben in den Notizen.

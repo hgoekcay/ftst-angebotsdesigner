@@ -1,3 +1,7 @@
+## Rückfragen ab 0.26.1
+
+Nach dem Speichern werden die Standardfragen aus den aktuellen Angaben neu aufgebaut: ausgefüllte Angaben entfernen die zugehörige Frage, geleerte Angaben öffnen sie wieder. Frei formulierte Fragen bleiben stehen, bis sie selbst entfernt werden. Das gilt auch für die Übernahme ins Projekt. Beim bloßen Öffnen werden alte Standardfragen nur in der Anzeige bereinigt; gespeichert wird erst durch eine Aktion.
+
 ## Digitalen Aufnahmebogen einlesen ab 0.26.0
 
 Im Projekt die Technikeraufnahme öffnen und **Ausgefüllten PDF-Aufnahmebogen einlesen** aufklappen. Eine digital ausgefüllte FTST-Vorlage wählen, das Ersetzen der bisherigen Aufnahmedaten bestätigen und **PDF einlesen und prüfen** drücken. Der Import erkennt die Systemart über die Formularstruktur, nicht über den Dateinamen. Beide Seiten müssen vorhanden sein; maximal 5 MB. Ein Scan oder als Bild gedrucktes PDF enthält keine auslesbaren Formularfelder und wird als Foto erfasst.
