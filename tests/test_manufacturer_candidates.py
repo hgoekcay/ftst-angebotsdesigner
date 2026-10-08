@@ -7,7 +7,7 @@ from quote_drafts import candidates
 
 @pytest.mark.parametrize('label', ['Ajax Tür-/Fensterkontakt', 'Ajax Fensterkontakte', 'Ajax Tür/Fensterkontakt'])
 def test_pdf_contact_labels_find_ajax_contact_family(label):
-    articles = [dict(id='1', title='Ajax DoorProtect'), dict(id='2', title='Door Protect Plus'),
+    articles = [dict(id='1', title='DOOR-PROTECT'), dict(id='2', title='Door Protect Plus'),
                 dict(id='3', title='Ajax MotionProtect'), dict(id='4', title='Dahua Fensterkontakt')]
     assert {row['id'] for row in candidates(label, articles)} == {'1', '2'}
 
