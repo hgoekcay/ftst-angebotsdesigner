@@ -1,3 +1,10 @@
+# 0.27.0
+
+- Optionales Kundenportal mit persönlichen widerrufbaren Angebotslinks für E-Mail und WhatsApp.
+- Freigegebene Kundenauswahl mit festem Endpreis, separater Bestätigung und PDF im bestehenden FTST-Design.
+- Ajax-Kameras und Außenschutz ausdrücklich aus Billomat als optionale Zusatzpositionen freigeben.
+- Serverseitiger Abgleich und Preisprüfung; standardmäßig deaktiviert, keine automatischen Billomat-Schreibzugriffe oder Nachrichtensendungen.
+
 # 0.26.3
 
 - Auch getrennte Katalogschreibweisen wie DOOR-PROTECT werden bei der Ajax-Gerätefamilie gefunden. Im Live-Katalog als ART-1035 geprüft.
