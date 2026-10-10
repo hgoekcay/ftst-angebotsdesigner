@@ -25,6 +25,14 @@ def messages(offer):
         'Mobil: +49 176 329 563 00\nE-Mail: info@ftst.eu')
     whatsapp = ('Guten Tag, hier ist Ihr Leistungsvorschlag ' + number + ' als PDF. '
                 'Bei Fragen melden Sie sich gerne. Viele Grüße, FT Sicherheitstechnik')
+    link = offer.get('customer_portal_url')
+    if link:
+        from urllib.parse import urlsplit
+        parsed = urlsplit(link)
+        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or any(c in link for c in '\r\n'):
+            raise ValueError('Ungültiger persönlicher Kundenlink.')
+        email += '\n\nIhr persönliches Angebot ansehen, anpassen und bestätigen:\n' + link
+        whatsapp += '\nIhr Angebot ansehen, anpassen und bestätigen: ' + link
     return subject, email, whatsapp
 
 

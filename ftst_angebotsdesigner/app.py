@@ -25,13 +25,14 @@ import offer_cache
 import offer_followup
 import offer_delivery
 import offer_mail
+import website_portal
 import offer_chat
 import quote_transfer
 from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.26.3"
+APP_VERSION = "0.27.0"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
@@ -247,7 +248,7 @@ def get_offer(oid):
     legacy_key = 'ftst_' + oid
     source = offer_store().load(bid.strip().lower(), oid, session.get(legacy_key))
     session.pop(legacy_key, None)
-    return materials.enrich(apply_source(raw, source), offer_store())
+    return website_portal.attach(offer_store(), bid.strip().lower(), materials.enrich(apply_source(raw, source), offer_store()))
 
 @app.get("/health")
 def health():
@@ -307,6 +308,8 @@ def detail(o):
         body = body.replace('Ihr persönliches Angebot', 'Ihr Angebotsentwurf').replace('Ihr Festpreis', 'Entwurfsbetrag')
     else:
         body = body.replace('Ihr persönliches Angebot', 'Ihr persönlicher Leistungsvorschlag').replace('data-pdf="FTST-Angebot-', 'data-pdf="FTST-Leistungsvorschlag-')
+    if website_portal.configured() and not o.get('is_draft'):
+        body += '<section class="card"><a class="btn" href="' + ingress('offer/' + str(o['id']) + '/portal') + '">Persönlichen Kundenlink vorbereiten</a> <a href="' + ingress('portal/responses') + '">Kundenantworten</a></section>'
     body = body.replace('<div class="grid">', offer_delivery.panel(o, ingress, offer_mail.form_identity()) + '<div class="grid">', 1)
     body += '<script defer src="' + ingress('ui-assets/'+APP_VERSION+'/offer-delivery.js') + '"></script>'
     return base("FTST Angebotsentwurf" if o.get('is_draft') else "FTST Leistungsvorschlag",body)
@@ -344,6 +347,7 @@ quote_presentation.register(app, base, ingress, clean, offer_store)
 quote_transfer.register(app, base, ingress, clean, offer_store, detect_offer_type)
 offer_followup.register(app, offer_store, base, ingress, clean, date_de)
 offer_mail.register(app, base, ingress, clean, offer_store, get_offer, make_pdf)
+website_portal.register(app, base, ingress, clean, offer_store, get_offer, make_pdf)
 offer_chat.register(app, base, ingress, clean, offer_store, get_offer, make_pdf, detect_offer_type)
 inventory_views.register(app, base, ingress, clean, offer_store)
 customers.register(app, base, ingress, clean, offer_store)
@@ -359,6 +363,7 @@ if __name__=="__main__":
     from mail_automation import MailAutomation
     automation = MailAutomation(offer_store, materials.account())
     automation.start(app.config['FTST_DATA_DIR'])
+    website_portal.start_sync(offer_store, make_pdf)
     try:
         app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))
     finally:

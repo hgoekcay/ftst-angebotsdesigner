@@ -161,6 +161,9 @@ def build_message(offer, recipient, subject, text, pdf, refs):
 
 def freeze(store, identity, oid, values, offer, pdf):
     recipient, subject, text = validate(values)
+    if offer.get('customer_portal_url') and offer['customer_portal_url'] not in text:
+        text += '\n\nIhr persönliches Angebot ansehen, anpassen und bestätigen:\n' + offer['customer_portal_url']
+        recipient, subject, text = validate(dict(recipient=recipient, subject=subject, text=text))
     raw, message_id = build_message(offer, recipient, subject, text, pdf, references(store, identity))
     digest = hashlib.sha256(raw).hexdigest()
     key = uuid4().hex
