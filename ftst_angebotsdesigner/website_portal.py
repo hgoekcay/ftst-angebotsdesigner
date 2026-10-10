@@ -267,8 +267,11 @@ def accepted_configuration(saved, response):
         net += line_net
         tax += amount(line_net * Decimal(line['tax_rate']) / 100)
         if Decimal(qty) > 0:
+            source_item = saved['original_offer']['items'][n - 1] if n <= len(saved['original_offer']['items']) else {}
             items.append(dict(position=len(items) + 1, title=title, description=desc, quantity=qty,
-                              unit=line['unit'], unit_price=unit, total_net=money(line_net), optional=0, reduction=''))
+                              unit=line['unit'], unit_price=unit, total_net=money(line_net),
+                              optional=0 if line['editable'] else source_item.get('optional', 0),
+                              reduction='' if line['editable'] else source_item.get('reduction', '')))
     if selected: raise ValueError('Unbekannte Position.')
     totals = dict(net=money(net), tax=money(tax), gross=money(net + tax))
     if response.get('preview_totals') != totals or response.get('final_totals') != totals: raise ValueError('Bestätigte Summen weichen ab.')

@@ -241,3 +241,23 @@ def test_all_base_product_images_are_allowlisted():
                             ('Ajax KeyPad weiß', 'ax-keypad-w'),
                             ('Ajax KeyPad Plus schwarz', 'ax-keypad-plus-b')]:
         assert product_image(title) == expected
+
+
+def test_fixed_discount_preserved_in_selected_pdf(tmp_path):
+    from website_portal import final_pdf
+    from app import make_pdf
+    from pypdf import PdfReader
+    o = offer()
+    o['items'][0].update(title='Montage und Inbetriebnahme', unit_price='125.00', reduction='20%')
+    s = dict(snapshot=snapshot(o, 1, ['position-2']), original_offer=o)
+    r = dict(request_id=str(uuid4()), kind='approval', status='customer_confirmed', confirmed=True,
+             document_id=s['snapshot']['document_id'], revision=1,
+             selections=[dict(line_id='position-2', option_id='original', quantity='0')],
+             preview_totals=dict(net='100.00', tax='19.00', gross='119.00'),
+             final_totals=dict(net='100.00', tax='19.00', gross='119.00'))
+    accepted = accepted_configuration(s, r)
+    assert accepted['items'][0]['unit_price'] == '125.00'
+    assert accepted['items'][0]['total_net'] == '100.00'
+    assert accepted['items'][0]['reduction'] == '20%'
+    text = '\n'.join(p.extract_text() for p in PdfReader(final_pdf(OfferStore(tmp_path), s, accepted, make_pdf)).pages)
+    assert 'Positionsrabatt: 20 %' in text and '119,00' in text
