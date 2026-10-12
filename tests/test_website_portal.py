@@ -261,3 +261,112 @@ def test_fixed_discount_preserved_in_selected_pdf(tmp_path):
     assert accepted['items'][0]['reduction'] == '20%'
     text = '\n'.join(p.extract_text() for p in PdfReader(final_pdf(OfferStore(tmp_path), s, accepted, make_pdf)).pages)
     assert 'Positionsrabatt: 20 %' in text and '119,00' in text
+
+
+def confirmed(s, selections, totals):
+    return dict(request_id=str(uuid4()), kind='approval', status='customer_confirmed',
+                confirmed=True, document_id=s['document_id'], revision=s['revision'],
+                selections=selections, preview_totals=totals, final_totals=totals)
+
+
+@pytest.mark.parametrize('reduction', ['10%', '29.00'])
+def test_document_discount_and_confirmed_pdf(reduction, tmp_path):
+    from website_portal import final_pdf
+    from app import make_pdf
+    from pypdf import PdfReader
+    o = offer()
+    o.update(reduction=reduction, total_reduction='29.00', total_net_unreduced='290.00',
+             total_net='261.00', total_gross='310.59')
+    before = deepcopy(o)
+    snap = snapshot(o, 1, ['position-1', 'position-2'])
+    totals = dict(net='180.00', tax='34.20', gross='214.20') if reduction.endswith('%') else dict(net='171.00', tax='32.49', gross='203.49')
+    selections = [dict(line_id='position-1', option_id='original', quantity='2'),
+                  dict(line_id='position-2', option_id='original', quantity='0')]
+    stored = dict(snapshot=snap, original_offer=o)
+    accepted = accepted_configuration(stored, confirmed(snap, selections, totals))
+    assert accepted['totals'] == totals
+    assert accepted['total_net_unreduced'] == '200.00'
+    assert accepted['total_reduction'] == ('20.00' if reduction.endswith('%') else '29.00')
+    text = '\n'.join(page.extract_text() for page in PdfReader(final_pdf(OfferStore(tmp_path), stored, accepted, make_pdf)).pages)
+    assert 'Angebotsrabatt:' in text
+    assert totals['gross'].replace('.', ',') in text
+    assert o == before
+
+
+@pytest.mark.parametrize('editable', [False, True])
+def test_billomat_optional_is_not_charged_until_selected(editable):
+    o = offer()
+    o['items'][1]['optional'] = '1'
+    o.update(total_net='100.00', total_gross='119.00')
+    snap = snapshot(o, 1, ['position-2'] if editable else [])
+    assert snap['totals']['gross'] == '119.00'
+    assert snap['lines'][1]['quantity'] == '0'
+    assert snap['lines'][1]['line_net'] == '0.00'
+    stored = dict(snapshot=snap, original_offer=o)
+    selections = [dict(line_id='position-2', option_id='original', quantity='1')] if editable else []
+    totals = dict(net='290.00', tax='55.10', gross='345.10') if editable else snap['totals']
+    accepted = accepted_configuration(stored, confirmed(snap, selections, totals))
+    assert len(accepted['items']) == (2 if editable else 1)
+    if editable: assert accepted['items'][1]['optional'] == 0
+
+
+def test_tax_rounds_on_total_and_legacy_revisions_stay_compatible():
+    o = offer()
+    for item in o['items']: item.update(unit_price='0.03', total_net='0.03')
+    o.update(total_net='0.06', total_gross='0.07')
+    snap = snapshot(o, 1)
+    assert snap['totals']['tax'] == '0.01'
+    stored = dict(snapshot=snap, original_offer=o)
+    assert accepted_configuration(stored, confirmed(snap, [], snap['totals']))['totals']['gross'] == '0.07'
+    del snap['pricing']
+    legacy = dict(net='0.06', tax='0.02', gross='0.08')
+    assert accepted_configuration(stored, confirmed(snap, [], legacy))['totals'] == legacy
+
+
+@pytest.mark.parametrize('field,value', [('reduction', '101%'), ('reduction', '-1'),
+    ('reduction', '10 percent'), ('total_reduction', '1'), ('total_net_unreduced', '1')])
+def test_inconsistent_discount_never_published(field, value):
+    o = offer(); o[field] = value
+    with pytest.raises(ValueError): snapshot(o, 1)
+
+
+def test_fixed_discount_cannot_exceed_selected_subtotal():
+    from website_portal import commercial_totals, document_pricing
+    from decimal import Decimal
+    with pytest.raises(ValueError): commercial_totals(Decimal('10'), document_pricing({'reduction':'20'}))
+
+
+def test_portal_failure_is_readable_and_get_uses_cached_catalog(tmp_path, monkeypatch):
+    import html, re, website_portal
+    from flask import Flask
+    app = Flask(__name__); app.secret_key = 'test'
+    store = OfferStore(tmp_path)
+    monkeypatch.setenv('BILLOMAT_ID', 'test')
+    monkeypatch.setenv('WEBSITE_PORTAL_ENABLED', 'true')
+    def forbidden(): raise AssertionError('GET must not request live catalog')
+    monkeypatch.setattr(website_portal, 'read_catalog', forbidden)
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'), units=[dict(id=1, name='Stück')],
+               articles=[dict(id=55, title='Ajax MotionProtect Outdoor weiß', sales_price='123.45', unit_id=1)])
+    store.put_record('test', 'catalog', 'shared', dict(data=raw, at='test'))
+    o = offer(); o['total_net'] = '1'
+    website_portal.register(app, lambda title, body: body, lambda path: '/' + path,
+                            html.escape, lambda: store, lambda oid: o, forbidden)
+    c = app.test_client()
+    page = c.get('/offer/42/portal')
+    assert page.status_code == 200 and 'Ajax MotionProtect Outdoor' in page.text
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    result = c.post('/offer/42/portal', data=dict(csrf=token, account='test', approved='yes', digest=fingerprint(o)))
+    assert result.status_code == 422
+    assert 'Rabatt oder Steuer' in result.text and 'Zurück zum Leistungsvorschlag' in result.text
+    assert not store.record('test', 'website_portal_offer', '42')
+
+
+def test_legacy_customer_link_survives_upgrade_but_not_discount_rule_change(tmp_path, monkeypatch):
+    monkeypatch.setenv('WEBSITE_PORTAL_ENABLED', 'true')
+    store = OfferStore(tmp_path); o = offer()
+    link = 'https://portal.example/angebot/' + str(uuid4()) + '#' + 'a' * 43
+    store.put_record('test', 'website_portal_offer', '42', dict(source_digest=fingerprint(o, legacy=True),
+        original_offer=deepcopy(o), snapshot={}, link=dict(customer_url=link, expires_at='2099-01-01T00:00:00Z')))
+    assert attach(store, 'test', o)['customer_portal_url'] == link
+    o['reduction'] = '10%'
+    assert 'customer_portal_url' not in attach(store, 'test', o)

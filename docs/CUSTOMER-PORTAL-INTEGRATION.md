@@ -41,3 +41,14 @@ Bestätigungsdatensatz: `kind=approval`, `status=customer_confirmed`, `confirmed
 - Zusätzliche Produktbilder werden nur bei eindeutigem Modell und Farbe hinterlegt. Ähnliche MotionCam-/MotionProtect- oder Kameraauflösungsvarianten bekommen kein geratenes Bild.
 - Publizierte Referenzbilder sind genau die bereits für die Kunden-PDF ausgewählten Bilder. Die komplette interne Bilderbibliothek wird niemals hochgeladen.
 - Geschäftliche Bestellung/Billomat-Annahme ist eine spätere eigene Schnittstelle. `customer_confirmed` dokumentiert hier die endgültige Kundenauswahl mit Endpreis; es gibt keinen zusätzlichen Prüf-/Änderungsantrag.
+
+
+## Preisberechnung ab 0.27.1
+
+Neue Snapshots enthalten `pricing: {tax_rounding: "total_net", discount: {kind: "percent" | "amount", value: "10.00"}}`. Positionsnettos enthalten Positionsrabatte, aber keinen Gesamtrabatt. Optionale Billomat-Positionen starten mit Menge und Netto null, auch wenn sie nicht zur Kundenauswahl freigegeben sind. Der Originalindex bleibt erhalten.
+
+Die Gesamtnetto-Zwischensumme wird um den einmal kaufmännisch gerundeten prozentualen Rabatt oder festen Nettorabatt reduziert. Anschließend werden 19 % Steuer einmal auf das rabattierte Gesamtnetto gerundet. Zusatzpositionen unterliegen ebenfalls dem Gesamtrabatt. Ein fester Rabatt darf den gewählten Nettowert nicht übersteigen. Billomats `total_reduction` und `total_net_unreduced` werden, wenn vorhanden, gegengeprüft. Abweichungen verhindern die Veröffentlichung.
+
+Bestätigungen und PDF-Erstellung nutzen dasselbe Verfahren. Ohne `pricing` bleiben alte gespeicherte Revisionen bei ihrer bisherigen Positionssteuer. Die Site muss die optionale `pricing`-Erweiterung vor Installation dieses Releases unterstützen.
+
+Beim Öffnen wird nur der vorhandene Artikelcache verwendet; ausgewählte Zusatzartikel werden vor dem Veröffentlichen erneut aus Billomat geprüft. Fachliche Validierungsfehler liefern eine App-Seite mit HTTP 422 statt HTTP 502.
