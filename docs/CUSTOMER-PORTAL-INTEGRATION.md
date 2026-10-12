@@ -52,3 +52,12 @@ Die Gesamtnetto-Zwischensumme wird um den einmal kaufmännisch gerundeten prozen
 Bestätigungen und PDF-Erstellung nutzen dasselbe Verfahren. Ohne `pricing` bleiben alte gespeicherte Revisionen bei ihrer bisherigen Positionssteuer. Die Site muss die optionale `pricing`-Erweiterung vor Installation dieses Releases unterstützen.
 
 Beim Öffnen wird nur der vorhandene Artikelcache verwendet; ausgewählte Zusatzartikel werden vor dem Veröffentlichen erneut aus Billomat geprüft. Fachliche Validierungsfehler liefern eine App-Seite mit HTTP 422 statt HTTP 502.
+
+
+## Gerätemengen und Bilder ab 0.27.2
+
+Das Freigabeformular wählt erkannte Geräte mit ganzzahliger Menge bis 50 und centgenauem effektivem Einzelpreis voraus. Dienstleistung, Montage und Fahrtskosten bleiben fest; explizite Software-Pauschalen können als 0/1-Auswahl freigegeben werden. Die ausdrückliche Gesamtfreigabe bleibt erforderlich. Die Ausgangsmenge stammt unverändert aus dem Angebot (optionale Positionen weiterhin 0). Nicht exakt skalierbare Positionen sind fest.
+
+Neue Bildfelder: `lines[].product_image_id`/`product_image_note` für feste Geräte sowie `options[].product_image_note` ergänzend zur vorhandenen Bild-ID. Alle IDs müssen in der Site freigegeben sein. Modell und Farbe werden aus Titel bzw. Farbangabe der Beschreibung ermittelt; unbekannte Modelle erhalten kein geratenes Bild. Bei bekannter Modellfamilie ohne Farbe kann eine freigegebene Beispielabbildung mit dem Hinweis „Beispielabbildung; Farbe nach Abstimmung.“ verwendet werden. Titel und tatsächliche Farbe werden dabei nicht verändert. Superior-Modelle nutzen eigene Bilder. Neue Bildfelder erfordern die kompatible Site-Version.
+
+Bereits veröffentlichte Snapshots werden nicht verändert. Neue Freigaben und Bilder erfordern einen neuen Kundenlink; der bisherige Link verweist weiter auf seine freigegebene Revision.

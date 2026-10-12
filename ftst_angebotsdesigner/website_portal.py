@@ -84,18 +84,40 @@ def attach(store, identity, offer):
 
 def category(title):
     t = title.lower()
-    if any(x in t for x in ('montage', 'inbetriebnahme', 'home assistant', 'home-assistant', 'software')):
+    if any(x in t for x in ('montage', 'inbetriebnahme', 'home assistant', 'home-assistant', 'software', 'dienstleistung', 'arbeitszeit', 'anfahrt', 'abfahrt', 'fahrtskosten')):
         return 'service'
     if any(x in t for x in ('kamera', 'camera', 'turret', 'bullet', 'dome')): return 'camera'
     if any(x in t for x in ('curtain outdoor', 'curtainoutdoor', 'dualcurtain', 'perimeter', 'außenschutz', 'aussenschutz')): return 'perimeter'
     if any(x in t for x in ('outdoor', 'aussen', 'außen')) and any(x in t for x in ('motion', 'bewegung')): return 'outdoor_motion'
     if any(x in t for x in ('streetsiren', 'außensirene', 'aussensirene')): return 'outdoor_siren'
     if 'hub' in t: return 'hub'
-    if any(x in t for x in ('doorprotect', 'öffnung')): return 'contact'
+    compact = re.sub(r'[^a-z0-9]', '', t)
+    if any(x in compact for x in ('doorprotect', 'magnetkontakt', 'tuerkontakt')) or any(x in t for x in ('öffnung', 'türkontakt')): return 'contact'
+    if 'glassprotect' in compact or 'glasbruch' in t: return 'contact'
+    if re.search(r'\b(tag|pass|chip|transponder)\b', t): return 'keypad'
     if any(x in t for x in ('motion', 'bewegung')): return 'motion'
     if any(x in t for x in ('siren', 'sirene')): return 'siren'
     if any(x in t for x in ('keypad', 'tastatur')): return 'keypad'
     return 'other'
+
+
+def quantity_editable(item):
+    title = item.get('title') or ''
+    cat = category(title)
+    optional_service = cat == 'service' and any(x in title.lower() for x in ('home assistant', 'home-assistant', 'software'))
+    if cat == 'service' and not optional_service:
+        return False
+    try:
+        q = Decimal(str(item['quantity']))
+        net = amount(item['total_net'])
+        return (q.is_finite() and 0 < q <= (1 if optional_service else 50)
+                and q == int(q) and amount(amount(net / q) * q) == net)
+    except (KeyError, ValueError, InvalidOperation, TypeError):
+        return False
+
+
+def default_editable(item):
+    return quantity_editable(item) and category(item.get('title') or '') != 'other'
 
 
 def document_pricing(offer):
@@ -172,8 +194,8 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
                     'description': (item.get('description') or '')[:2000], 'manufacturer': '',
                     'supplier_sku': '', 'variant': '', 'color': '',
                     'effective_unit_net': money(effective)}] if editable else []
-        photo = product_image(item.get('title', ''))
-        if editable and photo: options[0]['product_image_id'] = photo
+        visual = product_visual(item.get('title', ''), item.get('description', ''))
+        if editable: options[0].update(visual)
         lines.append(dict(id=line_id, title=item.get('title') or 'Leistung',
                           description=item.get('description') or '', quantity=str(int(quantity)) if editable else str(quantity),
                           unit=('Pauschale' if cat == 'service' else item.get('unit') or 'Stück'),
@@ -183,6 +205,7 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
                           max_quantity=1 if optional else 50,
                           selected_option='original' if editable else None,
                           options=options, visual_category=cat,
+                          **(visual if not editable else {}),
                           **({'optional_service': True} if optional and editable else {})))
         net += line_net
         tax += line_tax
@@ -225,11 +248,12 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
 
 
 
-def product_image(title):
+def product_image(title, description=''):
     # Exact advertised model/colour only. Similar models must not share a guessed photo.
     t = re.sub(r'[^a-z0-9]+', '', title.lower().replace('weiß', 'weiss'))
-    white = any(c in t for c in ('white', 'weiss'))
-    black = any(c in t for c in ('black', 'schwarz'))
+    color_text = (title + ' ' + (description or '')).lower().replace('ß', 'ss')
+    white = bool(re.search(r'\b(?:weiss[a-z]*|white)\b', color_text))
+    black = bool(re.search(r'\b(?:schwarz[a-z]*|black)\b', color_text))
     if white == black: return None
     if white and 'turretcam' in t and '8mp' in t and '28' in t:
         return 'ax-turretcam-8mp-2.8-w'
@@ -240,14 +264,30 @@ def product_image(title):
     suffix = 'w' if white else 'b'
     if 'streetsiren' in t and 'doubledeck' not in t:
         return 'ax-street-siren-' + suffix
+    if 'superiorglassprotect' in t and 'fibra' not in t:
+        return 'ax-superior-glass-protect-' + suffix
+    if re.search(r'\btag\b', title.lower()) and 'superior' not in t:
+        return 'ax-tag-' + suffix
     if any(x in t for x in ('outdoor', 'fibra', 'superior', 'motioncam', 'hub2g', 'hub4g')): return None
     exact = [('hub2plus', 'hub-2-plus'), ('hub24g', 'hub-2-4g'),
              ('doorprotectplus', 'door-protect-plus'), ('doorprotect', 'door-protect'),
              ('motionprotectplus', 'motion-protect-plus'), ('motionprotect', 'motion-protect'),
-             ('homesiren', 'home-siren'), ('keypadplus', 'keypad-plus'), ('keypad', 'keypad')]
+             ('glassprotect', 'glass-protect'), ('homesiren', 'home-siren'), ('keypadplus', 'keypad-plus'), ('keypad', 'keypad')]
     for model, asset in exact:
         if model in t: return 'ax-' + asset + '-' + suffix
     return None
+
+
+def product_visual(title, description=''):
+    photo = product_image(title, description)
+    if photo:
+        return dict(product_image_id=photo)
+    color_text = (title + ' ' + (description or '')).lower().replace('ß', 'ss')
+    if re.search(r'\b(?:weiss[a-z]*|white|schwarz[a-z]*|black)\b', color_text):
+        return {}
+    # Model-specific illustration only: never infer an ordered colour.
+    photo = product_image(title + ' weiß', description)
+    return dict(product_image_id=photo, product_image_note='Beispielabbildung; Farbe nach Abstimmung.') if photo else {}
 
 
 def approved_images(offer):
@@ -390,7 +430,17 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 return failure('Die Verbindung zu Billomat oder zum Kundenportal ist vorübergehend fehlgeschlagen. Ein Kundenlink konnte nicht bestätigt werden.', 503)
             return redirect(ingress('offer/' + oid))
         saved = store.record(identity, KIND, oid)
-        rows = ''.join('<label><input type="checkbox" name="editable" value="position-' + str(n) + '"> ' + clean(i.get('title', 'Leistung')) + (' – optional, zunächst nicht enthalten' if str(i.get('optional') or '0') == '1' else '') + '</label><br>' for n, i in enumerate(offer.get('items', []), 1))
+        rows = '<h2>Gerätemengen für den Kunden</h2><p>Erkannte Geräte sind vorausgewählt. Die Angebotsmenge wird übernommen; der Kunde kann sie anschließend ändern. Haken entfernen, um eine Position festzulegen.</p>'
+        for n, item in enumerate(offer.get('items', []), 1):
+            title = clean(item.get('title') or 'Leistung')
+            quantity = clean(str(item.get('quantity') or '0'))
+            if quantity_editable(item):
+                checked = ' checked' if default_editable(item) else ''
+                rows += '<label><input type="checkbox" name="editable" value="position-' + str(n) + '"' + checked + '> ' + title + ' · Ausgangsmenge ' + quantity + ' · Menge anpassbar</label><br>'
+            else:
+                rows += '<p>' + title + ' · ' + quantity + ' · bleibt fest</p>'
+            if str(item.get('optional') or '0') == '1':
+                rows += '<small>Optionale Position: startet beim Kunden mit Menge 0.</small><br>'
         try:
             cached = store.record(identity, 'catalog', 'shared') or {}
             extra = additional_catalog(cached['data']) if configured() and cached.get('data') else {}
@@ -402,7 +452,9 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" rel="noreferrer">Persönlichen Kundenlink öffnen</a></p>') if saved and not saved.get('revoked') else ''
         body = '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'
         body += '<p>Angebotsrabatt: ' + clean(str(offer.get('reduction') or '0')) + '. Dieser gilt auch für freigegebene Mengenänderungen und Zusatzartikel. Mehrwertsteuer: 19 % auf das rabattierte Gesamtnetto.</p>'
-        body += existing + '<form method="post">' + form_identity() + '<input type="hidden" name="digest" value="' + fingerprint(offer) + '">' + rows + '<label><input type="checkbox" name="approved" value="yes" required> Darstellung, Preise und Auswahlgrenzen für den Kunden freigegeben</label><p><button class="btn">Link vorbereiten</button></p></form>'
+        if existing:
+            body += '<p>Der vorhandene Kundenlink behält seine bisherige Freigabe. Erstellen Sie mit diesen Einstellungen einen neuen Kundenlink, damit Mengenänderungen und Produktbilder übernommen werden.</p>'
+        body += existing + '<form method="post">' + form_identity() + '<input type="hidden" name="digest" value="' + fingerprint(offer) + '">' + rows + '<label><input type="checkbox" name="approved" value="yes" required> Darstellung, Preise und Auswahlgrenzen für den Kunden freigegeben</label><p><button class="btn">Kundenlink mit dieser Auswahl erstellen</button></p></form>'
         if saved and not saved.get('revoked'):
             body += '<form method="post">' + form_identity() + '<button class="btn light" name="action" value="revoke">Kundenlink widerrufen</button></form>'
         return base('Kundenportal', body + '</section>')

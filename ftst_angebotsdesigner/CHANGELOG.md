@@ -1,3 +1,10 @@
+# 0.27.2
+
+- Gerätepositionen sind bei der Kundenlink-Vorbereitung standardmäßig mengenveränderbar vorausgewählt; die Angebotsmenge bleibt der Ausgangswert. Dienstleistungen und Anfahrt bleiben fest.
+- Modellspezifische Produktbilder berücksichtigen Farbangaben aus Beschreibungen. Ohne festgelegte Farbe werden geeignete Modellabbildungen ausdrücklich als Beispiel gekennzeichnet.
+- Produktbilder auch für feste Gerätepositionen; separate Zuordnung von GlassProtect und Superior GlassProtect sowie Ajax Tag.
+- Bestehende Links behalten ihre freigegebene Revision. Die App erklärt, wie die neue Auswahl mit einem neuen Link übernommen wird.
+
 # 0.27.1
 
 - Kundenportal übernimmt geprüfte Gesamtrabatte und berechnet 19 % Steuer auf das Gesamtnetto; bestehende Revisionen behalten ihre bisherige Berechnung.
