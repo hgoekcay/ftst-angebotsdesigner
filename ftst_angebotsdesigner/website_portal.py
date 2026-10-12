@@ -54,7 +54,7 @@ def fingerprint(offer):
     # Only frozen commercial and public presentation fields, never account secrets.
     public = {k: offer.get(k) for k in ('id', 'status', 'is_draft', 'date', 'validity_date',
               'validity_days', 'offer_number', 'number', 'customer_title', 'customer_intro',
-              'project_summary', 'items', 'total_net', 'total_gross', 'tax_amount', 'client', 'reference_image_ids', 'reference_images', 'company_profile')}
+              'project_summary', 'items', 'total_net', 'total_gross', 'tax_amount', 'reduction', 'total_reduction', 'client', 'reference_image_ids', 'reference_images', 'company_profile')}
     return hashlib.sha256(json.dumps(public, sort_keys=True, ensure_ascii=False,
                                      default=str).encode()).hexdigest()
 
@@ -87,6 +87,33 @@ def category(title):
     if any(x in t for x in ('siren', 'sirene')): return 'siren'
     if any(x in t for x in ('keypad', 'tastatur')): return 'keypad'
     return 'other'
+
+
+def document_pricing(offer):
+    raw = str(offer.get('reduction') or '0').strip()
+    percent = raw.endswith('%')
+    value = raw[:-1] if percent else raw
+    if not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,2})?', value):
+        raise ValueError('Angebotsrabatt ist nicht eindeutig lesbar.')
+    value = amount(value)
+    if percent and value > 100:
+        raise ValueError('Angebotsrabatt überschreitet 100 %.')
+    return dict(tax_rounding='total_net', discount=dict(kind='percent' if percent else 'amount', value=money(value)))
+
+
+def commercial_totals(subtotal, pricing):
+    discount = pricing['discount']
+    value = amount(discount['value'])
+    if pricing['tax_rounding'] != 'total_net' or discount['kind'] not in ('percent', 'amount'):
+        raise ValueError('Unbekannte Preisberechnung.')
+    if discount['kind'] == 'percent' and value > 100:
+        raise ValueError('Ungültiger Rabatt.')
+    reduction = amount(subtotal * value / 100) if discount['kind'] == 'percent' else value
+    if reduction > subtotal:
+        raise ValueError('Die Auswahl unterschreitet den festen Angebotsrabatt.')
+    net = amount(subtotal - reduction)
+    tax = amount(net * Decimal('.19'))
+    return dict(net=money(net), tax=money(tax), gross=money(net + tax))
 
 
 def snapshot(offer, revision, editable_ids=(), extra_articles=()):
@@ -124,6 +151,13 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
         rate = str(item.get('tax_rate') or '19')
         if Decimal(rate) != 19:
             raise ValueError('Diese Integration unterstützt geprüfte 19%-Positionen.')
+        optional_flag = str(item.get('optional') or '0')
+        if optional_flag not in ('0', '1'):
+            raise ValueError('Unbekannter Optionalstatus.')
+        source_optional = optional_flag == '1'
+        if source_optional:
+            quantity = Decimal(0)
+            line_net = Decimal(0)
         line_tax = amount(line_net * Decimal('.19'))
         options = [{'id': 'original', 'title': item.get('title') or 'Leistung',
                     'description': (item.get('description') or '')[:2000], 'manufacturer': '',
@@ -136,14 +170,20 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
                           unit=('Pauschale' if cat == 'service' else item.get('unit') or 'Stück'),
                           unit_net=money(unit), line_net=money(line_net), tax_rate='19',
                           line_tax=money(line_tax), editable=editable,
-                          min_quantity=1 if cat == 'hub' and editable else 0,
+                          min_quantity=1 if cat == 'hub' and editable and not source_optional else 0,
                           max_quantity=1 if optional else 50,
                           selected_option='original' if editable else None,
                           options=options, visual_category=cat,
                           **({'optional_service': True} if optional and editable else {})))
         net += line_net
         tax += line_tax
-    if not lines or len(lines) > 30 or net != amount(offer['total_net']) or net + tax != amount(offer['total_gross']):
+    pricing = document_pricing(offer)
+    totals = commercial_totals(net, pricing)
+    if offer.get('total_reduction') is not None and amount(offer['total_reduction']) != net - amount(totals['net']):
+        raise ValueError('Gesamtrabatt stimmt nicht mit Billomat überein.')
+    if offer.get('total_net_unreduced') is not None and amount(offer['total_net_unreduced']) != net:
+        raise ValueError('Zwischensumme stimmt nicht mit Billomat überein.')
+    if not lines or len(lines) > 30 or totals['net'] != money(offer['total_net']) or totals['gross'] != money(offer['total_gross']):
         raise ValueError('Positionssummen, Rabatt oder Steuer weichen ab. Keine Veröffentlichung.')
     for article in extra_articles:
         aid = str(article['id'])
@@ -170,7 +210,7 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
                 company=dict(name='FT Sicherheitstechnik', contact='Hafenbahnstraße 15, 68305 Mannheim',
                              email='info@ftst.eu', phone='+49 621 159 647 34'),
                 project_summary=offer.get('project_summary') or '', currency='EUR', price_source='BILLOMAT',
-                catalog_at=today.isoformat(), lines=lines, totals=dict(net=money(net), tax=money(tax), gross=money(net + tax)),
+                catalog_at=today.isoformat(), lines=lines, pricing=pricing, totals=totals,
                 images=[], phases=[])
 
 
@@ -273,16 +313,22 @@ def accepted_configuration(saved, response):
                               optional=0 if line['editable'] else source_item.get('optional', 0),
                               reduction='' if line['editable'] else source_item.get('reduction', '')))
     if selected: raise ValueError('Unbekannte Position.')
-    totals = dict(net=money(net), tax=money(tax), gross=money(net + tax))
+    totals = commercial_totals(net, s['pricing']) if s.get('pricing') else dict(net=money(net), tax=money(tax), gross=money(net + tax))
     if response.get('preview_totals') != totals or response.get('final_totals') != totals: raise ValueError('Bestätigte Summen weichen ab.')
     # Never copy caller-provided prices, titles or arbitrary source properties.
     return dict(id=uuid4().hex, source_document_id=s['document_id'], source_revision=s['revision'],
                 response_id=response['request_id'], status='customer_confirmed', items=items, totals=totals,
+                total_gross_unreduced=money(net + amount(net * Decimal('.19'))),
+                total_net_unreduced=money(net), total_reduction=money(net - amount(totals['net'])),
                 customer_display=s['customer_display'], title=s['title'], signature=response.get('signature'),
                 confirmed_at=response.get('created_at'))
 
 
 def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
+    def failure(message, status=422):
+        body = '<section class="card"><h1>Kundenportal konnte nicht vorbereitet werden</h1><p role="alert">' + clean(message) + '</p><p>Es wurde keine Nachricht versendet. Bitte prüfen Sie die Angaben vor einem erneuten Versuch.</p><p><a class="btn" href="' + clean(ingress('offer/' + request.view_args.get('oid', ''))) + '">Zurück zum Leistungsvorschlag</a></p></section>'
+        return base('Kundenportal – Hinweis', body), status
+
     def check_post():
         if not hmac.compare_digest(request.form.get('csrf', '').encode(), csrf().encode()) or request.form.get('account') != account():
             abort(400, 'Formularsitzung abgelaufen.')
@@ -290,9 +336,13 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
     @app.route('/offer/<oid>/portal', methods=['GET', 'POST'])
     def offer_portal(oid):
         store, identity = get_store(), account()
-        offer = get_offer(oid)
         if request.method == 'POST':
             check_post()
+        try:
+            offer = get_offer(oid)
+        except Exception:
+            return failure('Billomat ist zurzeit nicht erreichbar. Die aktuellen Angebotsdaten konnten nicht geprüft werden.', 503)
+        if request.method == 'POST':
             if request.form.get('action') == 'revoke':
                 saved = store.record(identity, KIND, oid)
                 if not saved: abort(404)
@@ -307,7 +357,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 catalog = read_catalog() if extra_ids else {}
                 if any(aid not in catalog for aid in extra_ids):
                     raise ValueError('Zusatzartikel ist nicht freigegeben.')
-                s = snapshot(offer, int(previous.get('snapshot', {}).get('revision', 0)) + 1, request.form.getlist('editable'), [catalog[aid] for aid in extra_ids])
+                try:
+                    s = snapshot(offer, int(previous.get('snapshot', {}).get('revision', 0)) + 1, request.form.getlist('editable'), [catalog[aid] for aid in extra_ids])
+                except ValueError as error:
+                    return failure(str(error))
                 pdf = make_pdf(offer).getvalue()
                 s['images'], image_bytes = approved_images(offer)
                 remote = client().publish(s, pdf, image_bytes)
@@ -322,20 +375,24 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                              proposal_id=remote['proposal_id'], link=link, revoked=False)
                 store.put_record(identity, 'website_portal_revision', remote['proposal_id'], saved)
                 store.put_record(identity, KIND, oid, saved)
-            except (PortalError, ValueError):
-                abort(502, 'Portal konnte nicht vorbereitet werden. Zugang, Gültigkeit und centgenaue Preise prüfen. Kein Versand.')
+            except ValueError:
+                return failure('Gültigkeit, Positionssummen, Rabatt oder Steuer konnten nicht eindeutig geprüft werden. Bitte den Leistungsvorschlag prüfen.')
+            except (PortalError, RuntimeError):
+                return failure('Die Verbindung zu Billomat oder zum Kundenportal ist vorübergehend fehlgeschlagen. Ein Kundenlink konnte nicht bestätigt werden.', 503)
             return redirect(ingress('offer/' + oid))
         saved = store.record(identity, KIND, oid)
-        rows = ''.join('<label><input type="checkbox" name="editable" value="position-' + str(n) + '"> ' + clean(i.get('title', 'Leistung')) + '</label><br>' for n, i in enumerate(offer.get('items', []), 1))
+        rows = ''.join('<label><input type="checkbox" name="editable" value="position-' + str(n) + '"> ' + clean(i.get('title', 'Leistung')) + (' – optional, zunächst nicht enthalten' if str(i.get('optional') or '0') == '1' else '') + '</label><br>' for n, i in enumerate(offer.get('items', []), 1))
         try:
-            extra = read_catalog() if configured() else {}
+            cached = store.record(identity, 'catalog', 'shared') or {}
+            extra = additional_catalog(cached['data']) if configured() and cached.get('data') else {}
         except Exception:
             extra = {}
         rows += '<h2>Optionale Ajax-Erweiterungen</h2><p>Ausgewählte Zusatzartikel starten mit Menge 0. Der Kunde kann sie zum freigegebenen Billomat-Verkaufspreis netto plus 19 % hinzufügen.</p>'
         rows += ''.join('<label><input type="checkbox" name="extra_article" value="' + clean(aid) + '"> ' + clean(article['title']) + ' · ' + clean(article['sales_price']) + ' EUR netto</label><br>' for aid, article in extra.items())
-        if not extra: rows += '<p>Kein passender Netto-EUR-Katalog verfügbar. Billomat-Katalog prüfen.</p>'
+        if not extra: rows += '<p>Kein passender gespeicherter Netto-EUR-Katalog verfügbar. Bitte den Billomat-Katalog in der Entwurfsbearbeitung aktualisieren. Vor Freigabe werden ausgewählte Zusatzpreise erneut live geprüft.</p>'
         existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" rel="noreferrer">Persönlichen Kundenlink öffnen</a></p>') if saved and not saved.get('revoked') else ''
         body = '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'
+        body += '<p>Angebotsrabatt: ' + clean(str(offer.get('reduction') or '0')) + '. Dieser gilt auch für freigegebene Mengenänderungen und Zusatzartikel. Mehrwertsteuer: 19 % auf das rabattierte Gesamtnetto.</p>'
         body += existing + '<form method="post">' + form_identity() + '<input type="hidden" name="digest" value="' + fingerprint(offer) + '">' + rows + '<label><input type="checkbox" name="approved" value="yes" required> Darstellung, Preise und Auswahlgrenzen für den Kunden freigegeben</label><p><button class="btn">Link vorbereiten</button></p></form>'
         if saved and not saved.get('revoked'):
             body += '<form method="post">' + form_identity() + '<button class="btn light" name="action" value="revoke">Kundenlink widerrufen</button></form>'
@@ -347,7 +404,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         try:
             synchronize(get_store(), account(), make_pdf)
         except (PortalError, ValueError, KeyError, TypeError, OSError):
-            abort(502, 'Portalantworten konnten nicht sicher übernommen werden. Cursor bleibt erhalten.')
+            abort(503, 'Portalantworten konnten nicht sicher übernommen werden. Cursor bleibt erhalten.')
         return redirect(ingress('portal/responses'))
 
     @app.get('/portal/responses')
@@ -380,6 +437,9 @@ def final_pdf(store, saved, accepted, make_pdf):
     if not path.exists():
         offer = deepcopy(saved['original_offer'])
         offer.update(items=accepted['items'], total_net=accepted['totals']['net'],
+                     total_net_unreduced=accepted.get('total_net_unreduced', accepted['totals']['net']),
+                     total_gross_unreduced=accepted.get('total_gross_unreduced', accepted['totals']['gross']),
+                     total_reduction=accepted.get('total_reduction', '0.00'),
                      total_gross=accepted['totals']['gross'], tax_amount=accepted['totals']['tax'],
                      taxes=[{'amount': accepted['totals']['tax']}],
                      project_summary='Bestätigte Kundenauswahl: ' + '; '.join(str(i['quantity']) + ' × ' + i['title'] for i in accepted['items']),

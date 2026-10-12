@@ -1,3 +1,10 @@
+# 0.27.1
+
+- Kundenportal übernimmt geprüfte Gesamtrabatte und berechnet 19 % Steuer auf das Gesamtnetto; bestehende Revisionen behalten ihre bisherige Berechnung.
+- Optionale Billomat-Positionen starten ohne Berechnung und werden nur bei ausdrücklich freigegebener Kundenauswahl hinzugefügt.
+- Fachliche Prüfprobleme erscheinen als verständlicher Hinweis statt als 502-Gateway-Fehler.
+- Kundenlink-Vorbereitung verwendet den gespeicherten Artikelkatalog; ausgewählte Zusatzpreise werden vor Veröffentlichung weiterhin live geprüft.
+
 # 0.27.0
 
 - Optionales Kundenportal mit persönlichen widerrufbaren Angebotslinks für E-Mail und WhatsApp.
