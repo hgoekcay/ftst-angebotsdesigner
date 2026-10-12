@@ -50,11 +50,13 @@ def client():
                         site_service_token=os.getenv('WEBSITE_PORTAL_SITE_TOKEN') or None)
 
 
-def fingerprint(offer):
+def fingerprint(offer, legacy=False):
     # Only frozen commercial and public presentation fields, never account secrets.
     public = {k: offer.get(k) for k in ('id', 'status', 'is_draft', 'date', 'validity_date',
               'validity_days', 'offer_number', 'number', 'customer_title', 'customer_intro',
-              'project_summary', 'items', 'total_net', 'total_gross', 'tax_amount', 'reduction', 'total_reduction', 'client', 'reference_image_ids', 'reference_images', 'company_profile')}
+              'project_summary', 'items', 'total_net', 'total_gross', 'tax_amount', 'client', 'reference_image_ids', 'reference_images', 'company_profile')}
+    if not legacy:
+        public.update(reduction=offer.get('reduction'), total_reduction=offer.get('total_reduction'))
     return hashlib.sha256(json.dumps(public, sort_keys=True, ensure_ascii=False,
                                      default=str).encode()).hexdigest()
 
@@ -63,7 +65,14 @@ def attach(store, identity, offer):
     result = dict(offer)
     if not configured(): return result
     saved = store.record(identity, KIND, str(offer['id']))
-    if saved and not saved.get('revoked') and saved['source_digest'] == fingerprint(offer):
+    matches = bool(saved and saved['source_digest'] == fingerprint(offer))
+    if saved and not matches and not saved.get('snapshot', {}).get('pricing') and saved.get('original_offer'):
+        try:
+            matches = (saved['source_digest'] == fingerprint(offer, legacy=True)
+                       and document_pricing(saved['original_offer']) == document_pricing(offer))
+        except ValueError:
+            matches = False
+    if saved and not saved.get('revoked') and matches:
         try:
             valid = datetime.fromisoformat(saved['link']['expires_at'].replace('Z', '+00:00')) > datetime.now(timezone.utc)
         except (ValueError, KeyError):

@@ -359,3 +359,14 @@ def test_portal_failure_is_readable_and_get_uses_cached_catalog(tmp_path, monkey
     assert result.status_code == 422
     assert 'Rabatt oder Steuer' in result.text and 'Zurück zum Leistungsvorschlag' in result.text
     assert not store.record('test', 'website_portal_offer', '42')
+
+
+def test_legacy_customer_link_survives_upgrade_but_not_discount_rule_change(tmp_path, monkeypatch):
+    monkeypatch.setenv('WEBSITE_PORTAL_ENABLED', 'true')
+    store = OfferStore(tmp_path); o = offer()
+    link = 'https://portal.example/angebot/' + str(uuid4()) + '#' + 'a' * 43
+    store.put_record('test', 'website_portal_offer', '42', dict(source_digest=fingerprint(o, legacy=True),
+        original_offer=deepcopy(o), snapshot={}, link=dict(customer_url=link, expires_at='2099-01-01T00:00:00Z')))
+    assert attach(store, 'test', o)['customer_portal_url'] == link
+    o['reduction'] = '10%'
+    assert 'customer_portal_url' not in attach(store, 'test', o)
