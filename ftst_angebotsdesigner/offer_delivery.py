@@ -36,7 +36,7 @@ def messages(offer):
     return subject, email, whatsapp
 
 
-def panel(offer, ingress, form_identity=''):
+def panel(offer, ingress, form_identity='', portal_enabled=False):
     if offer.get('is_draft'):
         return ''
     client = offer.get('client') or {}
@@ -46,6 +46,7 @@ def panel(offer, ingress, form_identity=''):
     oid = str(offer['id'])
     subject, email_text, whatsapp_text = messages(offer)
     e = lambda v: escape(str(v), quote=True)
+    portal_actions = ('<p><a class="btn" style="background:#16803c" href="' + e(ingress('offer/' + oid + '/portal')) + '">Persönlichen Kundenlink vorbereiten</a></p><p><a href="' + e(ingress('portal/responses')) + '">Kundenantworten</a></p>') if portal_enabled else ''
     return f'''<section class="card" data-offer-delivery data-pdf-url="{e(ingress('offer/' + oid + '/pdf'))}" data-filename="{e('FTST-Leistungsvorschlag-' + oid + '.pdf')}">
 <h2>Leistungsvorschlag versenden</h2><p>Kundendaten aus Billomat prüfen oder für diesen Versand ergänzen. E-Mail direkt mit PDF-Anhang vorbereiten oder die PDF über Ihre E-Mail-App bzw. WhatsApp teilen.</p>
 <form method="post" action="{e(ingress('offer/' + oid + '/email'))}">{form_identity}
@@ -54,6 +55,7 @@ def panel(offer, ingress, form_identity=''):
 <div class="field"><label for="delivery-subject">Betreff</label><input id="delivery-subject" name="subject" value="{e(subject)}" maxlength="200"></div>
 <details><summary>E-Mail-Text prüfen und bearbeiten</summary><div class="field"><label for="delivery-email-text">Ausführliche E-Mail</label><textarea id="delivery-email-text" name="text" style="min-height:300px" maxlength="4000">{e(email_text)}</textarea></div></details>
 <p><button class="btn" style="background:#16803c" type="submit" name="action" value="edit">Weiter zur E-Mail-Prüfung</button></p>
+{portal_actions}
 <p class="small">Ihre Änderungen werden in den nächsten Schritt übernommen. Es wird noch nichts versendet.</p>
 <div class="field"><label for="delivery-whatsapp-text">Kurzer WhatsApp-Text</label><textarea id="delivery-whatsapp-text" maxlength="1000">{e(whatsapp_text)}</textarea></div>
 <button class="btn" type="button" data-deliver="email">PDF für E-Mail vorbereiten</button>

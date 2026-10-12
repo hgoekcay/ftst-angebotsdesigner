@@ -1,3 +1,7 @@
+# 0.27.3
+
+- Persönlichen Kundenlink direkt unter „Weiter zur E-Mail-Prüfung“ vorbereiten, ohne zum Seitenende zu scrollen.
+
 # 0.27.2
 
 - Gerätepositionen sind bei der Kundenlink-Vorbereitung standardmäßig mengenveränderbar vorausgewählt; die Angebotsmenge bleibt der Ausgangswert. Dienstleistungen und Anfahrt bleiben fest.
