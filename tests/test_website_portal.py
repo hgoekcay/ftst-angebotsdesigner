@@ -370,3 +370,67 @@ def test_legacy_customer_link_survives_upgrade_but_not_discount_rule_change(tmp_
     assert attach(store, 'test', o)['customer_portal_url'] == link
     o['reduction'] = '10%'
     assert 'customer_portal_url' not in attach(store, 'test', o)
+
+
+def test_realistic_devices_default_editable_services_remain_fixed():
+    from website_portal import default_editable, quantity_editable, category
+    for title in ['DOOR-PROTECT/Magnetkontakt', 'MotionProtect/Bewegungsmelder',
+                  'TAG/Chip', 'Ajax Superior GlassProtect/Glasbruchmelder']:
+        item = dict(title=title, quantity=2, unit_price='88.92', total_net='177.84')
+        assert default_editable(item)
+    for title in ['[ART-16] Dienstleistung Techniker', '[ART-15] Dienstleistung Helfer',
+                  '[ART-65] An-& Abfahrtskosten Kleintransporter']:
+        assert category(title) == 'service'
+        assert not quantity_editable(dict(title=title, quantity=2, total_net='100.00'))
+    assert not default_editable(dict(title='MotionProtect', quantity=3, total_net='100.00'))
+
+
+def test_product_color_from_description_without_guessing_conflicting_color():
+    from website_portal import product_image
+    assert product_image('MotionProtect/Bewegungsmelder', 'Das weiße Gehäuse passt zur Wand.') == 'ax-motion-protect-w'
+    assert product_image('MotionProtect schwarz', 'weiß oder schwarz lieferbar') is None
+    assert product_image('MotionCam weiß') is None
+
+
+def test_default_checked_form_preserves_original_device_quantity(tmp_path, monkeypatch):
+    import html, re, website_portal
+    from flask import Flask
+    app = Flask(__name__); app.secret_key = 'test'
+    monkeypatch.setenv('BILLOMAT_ID', 'test')
+    o = offer()
+    o['items'][0].update(title='DOOR-PROTECT/Magnetkontakt', quantity=9, unit_price='10.00', total_net='90.00')
+    o['items'][1].update(title='[ART-16] Dienstleistung Techniker', total_net='200.00')
+    store = OfferStore(tmp_path)
+    website_portal.register(app, lambda title, body: body, lambda path: '/' + path,
+                            html.escape, lambda: store, lambda oid: o, lambda o: BytesIO(b'%PDF-test'))
+    page = app.test_client().get('/offer/42/portal')
+    assert 'value="position-1" checked' in page.text
+    assert 'Ausgangsmenge 9' in page.text
+    assert 'value="position-2"' not in page.text
+    snap = snapshot(o, 1, ['position-1'])
+    assert snap['lines'][0]['quantity'] == '9'
+    assert snap['lines'][0]['editable']
+    selected = [dict(line_id='position-1', option_id='original', quantity='10')]
+    totals = dict(net='300.00', tax='57.00', gross='357.00')
+    result = accepted_configuration(dict(snapshot=snap, original_offer=o), confirmed(snap, selected, totals))
+    assert result['items'][0]['quantity'] == '10'
+    assert result['totals'] == totals
+
+
+def test_product_examples_are_labelled_and_superior_is_not_standard_model():
+    from website_portal import product_visual
+    assert product_visual('DOOR-PROTECT/Magnetkontakt') == dict(product_image_id='ax-door-protect-w', product_image_note='Beispielabbildung; Farbe nach Abstimmung.')
+    assert product_visual('Ajax Superior GlassProtect/Glasbruchmelder', 'weiß')['product_image_id'] == 'ax-superior-glass-protect-w'
+    assert product_visual('Ajax GlassProtect weiß')['product_image_id'] == 'ax-glass-protect-w'
+    assert product_visual('TAG/Chip')['product_image_id'] == 'ax-tag-w'
+    assert 'product_image_note' in product_visual('TAG/Chip')
+    assert product_visual('Unbekannter Sensor') == {}
+    assert product_visual('MotionProtect weiß und schwarz') == {}
+
+
+def test_fixed_hardware_also_gets_product_image():
+    o = offer();o['items'][0]['title'] = 'DOOR-PROTECT/Magnetkontakt'
+    snap = snapshot(o, 1)
+    assert not snap['lines'][0]['editable']
+    assert snap['lines'][0]['product_image_id'] == 'ax-door-protect-w'
+    assert snap['lines'][0]['product_image_note'].startswith('Beispielabbildung')
