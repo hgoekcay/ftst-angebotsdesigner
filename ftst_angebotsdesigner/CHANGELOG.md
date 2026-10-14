@@ -1,3 +1,10 @@
+# 0.27.4
+
+- Geprüfte Produktbilder je Angebotsposition aus der internen Bilderbibliothek freigeben: Kameras, Rekorder, Türsprechanlagen und Zubehör.
+- Produktfotos separat von Projektbildern übertragen; private Bildmetadaten entfernen und Gesamt-Uploadgröße vor dem Versand prüfen.
+- 18 öffentliche FTST-/FTronics-Modelle eindeutig erkennen, ohne ähnliche Kameramodelle oder Kompatibilitätsangaben zu verwechseln.
+- Tag/Nacht-Kameras bekommen keine falsche Ajax-TAG-Chipabbildung mehr. Bereits veröffentlichte Revisionen bleiben unverändert; neue Freigabe erforderlich.
+
 # 0.27.3
 
 - Persönlichen Kundenlink direkt unter „Weiter zur E-Mail-Prüfung“ vorbereiten, ohne zum Seitenende zu scrollen.

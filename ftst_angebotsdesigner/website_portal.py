@@ -19,6 +19,8 @@ from materials import account
 from billomat_client import BillomatClient
 from offer_mail import csrf, form_identity
 from website_portal_client import PortalClient, PortalError
+from ftst_product_images import product_image as ftst_product_image
+import portal_product_photos
 
 KIND = 'website_portal_offer'
 CENT = Decimal('.01')
@@ -249,6 +251,9 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
 
 
 def product_image(title, description=''):
+    ftst_photo = ftst_product_image(title, description)
+    if ftst_photo:
+        return ftst_photo
     # Exact advertised model/colour only. Similar models must not share a guessed photo.
     t = re.sub(r'[^a-z0-9]+', '', title.lower().replace('weiß', 'weiss'))
     color_text = (title + ' ' + (description or '')).lower().replace('ß', 'ss')
@@ -266,7 +271,10 @@ def product_image(title, description=''):
         return 'ax-street-siren-' + suffix
     if 'superiorglassprotect' in t and 'fibra' not in t:
         return 'ax-superior-glass-protect-' + suffix
-    if re.search(r'\btag\b', title.lower()) and 'superior' not in t:
+    primary = re.sub(r'^\s*(?:\[[^\]]+\]\s*)*', '', title).lower()
+    camera_context = bool(re.search(r'kamera|camera|bullet|dome|turret|rekorder|recorder|aufzeichnungs|\bnvr\b|\bdvr\b|tag\s*[/ -]\s*nacht|day\s*[/ -]?\s*night', primary))
+    if (not camera_context and 'superior' not in t
+            and re.match(r'^(?:ajax[\s-]+)?(?:rfid[\s-]+)?tag\b', primary)):
         return 'ax-tag-' + suffix
     if any(x in t for x in ('outdoor', 'fibra', 'superior', 'motioncam', 'hub2g', 'hub4g')): return None
     exact = [('hub2plus', 'hub-2-plus'), ('hub24g', 'hub-2-4g'),
@@ -412,7 +420,9 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                     return failure(str(error))
                 pdf = make_pdf(offer).getvalue()
                 s['images'], image_bytes = approved_images(offer)
-                remote = client().publish(s, pdf, image_bytes)
+                choices = {key[len('product_photo:'):]: request.form.get(key, '') for key in request.form if key.startswith('product_photo:')}
+                product_bytes, photo_binding = portal_product_photos.apply(store, identity, offer, s, choices, lambda title: category(title) == 'service')
+                remote = client().publish(s, pdf, image_bytes, product_images=product_bytes) if product_bytes else client().publish(s, pdf, image_bytes)
                 link = client().create_link(remote['proposal_id'])
                 # Validate returned URLs against configured portal origin.
                 if (urlsplit(link['customer_url']).scheme != 'https'
@@ -424,13 +434,17 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                              proposal_id=remote['proposal_id'], link=link, revoked=False)
                 store.put_record(identity, 'website_portal_revision', remote['proposal_id'], saved)
                 store.put_record(identity, KIND, oid, saved)
-            except ValueError:
-                return failure('Gültigkeit, Positionssummen, Rabatt oder Steuer konnten nicht eindeutig geprüft werden. Bitte den Leistungsvorschlag prüfen.')
+                store.put_record(identity, portal_product_photos.KIND, oid, photo_binding)
+            except ValueError as error:
+                return failure(str(error) or 'Produktbilder oder Angebotsdaten konnten nicht geprüft werden.')
             except (PortalError, RuntimeError):
                 return failure('Die Verbindung zu Billomat oder zum Kundenportal ist vorübergehend fehlgeschlagen. Ein Kundenlink konnte nicht bestätigt werden.', 503)
             return redirect(ingress('offer/' + oid))
         saved = store.record(identity, KIND, oid)
         rows = '<h2>Gerätemengen für den Kunden</h2><p>Erkannte Geräte sind vorausgewählt. Die Angebotsmenge wird übernommen; der Kunde kann sie anschließend ändern. Haken entfernen, um eine Position festzulegen.</p>'
+        rows += '<p>Produktbilder für Kameras, Rekorder, Türsprechanlagen und Zubehör gezielt prüfen. Fehlende Bilder zuerst in der <a href="' + clean(ingress('materials')) + '">Bilderbibliothek</a> hochladen. Bereits veröffentlichte Links bleiben unverändert.</p>'
+        product_assets = portal_product_photos.available(store, identity)
+        remembered_photos = portal_product_photos.remembered(store, identity, offer)
         for n, item in enumerate(offer.get('items', []), 1):
             title = clean(item.get('title') or 'Leistung')
             quantity = clean(str(item.get('quantity') or '0'))
@@ -439,6 +453,15 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 rows += '<label><input type="checkbox" name="editable" value="position-' + str(n) + '"' + checked + '> ' + title + ' · Ausgangsmenge ' + quantity + ' · Menge anpassbar</label><br>'
             else:
                 rows += '<p>' + title + ' · ' + quantity + ' · bleibt fest</p>'
+            if category(item.get('title') or '') != 'service':
+                line_id = 'position-' + str(n)
+                chosen = remembered_photos.get(line_id, '')
+                automatic = product_visual(item.get('title') or '', item.get('description') or '')
+                default_label = 'Automatische Modellabbildung verwenden' if automatic else 'Kein eindeutiges Modellbild – geprüftes Produktfoto wählen'
+                options = '<option value="">' + clean(default_label) + '</option>'
+                options += ''.join('<option value="' + clean(key) + '"' + (' selected' if key == chosen else '') + '>' + clean(image.get('title') or 'Bibliotheksbild') + '</option>' for key, image in product_assets.items())
+                preview = '<img style="max-width:120px;max-height:120px" alt="Intern zu prüfende Produktabbildung"' + (' src="' + clean(ingress('materials/' + chosen)) + '"' if chosen else ' hidden') + '>'
+                rows += '<div class="field"><label>Geprüftes Produktbild für ' + title + '</label><select name="product_photo:' + line_id + '" data-product-photo-select data-preview-base="' + clean(ingress('materials/')) + '">' + options + '</select>' + preview + '</div>'
             if str(item.get('optional') or '0') == '1':
                 rows += '<small>Optionale Position: startet beim Kunden mit Menge 0.</small><br>'
         try:
@@ -454,9 +477,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         body += '<p>Angebotsrabatt: ' + clean(str(offer.get('reduction') or '0')) + '. Dieser gilt auch für freigegebene Mengenänderungen und Zusatzartikel. Mehrwertsteuer: 19 % auf das rabattierte Gesamtnetto.</p>'
         if existing:
             body += '<p>Der vorhandene Kundenlink behält seine bisherige Freigabe. Erstellen Sie mit diesen Einstellungen einen neuen Kundenlink, damit Mengenänderungen und Produktbilder übernommen werden.</p>'
-        body += existing + '<form method="post">' + form_identity() + '<input type="hidden" name="digest" value="' + fingerprint(offer) + '">' + rows + '<label><input type="checkbox" name="approved" value="yes" required> Darstellung, Preise und Auswahlgrenzen für den Kunden freigegeben</label><p><button class="btn">Kundenlink mit dieser Auswahl erstellen</button></p></form>'
+        body += existing + '<form method="post">' + form_identity() + '<input type="hidden" name="digest" value="' + fingerprint(offer) + '">' + rows + '<label><input type="checkbox" name="approved" value="yes" required> Darstellung, Preise, Auswahlgrenzen und genaue Zuordnung der ausgewählten Produktbilder für den Kunden freigegeben</label><p><button class="btn">Kundenlink mit dieser Auswahl erstellen</button></p></form>'
         if saved and not saved.get('revoked'):
             body += '<form method="post">' + form_identity() + '<button class="btn light" name="action" value="revoke">Kundenlink widerrufen</button></form>'
+        body += '''<script>document.querySelectorAll('[data-product-photo-select]').forEach(select=>select.addEventListener('change',()=>{const image=select.parentElement.querySelector('img');image.hidden=!select.value;if(select.value)image.src=select.dataset.previewBase+encodeURIComponent(select.value);else image.removeAttribute('src');}));</script>'''
         return base('Kundenportal', body + '</section>')
 
     @app.post('/portal/sync')

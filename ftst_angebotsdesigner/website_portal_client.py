@@ -45,7 +45,7 @@ class PortalClient:
             raise PortalError('Customer portal returned an invalid response.')
         return result
 
-    def publish(self, snapshot, original_pdf, images=None):
+    def publish(self, snapshot, original_pdf, images=None, product_images=None):
         if (not isinstance(snapshot, dict) or snapshot.get('schema_version') != 'ftst.customer-proposal.v1'
                 or snapshot.get('approved_for_customer') is not True):
             raise ValueError('An explicitly approved customer snapshot is required.')
@@ -57,13 +57,27 @@ class PortalClient:
         descriptors = snapshot.get('images', [])
         if len(descriptors) > 4 or set(images) != {x['id'] for x in descriptors}:
             raise ValueError('Supply exactly the approved images, at most four.')
+        product_images = product_images or {}
+        product_descriptors = snapshot.get('product_images', [])
+        if len(product_descriptors) > 30 or set(product_images) != {x['id'] for x in product_descriptors}:
+            raise ValueError('Genau die freigegebenen Produktbilder mitliefern, höchstens 30.')
+        if set(product_images) & set(images):
+            raise ValueError('Projekt- und Produktbild-IDs müssen getrennt sein.')
         files = [('pdf', ('original.pdf', original_pdf, 'application/pdf'))]
         for image_id, content in images.items():
-            if not isinstance(content, bytes) or len(content) > 2 * 1024 * 1024:
+            if not isinstance(content, bytes) or not content or len(content) > 2 * 1024 * 1024:
                 raise ValueError('Invalid approved image bytes.')
             files.append(('image:' + image_id, ('image', content, 'application/octet-stream')))
+        for image_id, content in product_images.items():
+            if not isinstance(content, bytes) or not content or len(content) > 2 * 1024 * 1024:
+                raise ValueError('Ungültige freigegebene Produktbild-Datei.')
+            files.append(('product:' + image_id, ('product.png', content, 'image/png')))
+        snapshot_json = json.dumps(snapshot, ensure_ascii=False, separators=(',', ':'))
+        total_bytes = len(original_pdf) + sum(len(x) for x in images.values()) + sum(len(x) for x in product_images.values()) + len(snapshot_json.encode('utf-8')) + 128 * 1024
+        if total_bytes > 18 * 1024 * 1024:
+            raise ValueError('PDF und freigegebene Bilder überschreiten zusammen die 18-MiB-Uploadgrenze. Bitte PDF/Projektbilder verkleinern.')
         return self._request('POST', '/api/internal/proposals',
-            data={'snapshot': json.dumps(snapshot, ensure_ascii=False, separators=(',', ':'))}, files=files)
+            data={'snapshot': snapshot_json}, files=files)
 
     def publish_final_pdf(self, proposal_id, request_id, pdf):
         self._proposal_id(proposal_id)
