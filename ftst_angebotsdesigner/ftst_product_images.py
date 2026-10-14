@@ -29,9 +29,15 @@ def model_tokens(text):
             clause = clause[:marker.start()]
         for match in MODEL_TOKEN.finditer(clause):
             token = match.group(0)
-            suffix = SPACE_SUFFIX.match(clause[match.end():])
-            if suffix:
+            remainder = clause[match.end():]
+            while True:
+                suffix = SPACE_SUFFIX.match(remainder)
+                if not suffix: break
                 token += suffix.group(1)
+                remainder = remainder[suffix.end():]
+            # Slashed variant/channel choices are not one uniquely sold model.
+            if re.match(r'^\s*/\s*(?:[0-9]+[A-Za-z0-9]*|PRO|ZOOM|MINI|MAX|DUAL|PLUS|ULTRA|LITE)(?![A-Za-z0-9])', remainder, re.IGNORECASE):
+                token += '/AMBIGUOUS'
             tokens.add(re.sub(r'[ _-]', '', token).upper())
     return tokens
 

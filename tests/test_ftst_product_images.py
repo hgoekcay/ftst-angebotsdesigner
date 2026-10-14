@@ -95,3 +95,8 @@ def test_primary_tag_product_still_has_labelled_example(title):
                                   '[ART-109] Werkzeuglos RJ45 CAT5/6/7','[ART-857] Cat6 CCA grau'])
 def test_generic_hardware_needs_reviewed_manual_picture(title):
     assert product_visual(title)=={}
+
+
+@pytest.mark.parametrize('title',['FC-8D/PRO','FC-8D / ZOOM','FN-8/16','FC-8D PRO MINI','FC-8D PRO ZOOM'])
+def test_slashed_or_stacked_variant_names_never_fall_back_to_base(title):
+    assert product_visual(title)=={}
