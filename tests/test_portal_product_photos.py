@@ -128,3 +128,18 @@ def test_release_ui_product_choice_requires_existing_csrf_and_employee_approval(
     assert published[0][0]['lines'][1]['product_photo_id']=='product-1'
     assert set(published[0][1])=={'product-1'}
     assert store.record('test',photos.KIND,'42')['position-2']['asset_id']==key
+
+
+@pytest.mark.parametrize('product',[False,True])
+def test_empty_image_parts_rejected_before_http(product):
+    client=PortalClient('https://portal.example','x'*32)
+    calls=[];client._request=lambda *args,**kwargs:calls.append(kwargs) or {}
+    s={'schema_version':'ftst.customer-proposal.v1','approved_for_customer':True,'images':[]}
+    if product:
+        s['product_images']=[{'id':'product-1','caption':'Synthetisches Produkt'}]
+        kwargs={'product_images':{'product-1':b''}}
+    else:
+        s['images']=[{'id':'reference-1'}]
+        kwargs={'images':{'reference-1':b''}}
+    with pytest.raises(ValueError):client.publish(s,b'%PDF-test',**kwargs)
+    assert not calls

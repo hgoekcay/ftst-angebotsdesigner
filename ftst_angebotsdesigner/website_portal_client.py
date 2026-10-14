@@ -65,11 +65,11 @@ class PortalClient:
             raise ValueError('Projekt- und Produktbild-IDs müssen getrennt sein.')
         files = [('pdf', ('original.pdf', original_pdf, 'application/pdf'))]
         for image_id, content in images.items():
-            if not isinstance(content, bytes) or len(content) > 2 * 1024 * 1024:
+            if not isinstance(content, bytes) or not content or len(content) > 2 * 1024 * 1024:
                 raise ValueError('Invalid approved image bytes.')
             files.append(('image:' + image_id, ('image', content, 'application/octet-stream')))
         for image_id, content in product_images.items():
-            if not isinstance(content, bytes) or len(content) > 2 * 1024 * 1024:
+            if not isinstance(content, bytes) or not content or len(content) > 2 * 1024 * 1024:
                 raise ValueError('Ungültige freigegebene Produktbild-Datei.')
             files.append(('product:' + image_id, ('product.png', content, 'image/png')))
         snapshot_json = json.dumps(snapshot, ensure_ascii=False, separators=(',', ':'))
