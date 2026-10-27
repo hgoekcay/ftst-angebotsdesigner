@@ -1,0 +1,23 @@
+name: "FTST ATLAS"
+version: "0.1.0"
+slug: "ftst_atlas"
+description: "Lokaler Firmenassistent mit Chat, überprüfbarem Wissen und Aufgaben."
+url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
+arch:
+  - amd64
+startup: application
+boot: manual
+init: false
+stage: experimental
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:brain
+panel_title: ATLAS
+panel_admin: true
+timeout: 30
+options:
+  ollama_url: "http://76b650ab-ftst-local-ai:11434"
+  model: "qwen3:4b"
+schema:
+  ollama_url: url
+  model: str
