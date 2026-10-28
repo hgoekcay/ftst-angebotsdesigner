@@ -1,3 +1,8 @@
+# 0.5.1
+
+- Include the bookkeeping list-limit hint in the shipped HTML.
+- Verify JavaScript element references against real HTML in CI.
+
 # 0.5.0
 
 - Owner-scoped selection of configured mailboxes and bounded invoice attachment import.

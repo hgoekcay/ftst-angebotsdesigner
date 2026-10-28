@@ -11,8 +11,9 @@ Ab 0.2.4 ist für direkte Antworten `qwen3:4b-instruct-2507-q4_K_M` vorgesehen
 - Bedienung über Home Assistant, auch am Handy.
 - Optionaler privater Telegram-Chat mit ausdrücklicher Kontofreigabe.
 
-**Diese Version ist ein Pilot.** WhatsApp, Telefonanrufe, Gerätesteuerung, E-Mail-Versand,
-Billomat und eigenständige Hintergrundaktionen sind noch nicht angebunden.
+**Diese Version ist ein Pilot.** WhatsApp, Telefonanrufe, Gerätesteuerung und E-Mail-Versand
+sind noch nicht angebunden. Billomat wird ab 0.5.0 ausschließlich lesend für die
+Belegvorbereitung angebunden; regelmäßiger Import und Telegram-Berichte sind optional.
 ATLAS führt keine Geräte- oder Shellbefehle aus. Antworten sind Entwürfe und
 müssen fachlich geprüft werden. Die Oberfläche zeigt fehlende Anbindungen offen.
 
