@@ -19,4 +19,4 @@ Vom Inhaber im Gespräch bestätigt:
 
 Aktueller Arbeitsmodus: kleine überprüfbare Änderungen, nachvollziehbare Versionierung und passende Tests. Hüseyin hat Agenten zur parallelen Unterstützung ausdrücklich gewünscht. Datei-Verantwortlichkeiten abstimmen und Ergebnisse vor Zusammenführung prüfen.
 
-Kundenversand und verbindliche Zusagen erfolgen erst nach entsprechender Freigabe. Noch kein Telegram-Bot oder kostenpflichtiger KI-Betrieb eingerichtet. Dieses Dokument hält Projektkontext fest und ersetzt keine bereits erteilte konkrete Autorisierung.
+Kundenversand und verbindliche Zusagen erfolgen erst nach entsprechender Freigabe. Telegram ist inzwischen eingerichtet. Optionaler Online-Betrieb wird vorbereitet; API-Zugang noch nicht konfiguriert. Aktueller Stand und offene Schritte: [ATLAS-STATUS.md](ATLAS-STATUS.md). Dieses Dokument hält Projektkontext fest und ersetzt keine bereits erteilte konkrete Autorisierung.
