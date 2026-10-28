@@ -27,6 +27,9 @@ class JobQueue:
         self._stop = threading.Event()
         self._lifecycle = threading.Lock()
         self._thread = None
+        # A finished external call may outlive a temporary local DB outage.
+        # Keep its bounded completion in memory and retry only the local write.
+        self._pending_completion = None
         with self.db() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS atlas_jobs (
                 id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, title TEXT NOT NULL,
@@ -103,8 +106,9 @@ class JobQueue:
                 return
             with self.db() as db:
                 db.execute("""UPDATE atlas_jobs SET status='failed',finished_at=?,payload='{}',
-                    error=? WHERE status='running'""", (_now(),
-                    'ATLAS wurde neu gestartet. Der begonnene Auftrag wird nicht automatisch wiederholt.'))
+                    error=? WHERE status='running' AND id<>?""", (_now(),
+                    'ATLAS wurde neu gestartet. Der begonnene Auftrag wird nicht automatisch wiederholt.',
+                    self._pending_completion[-1] if self._pending_completion else ''))
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, name='atlas-jobs', daemon=True)
             self._thread.start()
@@ -117,6 +121,9 @@ class JobQueue:
             thread.join(timeout=timeout)
 
     def _process_one(self):
+        if self._pending_completion is not None:
+            self._finalize_pending()
+            return True
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute("SELECT id,user_id,payload FROM atlas_jobs WHERE status='queued' ORDER BY created_at,rowid LIMIT 1").fetchone()
@@ -138,11 +145,22 @@ class JobQueue:
         except Exception:
             result, status = None, 'failed'
             error = 'Auftrag konnte nicht abgeschlossen werden. Keine automatische Wiederholung.'
+        self._pending_completion = (status, _now(), result, error, ident)
+        self._finalize_pending()
+        return True
+
+    def _finalize_pending(self):
+        completion = self._pending_completion
+        if completion is None:
+            return
         with self.db() as db:
             # Inputs are no longer required after execution. Retain only output.
             db.execute("UPDATE atlas_jobs SET status=?,finished_at=?,result=?,error=?,payload='{}' WHERE id=? AND status='running'",
-                       (status, _now(), result, error, ident))
-        return True
+                       completion)
+        # Clear only after the transaction context committed successfully. A
+        # retry after an uncertain commit is harmless because this UPDATE is
+        # conditional and never executes the original external operation.
+        self._pending_completion = None
 
     def _run(self):
         while not self._stop.is_set():
@@ -150,7 +168,9 @@ class JobQueue:
                 if self._process_one():
                     continue
             except sqlite3.Error:
-                # Never log database contents or retry an already-claimed job.
-                pass
+                # Fixed, interruptible backoff even when submissions keep the
+                # wake event set. Never retry an already-claimed external call.
+                self._stop.wait(1)
+                continue
             self._wake.wait(1)
             self._wake.clear()
