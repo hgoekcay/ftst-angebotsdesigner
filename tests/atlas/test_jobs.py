@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
@@ -140,6 +141,79 @@ class JobTests(unittest.TestCase):
         release.set()
         self.queue.stop()
         self.assertEqual(self.queue.get('alice', job['id'])['status'], 'completed')
+
+    def test_transient_completion_write_failure_retries_only_local_write(self):
+        failed, saved = threading.Event(), threading.Event()
+        attempts = []
+        class FlakyConnection(sqlite3.Connection):
+            def execute(connection, sql, parameters=()):
+                if sql.startswith('UPDATE atlas_jobs SET status=?'):
+                    attempts.append(1)
+                    if len(attempts) == 1:
+                        failed.set()
+                        raise sqlite3.OperationalError('temporarily locked')
+                    result = super().execute(sql, parameters)
+                    saved.set()
+                    return result
+                return super().execute(sql, parameters)
+        self.queue.db = lambda: sqlite3.connect(self.path, timeout=5, factory=FlakyConnection)
+        job = self.queue.submit('alice', {'message': 'paid request'})
+        self.queue.start()
+        self.assertTrue(failed.wait(3))
+        self.assertEqual(self.queue.get('alice', job['id'])['status'], 'running')
+        self.assertTrue(saved.wait(4))
+        self.queue.stop()
+        self.execute.assert_called_once_with('alice', {'message': 'paid request'})
+        self.assertEqual(len(attempts), 2)
+        result = self.queue.get('alice', job['id'])
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['result'], {'reply': 'Antwort'})
+        self.assertEqual(self.queue.submit('alice', {})['status'], 'queued')
+
+    def test_stop_and_start_preserve_pending_completion_without_reexecution(self):
+        failed, unavailable = threading.Event(), threading.Event()
+        unavailable.set()
+        class UnavailableConnection(sqlite3.Connection):
+            def execute(connection, sql, parameters=()):
+                if sql.startswith('UPDATE atlas_jobs SET status=?') and unavailable.is_set():
+                    failed.set()
+                    raise sqlite3.OperationalError('temporary local write failure')
+                return super().execute(sql, parameters)
+        self.queue.db = lambda: sqlite3.connect(self.path, timeout=5, factory=UnavailableConnection)
+        job = self.queue.submit('alice', {})
+        self.queue.start()
+        self.assertTrue(failed.wait(3))
+        self.queue.stop()
+        self.assertIsNotNone(self.queue._pending_completion)
+        unavailable.clear()
+        self.queue.start()
+        deadline = time.monotonic() + 3
+        while self.queue.get('alice', job['id'])['status'] == 'running' and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.queue.stop()
+        self.execute.assert_called_once_with('alice', {})
+        self.assertEqual(self.queue.get('alice', job['id'])['status'], 'completed')
+
+    def test_process_restart_fails_lost_completion_without_replaying_paid_call(self):
+        job = self.queue.submit('alice', {})
+        original_factory = self.queue.db
+        calls = []
+        def failing_factory():
+            calls.append(1)
+            if len(calls) == 2:
+                raise sqlite3.OperationalError('local completion connection unavailable')
+            return original_factory()
+        self.queue.db = failing_factory
+        with self.assertRaises(sqlite3.OperationalError):
+            self.queue._process_one()
+        self.execute.assert_called_once()
+        # A new process cannot recover the in-memory completion, so fail closed.
+        other_execute = Mock()
+        self.queue = jobs.JobQueue(self.db, other_execute)
+        self.queue.start()
+        self.queue.stop()
+        self.assertEqual(self.queue.get('alice', job['id'])['status'], 'failed')
+        other_execute.assert_not_called()
 
 
 if __name__ == '__main__':

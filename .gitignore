@@ -6,3 +6,6 @@ __pycache__/
 *.sqlite3*
 instance/
 data/
+
+# Rebuildable local code-relationship index
+.code-review-graph/
