@@ -24,7 +24,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.1.1'
+VERSION = '0.2.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -247,7 +247,7 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             if path == '/api/status':
-                return self.send(200, app.status())
+                return self.send(200, {**app.status(), 'ha_user_id': self.user_id})
             if path == '/api/profile':
                 return self.send(200, {'text': app.profile(self.user_id)})
             if path == '/api/memories':
@@ -351,6 +351,11 @@ def make_handler(app):
 
 def main():
     app = App()
+    if not app.dev:
+        from telegram_bridge import start_bridge
+        options_path = app.data_dir / 'options.json'
+        options = json.loads(options_path.read_text()) if options_path.exists() else {}
+        start_bridge(app, options)
     host = '127.0.0.1' if app.dev else '0.0.0.0'
     port = int(os.environ.get('ATLAS_PORT', '8099'))
     server = ThreadingHTTPServer((host, port), make_handler(app))

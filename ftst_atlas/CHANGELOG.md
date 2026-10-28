@@ -1,3 +1,10 @@
+# 0.2.0
+
+- Optionale Telegram-Textanbindung per Long Polling, standardmäßig deaktiviert.
+- Explizite Zuordnung privater Telegram-ID zum gespeicherten HA-Profil.
+- /id ohne Wissenszugriff; /tasks und /remember für freigegebenen Nutzer.
+- Qwen-Korrektur aus 0.1.1 enthalten, Live-Abnahme weiterhin erforderlich.
+
 # 0.1.0
 
 - Erste separate ATLAS-App für vorhandenes lokales Ollama.
