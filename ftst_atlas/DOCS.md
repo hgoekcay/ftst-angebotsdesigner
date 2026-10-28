@@ -3,7 +3,9 @@
 ## Installation
 
 1. Home-Assistant-Sicherung erstellen. FTST Lokale KI muss bereits laufen und
-   `qwen3:4b` bereitstellen.
+   `qwen3:4b-instruct-2507-q4_K_M` bereitstellen (etwa 2,5 GB).
+   In der ATLAS-Konfiguration diesen exakten Modellnamen auswählen.
+   Der unspezifische Alias `qwen3:4b` kann auf eine Thinking-Variante zeigen.
 2. Apps-Store aktualisieren, **FTST ATLAS** installieren und starten.
 3. **Weboberfläche öffnen**. Keine Ports freigeben, keine Routeränderung nötig.
 4. Im Bereich Wissen das eigene Firmenprofil eintragen (maximal 2.000 Zeichen). Nur freigegebene Fakten
@@ -34,12 +36,12 @@ Nutzerbezogene Inhalte dürfen nur über die eigene Home-Assistant-Sitzung
 zugänglich sein. Das App-Panel ist für Administratoren vorgesehen.
 
 Keine Supervisor-API, kein Docker-Socket, kein Hostnetzwerk, keine veröffentlichten
-Ports und kein Zugriff auf HA-Konfigurationsdateien. Die App darf ausschließlich
-den eingestellten Ollama-Dienst anfragen. Die Installation des Container-Images
+Ports und kein Zugriff auf HA-Konfigurationsdateien. Modellanfragen gehen ausschließlich an den eingestellten Ollama-Dienst.
+Bei ausdrücklich aktiviertem Telegram werden Nachrichten über api.telegram.org übertragen. Die Installation des Container-Images
 benötigt Internet; Chat-Inhalte gehen an den konfigurierten Modellserver.
 
-Eine Generierung gleichzeitig, 4096 Token Kontext, maximal 256 neue Tokens,
-zwei CPU-Threads und kurze Modellhaltezeit. Dies begrenzt den Modellaufruf,
+Eine Generierung gleichzeitig, 4096 Token Kontext, maximal 384 neue Tokens,
+vier CPU-Threads und kurze Modellhaltezeit. Dies begrenzt den Modellaufruf,
 ist aber keine harte RAM-Quote. AngebotsDesigner und ATLAS teilen sich dieselbe
 Modellressource. Umfangreiche Antworten können auf dem Mini-PC langsam sein.
 
