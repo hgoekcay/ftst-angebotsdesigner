@@ -1,3 +1,9 @@
+# 0.2.3
+
+- Aufeinanderfolgende Telegram-Nachrichten nicht mehr durch Zehn-Sekunden-Sperre verwerfen.
+- Aufgaben auch mit tasks oder Aufgaben abrufen; KI-Fragen sofort bestätigen.
+- Antwortbudget auf 768 Tokens erhöhen, unvollständige Antworten weiterhin abweisen.
+
 # 0.2.2
 
 - Abgeschlossene Modellantworten von separaten oder vorangestellten Denk-Ausgaben trennen.
