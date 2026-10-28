@@ -157,9 +157,9 @@ class BackendTests(unittest.TestCase):
             {'response': 'Abgebrochene Antwort', 'done': True, 'done_reason': 'length'},
             {'response': 'Noch nicht fertig', 'done': False, 'done_reason': 'stop'},
             {'response': 'Kein Abschlussstatus'},
-            {'response': '<think>private analysis</think>Antwort', 'done': True, 'done_reason': 'stop'},
-            {'response': 'private analysis</think>Antwort', 'done': True, 'done_reason': 'stop'},
-            {'response': 'Antwort', 'thinking': 'private analysis', 'done': True, 'done_reason': 'stop'},
+            {'response': '<think>private analysis', 'done': True, 'done_reason': 'stop'},
+            {'response': '<think>private analysis</think>', 'done': True, 'done_reason': 'stop'},
+            {'response': '', 'thinking': 'private analysis', 'done': True, 'done_reason': 'stop'},
             {'response': '<|im_start|>assistant Antwort', 'done': True, 'done_reason': 'stop'},
         ]
         for result in cases:
@@ -167,6 +167,15 @@ class BackendTests(unittest.TestCase):
                 code, raw = self.request('/api/chat', 'POST', {'message': 'Hallo'})
                 self.assertEqual(code, 503)
                 self.assertNotIn('reply', json.loads(raw))
+                self.assertNotIn(b'private analysis', raw)
+
+    def test_completed_answer_excludes_internal_thinking(self):
+        for response in ['<think>private analysis</think>Antwort', 'private analysis</think>Antwort', 'Antwort']:
+            result = {'response': response, 'thinking': 'private analysis', 'done': True, 'done_reason': 'stop'}
+            with self.subTest(response=response), patch.object(module, 'local_open', return_value=Response(json.dumps(result).encode())):
+                code, raw = self.request('/api/chat', 'POST', {'message': 'Hallo'})
+                self.assertEqual(code, 200)
+                self.assertEqual(json.loads(raw)['reply'], 'Antwort')
                 self.assertNotIn(b'private analysis', raw)
 
     def test_qwen_prompt_prevents_role_delimiter_injection(self):
