@@ -1,7 +1,7 @@
 name: "FTST ATLAS"
-version: "0.3.0"
+version: "0.4.0"
 slug: "ftst_atlas"
-description: "Lokaler Firmenassistent mit Chat, überprüfbarem Wissen und Aufgaben."
+description: "Firmenassistent mit lokalem Wissen, optionaler Online-Beratung und Hintergrundaufträgen."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
 arch:
   - amd64
@@ -22,6 +22,10 @@ options:
   mail_enabled: false
   mail_bridge_url: "http://76b650ab-ftst-strato-mail:8098"
   mail_account_id: "primary"
+  online_enabled: false
+  online_model: "gpt-6-astra"
+  online_daily_limit: 10
+  online_share_profile: false
 schema:
   ollama_url: url
   model: str
@@ -34,3 +38,9 @@ schema:
   mail_bridge_token: "password?"
   mail_ha_user_id: "str?"
   mail_account_id: str
+  online_enabled: bool
+  openai_api_key: "password?"
+  online_ha_user_id: "str?"
+  online_model: str
+  online_daily_limit: "int(1,100)"
+  online_share_profile: bool
