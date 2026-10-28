@@ -17,8 +17,7 @@ to perform unapproved external actions. Check live versions before deployment.
 ## Delivered before the current release
 
 - ATLAS 0.3.0 was the installed starting point. Telegram and the explicit Qwen3 Instruct model were tested.
-- STRATO mail preview, local summaries and reply drafts are implemented. ATLAS mail
-  access is still disabled; the existing separate mail service is running.
+- STRATO mail preview, local summaries and reply drafts are implemented. ATLAS primary-mailbox access is now enabled for the owner; the existing separate mail service is running.
 - AngebotsDesigner 0.27.4 was the installed starting point.
 
 ## Current release: PR 62
@@ -72,4 +71,8 @@ or start automatic repository hooks merely to use a review skill.
 
 ## STRATO service repair (2026-10-28)
 
-The existing local STRATO mail addon stopped during configuration validation after four additional accounts were entered with invalid account IDs (uppercase/spaces) and blank folders. Corrected only their logical IDs to lowercase underscore names and set folders to INBOX, preserving credentials and enabled states. Saved through Home Assistant and started the service. Live logs confirmed application startup and a successful mailbox monitor check. This verifies the primary monitored mailbox, not each additional account's authentication. ATLAS mail access remains separately disabled.
+The existing local STRATO mail addon stopped during configuration validation after four additional accounts were entered with invalid account IDs (uppercase/spaces) and blank folders. Corrected only their logical IDs to lowercase underscore names and set folders to INBOX, preserving credentials and enabled states. Saved through Home Assistant and started the service. Live logs confirmed application startup and a successful mailbox monitor check. This verifies the primary monitored mailbox, not each additional account's authentication. ATLAS access was still disabled at this repair checkpoint; see the subsequent activation below.
+
+## ATLAS mail connection enabled (2026-10-28)
+
+After explicit user confirmation, enabled read-only primary-mailbox access for the existing owner HA account. Reused the existing bridge token entirely on the Home Assistant host without exposing it. Supervisor validated the options and restarted ATLAS. UI preview successfully returned ten messages and correctly indicated more matching messages outside the bounded preview. No mail was sent, deleted or marked read. Additional mailboxes and attachment ingestion are not included in this ATLAS connection.
