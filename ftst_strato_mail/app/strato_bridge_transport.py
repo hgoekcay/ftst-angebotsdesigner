@@ -23,8 +23,8 @@ def _quoted_folder():
     folder = _folder()
     return 'INBOX' if folder == 'INBOX' else quoted(folder)
 
-MAX_MESSAGE = 8 * 1024 * 1024
-MAX_BATCH = 20 * 1024 * 1024
+MAX_MESSAGE = 32 * 1024 * 1024
+MAX_BATCH = 40 * 1024 * 1024
 MAX_MESSAGES = 10
 TIMEOUT = 15
 MAX_SECONDS = 60
@@ -43,6 +43,27 @@ class UIDValidityChanged(ImapFetchError):
 
 class ImapLimitError(ImapFetchError):
     pass
+
+
+class ImapMessageTooLarge(ImapLimitError):
+    pass
+
+
+class ImapAuthenticationError(ImapFetchError):
+    pass
+
+
+def _authenticate(call):
+    # Classify only the authentication exchange; never expose server replies.
+    try:
+        result = call()
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        raise ImapAuthenticationError('Postfachanmeldung abgelehnt. Zugangsdaten prüfen.') from None
+    if isinstance(result, tuple) and len(result) == 2 and result[0] in ('NO', 'BAD'):
+        raise ImapAuthenticationError('Postfachanmeldung abgelehnt. Zugangsdaten prüfen.')
+    return _ok(result)
 
 
 class _BoundedIMAP(imaplib.IMAP4_SSL):
@@ -67,7 +88,7 @@ class _BoundedIMAP(imaplib.IMAP4_SSL):
 
     def read(self, size):
         if size > MAX_MESSAGE + 1:
-            raise ImapLimitError('Die Mailantwort überschreitet 8 MiB. Abruf nicht übernommen.')
+            raise ImapMessageTooLarge('Die Mailantwort überschreitet 32 MiB. Abruf nicht übernommen.')
         self._budget(size)
         pending = getattr(self, '_pending', b'')
         first = pending[:size]
@@ -157,13 +178,13 @@ def _open(password):
     try:
         client.debug = 0
         if password.isascii():
-            _ok(client.login(_user(), password))
+            _authenticate(lambda: client.login(_user(), password))
         else:
             capabilities = {c.decode('ascii') if isinstance(c, bytes) else c for c in client.capabilities}
             if 'AUTH=PLAIN' not in capabilities:
                 raise ImapFetchError('Sichere Passwortübermittlung nicht unterstützt.')
             payload = b'\x00' + _user().encode('ascii') + b'\x00' + password.encode('utf-8')
-            _ok(client.authenticate('PLAIN', lambda challenge: payload if not challenge else None))
+            _authenticate(lambda: client.authenticate('PLAIN', lambda challenge: payload if not challenge else None))
         _ok(client.select(_quoted_folder(), readonly=True))
         return client
     except BaseException:
@@ -225,7 +246,7 @@ def _fetch(client, uid, *, body=False):
         raise ImapFetchError('Mailkennung oder Größe unklar. Kein Teilabruf bestätigt.')
     size = int(sizes[0])
     if size > MAX_MESSAGE:
-        raise ImapLimitError('Eine Mail überschreitet 8 MiB. Abruf angehalten; Mail nicht übersprungen.')
+        raise ImapMessageTooLarge('Eine Mail überschreitet 32 MiB. Abruf angehalten; Mail nicht übersprungen.')
     if size <= 0 or (not body and bodies):
         raise ImapFetchError('Mailgröße oder Antwortformat ungültig.')
     if body:

@@ -87,9 +87,20 @@ UIDVALIDITY sind nur innerhalb eines Postfachs eindeutig: Der Empfänger muss Cu
 Originale und Verarbeitung stets zusammen mit der `account_id` speichern. GET `/internal/mail/checkpoint` liefert UIDVALIDITY und UIDNEXT−1.
 POST `/internal/mail/batch` erwartet `uidvalidity`, `after_uid`, `since`
 (YYYY-MM-DD). Antworten enthalten höchstens zehn vollständige EML-Nachrichten,
-je höchstens 8 MiB und insgesamt höchstens 20 MiB, als Base64. Fehler bestätigen
+je höchstens 32 MiB und insgesamt höchstens 40 MiB, als Base64. Fehler bestätigen
 keinen Cursor. UIDVALIDITY-Wechsel ergeben HTTP 409. EXAMINE und BODY.PEEK
 verändern keine Gelesen-Markierung. Es gibt keinen Versand und keine Löschfunktion.
+
+Ab Version 0.3.1 unterscheidet HTTP 502 feste Fehlercodes: `mail_auth_failed`
+(abgelehnte Anmeldung), `mail_message_too_large` (einzelne MIME-Nachricht über
+32 MiB) und `mail_limit_exceeded` (sonstige Transportlimits). Unklassifizierte
+Fehler bleiben `mail_operation_failed`; Serverantworten werden nicht ausgegeben.
+Eine übergroße Nachricht wird nicht übersprungen. Bei einer erfolgreichen
+Teilmenge endet der Batch vor der nächsten Nachricht, die das Batchlimit
+überschreiten würde; `pending` bleibt wahr. Der Empfänger setzt seinen Cursor
+erst nach dauerhafter Übernahme der gelieferten Nachrichten. Base64 erhöht das
+HTTP-Antwortvolumen auf bis zu rund 54 MiB; Clients müssen ihre Grenzen passend
+setzen. Grenzen für einzelne extrahierte Belege bleiben davon unabhängig.
 
 
 Für sichere Quellenbindung sendet der AngebotsDesigner bei jedem POST-Checkpoint

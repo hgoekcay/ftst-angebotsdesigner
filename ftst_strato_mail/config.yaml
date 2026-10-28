@@ -1,5 +1,5 @@
 name: "FTST STRATO Mail"
-version: "0.3.0"
+version: "0.3.1"
 slug: "ftst_strato_mail"
 description: "STRATO-Mails lesen und den Postfachzugang automatisch überwachen."
 arch:

@@ -26,8 +26,8 @@ class UIDValidityChanged(MailError):
 
 
 ImapFetchError = MailError
-MAX_MESSAGE = 8 * 1024 * 1024
-MAX_BATCH = 20 * 1024 * 1024
+MAX_MESSAGE = 32 * 1024 * 1024
+MAX_BATCH = 40 * 1024 * 1024
 MAX_MESSAGES = 10
 
 HOST = 'local-ftst-strato-mail'
@@ -346,7 +346,7 @@ def _request(token, path, payload=None, host=HOST):
         response_socket.settimeout(RESPONSE_TIMEOUT)
         response = connection.getresponse()
         response_socket.settimeout(TIMEOUT)
-        if response.status not in (200, 409):
+        if response.status not in (200, 409, 502):
             raise ValueError('HTTP failure')
         if response.getheader('Content-Type', '').split(';')[0].strip().lower() != 'application/json':
             raise ValueError('not JSON')
@@ -372,6 +372,15 @@ def _request(token, path, payload=None, host=HOST):
         value = json.loads(b''.join(chunks), object_pairs_hook=_unique_object)
         if type(value) is not dict:
             raise ValueError('invalid object')
+        if response.status == 502:
+            messages = {
+                'mail_auth_failed': 'STRATO hat die Anmeldung abgelehnt. Zugangsdaten in der Mail-App prüfen. Kein Abruf übernommen.',
+                'mail_message_too_large': 'Eine E-Mail überschreitet 32 MiB. Abruf angehalten; keine Nachricht übersprungen.',
+                'mail_limit_exceeded': 'Eine Sicherheitsgrenze beim Mailabruf wurde erreicht. Abruf angehalten; keine Nachricht übersprungen.',
+            }
+            if value.get('error') in messages:
+                raise ImapFetchError(messages[value['error']])
+            raise ValueError('upstream failure')
         if response.status == 409:
             if value.get('error') == 'source_changed':
                 raise ImapFetchError('Postfachquelle geändert. Abruf unverändert angehalten; technischer Abgleich erforderlich.')

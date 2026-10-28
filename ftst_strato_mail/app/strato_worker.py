@@ -17,6 +17,25 @@ class BridgeUIDValidityChanged(ValueError):
     pass
 
 
+class BridgeAuthenticationError(ValueError):
+    pass
+
+
+class BridgeMessageTooLarge(ValueError):
+    pass
+
+
+class BridgeLimitError(ValueError):
+    pass
+
+
+BRIDGE_ERRORS = {
+    'MAIL_AUTH_FAILED': BridgeAuthenticationError,
+    'MAIL_MESSAGE_TOO_LARGE': BridgeMessageTooLarge,
+    'MAIL_LIMIT_EXCEEDED': BridgeLimitError,
+}
+
+
 def run_mail_operation(operation: str, arguments: dict) -> dict:
     if operation not in OPERATIONS or not isinstance(arguments, dict):
         raise ValueError("Ungültige Mailoperation.")
@@ -38,6 +57,8 @@ def run_mail_operation(operation: str, arguments: dict) -> dict:
             raise ValueError("Ungültige Antwort des lokalen Mailprozesses.") from None
         if isinstance(payload, dict) and payload.get("error_code") == "UIDVALIDITY_CHANGED":
             raise BridgeUIDValidityChanged("Postfachkennung geändert.")
+        if isinstance(payload, dict) and payload.get("error_code") in BRIDGE_ERRORS:
+            raise BRIDGE_ERRORS[payload["error_code"]]("Postfachabruf nicht bestätigt.")
         if not isinstance(payload, dict) or payload.get("ok") is not True or not isinstance(payload.get("result"), dict):
             raise ValueError("Mailoperation fehlgeschlagen. Verbindung, Suchbereich und Nachrichtengröße prüfen.")
         return payload["result"]
@@ -86,8 +107,13 @@ def main():
         response = {"ok": True, "result": result}
     except Exception as exc:
         # Never echo server responses, supplied message text, options or subprocess stderr.
-        response = {"ok": False, "error_code": "UIDVALIDITY_CHANGED" if
-                    type(exc).__name__ == "UIDValidityChanged" else "MAIL_OPERATION_FAILED"}
+        codes = {
+            'UIDValidityChanged': 'UIDVALIDITY_CHANGED',
+            'ImapAuthenticationError': 'MAIL_AUTH_FAILED',
+            'ImapMessageTooLarge': 'MAIL_MESSAGE_TOO_LARGE',
+            'ImapLimitError': 'MAIL_LIMIT_EXCEEDED',
+        }
+        response = {"ok": False, "error_code": codes.get(type(exc).__name__, "MAIL_OPERATION_FAILED")}
     sys.stdout.write(json.dumps(response, ensure_ascii=True, allow_nan=False))
 
 

@@ -119,3 +119,14 @@ The existing Cloudflared configuration was preserved and extended with belege.ft
 One activation/status message to the existing Telegram owner was accepted by the Telegram API. This does not establish that the owner read it. The scheduled first 09:00 delivery has not yet been observed. Online OpenAI access remains unconfigured pending an API key. Tax filing, bank reconciliation, and complete bookkeeping are not delivered by this activation.
 
 The additional TikTok link vm.tiktok.com/ZGdX18Bw6 was inaccessible through web retrieval. No video content was inspected; a direct upload is needed for a grounded explanation.
+
+
+## Knowledge and mail reliability release preparation (2026-10-29)
+
+ATLAS 0.6.0 adds owner-scoped knowledge search/tags, correction history with optimistic concurrency, and explicit task-to-knowledge links. Existing SQLite data migrates in place. Local answers use bounded current-note context with provenance; obsolete revisions are not used as current facts. Knowledge remains explicitly confirmed, not automatically extracted from incoming mail. Tasks remain a local list, not autonomous workflow execution.
+
+STRATO 0.3.1 and ATLAS 0.6.0 align raw MIME32MiB, batch40MiB and bounded base64 response handling. Individual document attachments remain8MiB; skipped documents retain warnings. Larger raw messages still stop the cursor explicitly. Authentication, size and transport-limit failures propagate fixed non-secret error categories. This does not repair invalid mailbox credentials.
+
+Validation: initial full Python suite1224 tests and101 subtests passed; independent review found a richly tagged note could exceed the prompt budget and disappear. Corrected with actual serialized-budget truncation and an additional regression; seven knowledge tests passed. Both Node UI harnesses passed. Real Playwright visual check unavailable locally because browser download was truncated. No live deployment at this checkpoint. Earlier activation remains as documented above.
+
+Development graph2.3.9 available; existing import relationships source-checked. Release-tree graph rebuilt with staged new files and no embeddings; knowledge import into app.py verified. One intermediate concurrent validation snapshot was inconsistent; staged source was restored and validation rerun serially before release. Next: complete release validation, inspect UI, update installed addons with backup and verify bounded import/error behavior. No new external permissions, cloud context sharing or mail sending.

@@ -9,6 +9,7 @@ import time
 from mail_client import MailClient, MailError
 from online_client import OnlineClient, OnlineError
 from jobs import JobQueue, JobError
+from knowledge import Knowledge, KnowledgeConflict
 from bookkeeping import Bookkeeping
 from bookkeeping_sync import BookkeepingSync, SyncError
 from atlas_billomat_client import BillomatClient
@@ -33,7 +34,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -88,6 +89,7 @@ class App:
         with self.db() as db:
             db.executescript('''CREATE TABLE IF NOT EXISTS memories(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS profiles(user_id TEXT PRIMARY KEY, text TEXT NOT NULL);''')
+        self.knowledge = Knowledge(self.db)
         os.chmod(self.db_path, 0o600)
         self.bookkeeping = Bookkeeping(self.db, self.data_dir)
         self.submissions = Submissions(self.db, self.bookkeeping, owner_enabled=lambda user: self.bookkeeping_sync.enabled_for(user))
@@ -103,8 +105,12 @@ class App:
 
     def collection(self, table, user_id):
         assert table in ('memories', 'tasks')
+        if table == 'memories':
+            return self.knowledge.search(user_id)
         with self.db() as db:
             rows = [dict(x) for x in db.execute(f'SELECT * FROM {table} WHERE user_id=? ORDER BY id DESC LIMIT 500', (user_id,))]
+            for row in rows:
+                row['knowledge_ids'] = self.knowledge.task_ids(db, user_id, row['id'])
         if table == 'tasks':
             for row in rows:
                 row['done'] = bool(row['done'])
@@ -203,20 +209,46 @@ class App:
 
     def chat(self, message, user_id, history=None):
         profile = self.profile(user_id)[:2000]
-        words = set(re.findall(r'\w{3,}', message.lower()))
-        memories = self.collection('memories', user_id)
-        memories.sort(key=lambda m: len(words & set(re.findall(r'\w{3,}', m['text'].lower()))), reverse=True)
+        memories = self.knowledge.search(user_id, message, limit=6)
+        # Explicit task links provide context even if the note uses different words.
+        words = set(re.findall(r'\w{3,}', message.casefold()))
+        all_tasks = self.collection('tasks', user_id)
+        linked_ids = {ident for task in all_tasks if not task['done'] and
+                      words & set(re.findall(r'\w{3,}', task['title'].casefold()))
+                      for ident in task['knowledge_ids']}
+        if linked_ids:
+            linked = [m for m in self.knowledge.search(user_id) if m['id'] in linked_ids]
+            memories = (linked + [m for m in memories if m['id'] not in linked_ids])[:6]
         selected = []
         for memory in memories[:6]:
-            entry = {'text': memory['text'][:1000], 'source': memory['source'], 'excerpt': len(memory['text']) > 1000}
-            if len(json.dumps(selected + [entry], ensure_ascii=False)) <= 1500:
+            # Budget the serialized form: quotes/control characters expand in JSON.
+            # Keep identifying provenance even when a long note needs an excerpt.
+            entry = {'id': memory['id'], 'text': '', 'source': memory['source'][:80],
+                     'tags': [tag[:30] for tag in memory['tags'][:2]],
+                     'revision': memory['revision'], 'updated_at': memory['updated_at'][:40],
+                     'excerpt': True,
+                     'metadata_excerpt': len(memory['source']) > 80 or len(memory['tags']) > 2 or
+                                         any(len(tag) > 30 for tag in memory['tags'][:2])}
+            content = memory['text'][:1000]
+            low, high = 0, len(content)
+            while low < high:
+                middle = (low + high + 1) // 2
+                entry['text'] = content[:middle]
+                entry['excerpt'] = middle < len(memory['text'])
+                if len(json.dumps(selected + [entry], ensure_ascii=False)) <= 1500:
+                    low = middle
+                else:
+                    high = middle - 1
+            if low:
+                entry['text'] = content[:low]
+                entry['excerpt'] = low < len(memory['text'])
                 selected.append(entry)
         knowledge = json.dumps(selected, ensure_ascii=False)
         selected_tasks = []
-        for task in self.collection('tasks', user_id):
+        for task in all_tasks:
             if task['done']:
                 continue
-            entry = {'title': task['title'], 'done': False}
+            entry = {'title': task['title'], 'done': False, 'knowledge_ids': task['knowledge_ids']}
             if len(json.dumps(selected_tasks + [entry], ensure_ascii=False)) <= 800:
                 selected_tasks.append(entry)
         tasks = json.dumps(selected_tasks, ensure_ascii=False)
@@ -375,7 +407,15 @@ def make_handler(app):
             if path == '/api/profile':
                 return self.send(200, {'text': app.profile(self.user_id)})
             if path == '/api/memories':
-                return self.send(200, {'memories': app.collection('memories', self.user_id)})
+                try:
+                    values = parse_qs(urlsplit(self.path).query)
+                    return self.send(200, {'memories': app.knowledge.search(self.user_id, values.get('q', [''])[0], values.get('tag', [''])[0])})
+                except (ValueError, sqlite3.Error):
+                    return self.error(400, 'Wissenssuche fehlgeschlagen.')
+            match = re.fullmatch(r'/api/memories/([1-9][0-9]{0,17})/revisions', path)
+            if match:
+                revisions = app.knowledge.history(self.user_id, int(match[1]))
+                return self.send(200, {'revisions': revisions}) if revisions is not None else self.error(404, 'Notiz nicht gefunden.')
             if path == '/api/tasks':
                 return self.send(200, {'tasks': app.collection('tasks', self.user_id)})
             if path in STATIC:
@@ -490,48 +530,52 @@ def make_handler(app):
                         db.execute('INSERT INTO profiles(user_id,text) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET text=excluded.text', (self.user_id, text))
                     return self.send(200, {'text': text})
                 if method == 'POST' and path == '/api/memories':
-                    data = self.body()
-                    text = self.text(data, 'text', 2000)
-                    source = data.get('source', 'Vom Nutzer bestätigt')
-                    if not isinstance(source, str) or not source.strip() or len(source) > 200:
-                        raise ValueError('source: Kurze Quellenangabe erforderlich.')
-                    stamp = now()
-                    with app.db() as db:
-                        if db.execute('SELECT COUNT(*) FROM memories WHERE user_id=?', (self.user_id,)).fetchone()[0] >= 500:
-                            raise ValueError('Speicherlimit erreicht. Bitte alte Notizen entfernen.')
-                        cursor = db.execute('INSERT INTO memories(user_id,text,source,created_at) VALUES (?,?,?,?)', (self.user_id, text, source.strip(), stamp))
-                    return self.send(201, {'memory': {'id': cursor.lastrowid, 'text': text, 'source': source.strip(), 'created_at': stamp}})
+                    return self.send(201, {'memory': app.knowledge.create(self.user_id, self.body())})
                 if method == 'POST' and path == '/api/tasks':
-                    title = self.text(self.body(), 'title', 500)
+                    data = self.body()
+                    title = self.text(data, 'title', 500)
                     stamp = now()
                     with app.db() as db:
                         if db.execute('SELECT COUNT(*) FROM tasks WHERE user_id=?', (self.user_id,)).fetchone()[0] >= 500:
                             raise ValueError('Aufgabenlimit erreicht.')
                         cursor = db.execute('INSERT INTO tasks(user_id,title,created_at) VALUES (?,?,?)', (self.user_id, title, stamp))
-                    return self.send(201, {'task': {'id': cursor.lastrowid, 'title': title, 'done': False, 'created_at': stamp}})
+                        app.knowledge.link_task(db, self.user_id, cursor.lastrowid, data.get('knowledge_ids', []))
+                        ids = app.knowledge.task_ids(db, self.user_id, cursor.lastrowid)
+                    return self.send(201, {'task': {'id': cursor.lastrowid, 'title': title, 'done': False, 'created_at': stamp, 'knowledge_ids': ids}})
                 match = re.fullmatch(r'/api/memories/([1-9][0-9]*)', path)
+                if method == 'PATCH' and match:
+                    memory = app.knowledge.update(self.user_id, int(match[1]), self.body())
+                    return self.send(200, {'memory': memory}) if memory else self.error(404, 'Notiz nicht gefunden.')
                 if method == 'DELETE' and match:
-                    with app.db() as db:
-                        cursor = db.execute('DELETE FROM memories WHERE id=? AND user_id=?', (int(match[1]), self.user_id))
-                    return self.send(200, {'ok': True}) if cursor.rowcount else self.error(404, 'Notiz nicht gefunden.')
+                    found = app.knowledge.delete(self.user_id, int(match[1]))
+                    return self.send(200, {'ok': True}) if found else self.error(404, 'Notiz nicht gefunden.')
                 match = re.fullmatch(r'/api/tasks/([1-9][0-9]*)', path)
                 if method == 'DELETE' and match:
                     with app.db() as db:
                         cursor = db.execute('DELETE FROM tasks WHERE id=? AND user_id=?', (int(match[1]), self.user_id))
+                        db.execute('DELETE FROM atlas_task_knowledge WHERE task_id=? AND user_id=?', (int(match[1]), self.user_id))
                     return self.send(200, {'ok': True}) if cursor.rowcount else self.error(404, 'Aufgabe nicht gefunden.')
                 if method == 'PATCH' and match:
                     data = self.body()
-                    if not isinstance(data.get('done'), bool):
-                        raise ValueError('done muss wahr oder falsch sein.')
+                    if not data or set(data) - {'done', 'knowledge_ids'} or ('done' in data and not isinstance(data['done'], bool)):
+                        raise ValueError('Ungültige Aufgabenänderung.')
                     with app.db() as db:
-                        cursor = db.execute('UPDATE tasks SET done=? WHERE id=? AND user_id=?', (int(data['done']), int(match[1]), self.user_id))
+                        db.execute('BEGIN IMMEDIATE')
                         row = db.execute('SELECT * FROM tasks WHERE id=? AND user_id=?', (int(match[1]), self.user_id)).fetchone()
-                    if not row:
-                        return self.error(404, 'Aufgabe nicht gefunden.')
-                    task = dict(row)
+                        if not row:
+                            return self.error(404, 'Aufgabe nicht gefunden.')
+                        if 'done' in data:
+                            db.execute('UPDATE tasks SET done=? WHERE id=? AND user_id=?', (int(data['done']), int(match[1]), self.user_id))
+                        if 'knowledge_ids' in data:
+                            app.knowledge.link_task(db, self.user_id, int(match[1]), data['knowledge_ids'])
+                        row = db.execute('SELECT * FROM tasks WHERE id=? AND user_id=?', (int(match[1]), self.user_id)).fetchone()
+                        task = dict(row)
+                        task['knowledge_ids'] = app.knowledge.task_ids(db, self.user_id, int(match[1]))
                     task['done'] = bool(task['done'])
                     return self.send(200, {'task': task})
                 self.error(404, 'Nicht gefunden.')
+            except KnowledgeConflict as exc:
+                self.error(409, str(exc))
             except (OnlineError, JobError) as exc:
                 self.error(503, str(exc))
             except MailError as exc:

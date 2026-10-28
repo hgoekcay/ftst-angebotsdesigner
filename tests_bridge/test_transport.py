@@ -221,3 +221,41 @@ def test_line_read_ahead_keeps_literal_and_next_line_intact():
     assert client.read(3) == b'abc'
     assert client.readline() == b')\r\n'
     assert client._wire == len(b'header {3}\r\nabc)\r\n')
+
+
+def test_large_mime_fits_new_limit_and_next_message_is_not_skipped(server):
+    # MIME encoding/inline media can exceed the separate decoded document cap.
+    server.messages = {1: b'a' * (25 * 1024 * 1024), 2: b'b' * (20 * 1024 * 1024)}
+    result = transport.fetch_batch(SECRET, '2026-09-18', 7)
+    assert result['messages'] == [(1, server.messages[1])] and result['pending']
+    assert not any(c[0] == 'FETCH' and c[1] == '2' and 'BODY' in c[2] for c in server.calls)
+    server.validities = [7, 7]
+    result = transport.fetch_batch(SECRET, '2026-09-18', 7, after_uid=1)
+    assert result['messages'] == [(2, server.messages[2])] and not result['pending']
+
+
+def test_over_limit_metadata_rejected_without_body_fetch(server):
+    server.uid = Mock(return_value=('OK', [f'1 (UID 1 RFC822.SIZE {transport.MAX_MESSAGE + 1})'.encode()]))
+    with pytest.raises(transport.ImapMessageTooLarge):
+        transport._fetch(server, 1)
+    assert server.uid.call_count == 1
+    assert 'BODY' not in server.uid.call_args.args[2]
+
+
+@pytest.mark.parametrize('exception', [False, True])
+def test_auth_rejection_has_safe_specific_type(server, exception):
+    if exception:
+        server.login = Mock(side_effect=transport.imaplib.IMAP4.error(SECRET))
+    else:
+        server.login = Mock(return_value=('NO', [SECRET.encode()]))
+    with pytest.raises(transport.ImapAuthenticationError) as err:
+        transport.activation_checkpoint(SECRET)
+    assert SECRET not in str(err.value) and server.closed
+
+
+def test_auth_connection_abort_is_not_bad_credentials(server):
+    server.login = Mock(side_effect=transport.imaplib.IMAP4.abort(SECRET))
+    with pytest.raises(transport.ImapFetchError) as err:
+        transport.activation_checkpoint(SECRET)
+    assert not isinstance(err.value, transport.ImapAuthenticationError)
+    assert SECRET not in str(err.value)
