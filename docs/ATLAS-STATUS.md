@@ -93,3 +93,6 @@ Release validation and deployment are pending at this checkpoint. Live ATLAS rem
 
 
 0.5.0 validation checkpoint: 154 ATLAS unit/integration tests passed locally, including owner/CSRF isolation, immutable originals/month exports, revocable employee access and separate public HTTP routes. JavaScript syntax and whitespace checks passed. Code Review Graph was refreshed against the working tree including new files via a temporary Git index; import edges for bookkeeping and submissions were inspected and source-verified. UI fragment-token adjustment is receiving its final integration check; full repository/container CI and live installation still pending.
+
+
+Release 0.5.0 merged via PR64 as d927f552da55d45b9cedeaf6b8199fc951fe48b4. Final head21016f47f447425d7af62060d2e0d3c21a48dd9b passed all six GitHub Actions jobs, including both Python versions, ATLAS image wiring, mail image, local-AI image and browser tests. Python3.13:1216 tests and97 subtests passed. Local ATLAS:156 tests passed. Initial whole-suite import-path leakage was corrected and regression-checked; no Designer production change was needed. The employee browser-flow test is preserved as tests/atlas_upload_browser.cjs. Live update is next; new sensitive access remains unactivated.
