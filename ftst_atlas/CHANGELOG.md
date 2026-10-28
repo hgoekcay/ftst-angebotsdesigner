@@ -1,3 +1,7 @@
+## 0.6.1
+
+- Veraltete fest eingetragene Versionsnummer aus der Fußzeile entfernt. Unter System wird die tatsächliche Backend-Version angezeigt.
+
 ## 0.6.0
 
 - Firmenwissen mit Schlagwörtern suchen und mit nachvollziehbarer Versionshistorie korrigieren. Gleichzeitige Änderungen werden erkannt.
