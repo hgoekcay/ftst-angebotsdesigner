@@ -13,7 +13,10 @@ sys.path.insert(0, str(Path(__file__).parents[2] / 'ftst_atlas'))
 
 spec = importlib.util.spec_from_file_location('bookkeeping',Path(__file__).parents[2] / 'ftst_atlas' / 'bookkeeping.py')
 module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+try:
+    spec.loader.exec_module(module)
+finally:
+    sys.path.pop(0)
 
 XML = b'''<?xml version="1.0"?><Invoice xmlns="urn:invoice" xmlns:c="urn:common"><c:ID>R-123</c:ID><c:IssueDate>2026-10-02</c:IssueDate><c:DocumentCurrencyCode>EUR</c:DocumentCurrencyCode><c:AccountingSupplierParty><c:Party><c:PartyLegalEntity><c:RegistrationName>Example GmbH</c:RegistrationName></c:PartyLegalEntity></c:Party></c:AccountingSupplierParty><c:TaxTotal><c:TaxAmount>19.00</c:TaxAmount></c:TaxTotal><c:LegalMonetaryTotal><c:TaxExclusiveAmount>100.00</c:TaxExclusiveAmount><c:TaxInclusiveAmount>119.00</c:TaxInclusiveAmount></c:LegalMonetaryTotal></Invoice>'''
 PNG = b'\x89PNG\r\n\x1a\nsynthetic'

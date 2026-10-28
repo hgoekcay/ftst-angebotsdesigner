@@ -1,5 +1,11 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -34,7 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs tests/material_upload_browser.cjs tests/offer_delivery_browser.cjs
+      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs tests/material_upload_browser.cjs tests/offer_delivery_browser.cjs tests/atlas_upload_browser.cjs
   local-ai-container:
     runs-on: ubuntu-latest
     steps:

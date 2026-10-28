@@ -17,7 +17,10 @@ ROOT = Path(__file__).parents[2] / 'ftst_atlas'
 sys.path.insert(0, str(ROOT))
 spec = importlib.util.spec_from_file_location('submission_tests_module', ROOT / 'submissions.py')
 m = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(m)
+try:
+    spec.loader.exec_module(m)
+finally:
+    sys.path.pop(0)
 PNG = b'\x89PNG\r\n\x1a\nsynthetic'
 ENCODED = base64.b64encode(PNG).decode()
 
@@ -144,7 +147,11 @@ class SubmissionTests(unittest.TestCase):
     def test_real_bookkeeping_stores_under_invitation_owner(self):
         spec = importlib.util.spec_from_file_location('submission_real_bookkeeping', ROOT / 'bookkeeping.py')
         bk = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(bk)
+        sys.path.insert(0, str(ROOT))
+        try:
+            spec.loader.exec_module(bk)
+        finally:
+            sys.path.pop(0)
         real = bk.Bookkeeping(self.db, self.root)
         self.store = m.Submissions(self.db, real)
         result = self.submit(filename='../../scan.png')
@@ -162,7 +169,11 @@ class SubmissionOwnerRouteTests(unittest.TestCase):
     def test_owner_routes_require_ingress_owner_and_csrf(self):
         spec = importlib.util.spec_from_file_location('submission_owner_route_app', ROOT / 'app.py')
         app_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(app_module)
+        sys.path.insert(0, str(ROOT))
+        try:
+            spec.loader.exec_module(app_module)
+        finally:
+            sys.path.pop(0)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'options.json').write_text(json.dumps({'bookkeeping_enabled': True,
