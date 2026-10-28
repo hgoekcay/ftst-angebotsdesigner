@@ -157,3 +157,28 @@ Telegram unterstützt `/online FRAGE`, `/lokal FRAGE` und automatische Auswahl f
 Noch nicht enthalten: selbstständig geplante Hintergrundzyklen, E-Mail-Versand, Zahlungen, Buchungen, Geräteaktionen oder freier Shell-/Browserzugriff durch das Modell. Diese Erweiterung schafft Online-Beratung und verlässliche Ausführung ausdrücklich gestarteter Aufträge; sie ist keine uneingeschränkte „Jarvis“-Vollautomatik.
 
 Technische Grundlagen: https://developers.openai.com/api/docs/guides/tools-web-search und https://developers.openai.com/api/reference/cli/resources/responses/methods/create .
+
+
+## Belegvorbereitung ab 0.5.0
+
+`bookkeeping_enabled` und `bookkeeping_ha_user_id` schalten die Vorbereitung für genau ein HA-Profil frei. `mail_account_ids` enthält die ausdrücklich freigegebenen eingerichteten STRATO-Konto-IDs; leer erhält die bisherige Einzelkonto-Auswahl. Das setzt funktionierende Zugangsdaten im STRATO-Dienst voraus. Vorschau liest höchstens zehn Nachrichten; Import verarbeitet begrenzte Batches mit Fortsetzung. Die Vorschau ist kein Volltextarchiv aller E-Mails.
+
+`billomat_enabled`, `billomat_ha_user_id`, `billomat_subdomain` und `billomat_api_key` aktivieren ausschließlich lesende API-Abfragen. Der Subdomain-Wert ist der Mandant vor `.billomat.net`, keine URL. Geheimnisse nur in die maskierte Addon-Konfiguration eingeben, nie in Repository oder Chat kopieren. Billomat-Zahlungsangaben sind Quellenstände, kein Bankabgleich. Stornos und Entwürfe werden nicht als offene Forderung ausgegeben.
+
+`bookkeeping_auto_sync` aktiviert wiederholten Import, standardmäßig alle 3600 Sekunden. `bookkeeping_lookback_days` ist standardmäßig 30; eine vollständige historische Übernahme wird nicht behauptet. Bis zu drei Mailbatches pro Konto und drei Billomat-Seiten sowie fünf PDFs pro Lauf begrenzen die Arbeit. Noch offene Arbeit und Quellenfehler bleiben sichtbar. Billomat-Seiten sind keine unveränderliche Momentaufnahme. Änderungen werden bei weiteren Durchläufen erneut abgefragt. STRATO lehnt Rohmails über 8 MiB ab; solche Fehler können den jeweiligen Importcursor blockieren und benötigen eine gezielte Nachreichung.
+
+Originale werden unter `/data/bookkeeping` dauerhaft und anhand von SHA-256 geprüft gespeichert. Der Monats-ZIP enthält CSV, Originale, Manifest, offene Prüfpunkte, Billomat-Datenstände und `ai-bookkeeping.documents.json`. Undatierte Belege sind sichtbar enthalten und können deshalb in mehreren Monatsausgaben erscheinen. Exporte sind auf 100 Belege/100 MiB begrenzt. CSV-Eingaben werden gegen Formelinterpretation abgesichert. XML wird ohne externe Entitäten gelesen, PDF-Text in einem begrenzten Unterprozess; Fotos und Scans benötigen weiterhin OCR beziehungsweise manuelle Prüfung. Diese Fassung enthält keine automatische Foto-OCR.
+
+Die Brücke verwendet das documents/1-Format des originalen MIT-lizenzierten AI-Bookkeeping-Projekts (https://github.com/leebale/billpal-skills, Revision 8ccff9c7cbd1b568e3bd469a4d457b50ab381781). Der vollständige Originalskill wurde separat als Entwicklungs-/Arbeitswerkzeug installiert; sein Ledger wird nicht als Mehrbenutzerdienst im Addon ausgeführt. Das Austauschformat bleibt bei fehlenden Steuerangaben ausdrücklich prüfpflichtig. Kein automatischer DATEV-Kontenrahmen, keine erfundenen Steuerfälle, kein Bankabgleich und keine Steuerübermittlung. Unternehmensform, Gewinnermittlung, Umsatzsteuerverfahren, Konten und Bankdaten müssen vor einer belastbaren laufenden Buchführung geklärt werden.
+
+### Telegram
+
+`/op` zeigt bekannte positive offene Billomat-Ausgangsbeträge, `/belege` fehlende Originale und Prüfbedarf, `/buchhaltung` eine Zusammenfassung. Alle Befehle benötigen das bereits freigegebene Telegram-Konto und dasselbe Buchhaltungsprofil. Ohne Daten oder bei ausstehendem Import steht keine vollständige OP-Liste zur Verfügung. Fehlende Einkaufsbelege ohne korrespondierende Banktransaktionen kann ATLAS nicht erkennen. Telegram-Dateianhänge werden in dieser Fassung nicht importiert.
+
+`bookkeeping_telegram_daily` ist standardmäßig aus. Bei Aktivierung sendet der Bot einen täglichen Bericht um `bookkeeping_telegram_time` (Standard09:00, Europe/Berlin) an den eingerichteten Eigentümer. Versandversuche werden dauerhaft pro Tag begrenzt. Finanzdaten werden dabei an Telegram übertragen; nicht für Mitarbeitergruppen aktivieren.
+
+### Mitarbeiter-Belege
+
+In Buchhaltung → Mitarbeiterzugänge erstellt der Eigentümer persönliche, widerrufbare Upload-Links. Der Link ist ein Zugangsschlüssel: nur an die benannte Person geben, nicht öffentlich teilen. Gespeichert wird nur sein Hash; das Geheimnis wird einmal angezeigt. Mitarbeiter können PDF, XML, PNG, JPEG oder TIFF mit Projekt/Kommentar einreichen, erhalten jedoch keine Buchhaltungs-, Mail- oder Dokumentleserechte. Originale bleiben prüfpflichtig; ein neuer Upload wird nicht automatisch einer früheren Rechnung zugeordnet.
+
+Der Upload-Dienst startet nur mit `submissions_enabled: true` und gültiger `submissions_public_url` (HTTPS-Ursprung ohne Unterpfad). Er läuft getrennt auf Port8100. Der normale ATLAS-Ingress bleibt auf8099 und darf nicht öffentlich umgeleitet werden. Port8100 ist standardmäßig nicht am Host veröffentlicht. Ein vorhandener HTTPS-Reverse-Proxy muss nur den Upload-Dienst an einen eigenen Host weiterleiten; Zugangsschlüssel stehen im URL-Fragment und werden nur im JSON-Body übertragen; Request-Bodies dürfen nicht in Proxylogs landen. Der Dienst akzeptiert keine HA-Header als Berechtigung, erlaubt keine Firmen-API und begrenzt Dateigröße, Anfragen und Uploadquoten. Keine öffentliche Freigabe ohne bewusste Konfiguration. Backup muss Datenbank und `/data/bookkeeping` gemeinsam enthalten.

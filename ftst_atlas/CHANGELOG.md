@@ -1,3 +1,13 @@
+# 0.5.0
+
+- Owner-scoped selection of configured mailboxes and bounded invoice attachment import.
+- Read-only Billomat invoice snapshots and original PDFs, resumable periodic synchronization.
+- Immutable original documents, review history, explicit missing information and monthly ZIP exports.
+- AI Bookkeeping documents/1 interchange; uncertain tax treatment remains blocked for review.
+- Telegram `/op`, `/belege`, `/buchhaltung` and optional daily Berlin-time summary.
+- Personal revocable employee upload links on a separate HTTPS-proxied upload-only service.
+- New integrations and public listener remain disabled until explicitly configured.
+
 ## 0.4.1
 
 - Bei vorübergehenden Datenbankfehlern wird nur das Speichern eines bereits berechneten Auftragsergebnisses wiederholt. Die KI-Anfrage wird nicht erneut ausgeführt.

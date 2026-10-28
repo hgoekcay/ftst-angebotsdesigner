@@ -3,6 +3,7 @@ import base64
 import importlib.util
 import pathlib
 import unittest
+from email.message import EmailMessage
 from unittest.mock import patch, MagicMock
 
 spec = importlib.util.spec_from_file_location('atlas_mail_client_tests', pathlib.Path(__file__).parents[2] / 'ftst_atlas/mail_client.py')
@@ -81,6 +82,122 @@ class MailClientTests(unittest.TestCase):
             response.read1.side_effect = [payload, b'']
             with patch.object(m.http.client, 'HTTPConnection', return_value=connection), self.assertRaises(m.MailError):
                 m._request(TOKEN, '/internal/mail/accounts')
+
+    def test_accounts_scope_and_account_switch(self):
+        second = {'id': 'billing', 'email': 'billing@example.test', 'folder': 'Invoices'}
+        hidden = {'id': 'private', 'email': 'private@example.test', 'folder': 'INBOX'}
+        client = m.MailClient(dict(OPTIONS, mail_account_ids=['primary', 'billing']))
+        with patch.object(m, '_request', return_value={'accounts': [ACCOUNT, second, hidden]}) as request:
+            self.assertEqual(client.accounts('owner'), [ACCOUNT, second])
+            for operation in [lambda: client.accounts('other'), lambda: client.preview('owner', account_id='private'),
+                              lambda: client.invoice_batch('owner', 'private', 7)]:
+                count = request.call_count
+                with self.assertRaises(m.MailAccessError):
+                    operation()
+                self.assertEqual(request.call_count, count)
+        with patch.object(m, '_request', side_effect=[{'accounts': [ACCOUNT, second]}, {'uidvalidity': 12, 'after_uid': 100}, {'uidvalidity': 12, 'messages': [], 'pending': False}]) as request:
+            result = client.preview('owner', account_id='billing')
+            self.assertEqual(result['source']['mailbox'], second['email'])
+            self.assertEqual(request.call_args.args[2]['account_id'], 'billing')
+            self.assertEqual(request.call_args.args[2]['expected_folder'], 'Invoices')
+
+    def test_allowlist_requires_explicit_well_formed_unique_entries(self):
+        for allowlist in [['primary', 'primary'], ['*'], ['PRIMARY'], 'primary', [None], ['a' + str(i) for i in range(22)]]:
+            with self.subTest(allowlist=allowlist), self.assertRaises(m.MailError):
+                m.MailClient(dict(OPTIONS, mail_account_ids=allowlist))
+        self.assertEqual(m.MailClient(OPTIONS).account_ids, ('primary',))
+        self.assertEqual(m.MailClient(dict(OPTIONS, mail_account_ids=[])).account_ids, ('primary',))
+        self.assertEqual(m.MailClient(dict(OPTIONS, mail_account_ids=['billing'])).account_id, 'billing')
+
+    def document_mail(self, attachments):
+        message = EmailMessage()
+        message['Subject'] = 'Belegprüfung'
+        message['From'] = 'sender@example.test'
+        message.set_content('Bitte prüfen.')
+        for data, mime, name, disposition in attachments:
+            main, sub = mime.split('/')
+            message.add_attachment(data, maintype=main, subtype=sub, filename=name, disposition=disposition)
+        return message.as_bytes()
+
+    def test_invoice_batch_source_hash_and_continuation(self):
+        pdf = b'%PDF-1.4\nfixture'
+        raw = self.document_mail([(pdf, 'application/pdf', '../../rechnungen\\beleg.pdf', 'attachment')])
+        result = {'uidvalidity': 123, 'messages': [{'uid': 8, 'raw_base64': base64.b64encode(raw).decode()},
+                  {'uid': 9, 'raw_base64': base64.b64encode(RAW).decode()}], 'pending': True}
+        with patch.object(m, '_request', side_effect=[{'accounts': [ACCOUNT]}, result]) as request:
+            batch = m.MailClient(OPTIONS).invoice_batch('owner', 'primary', 7, after_uid=7, uidvalidity=123)
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual(request.call_args.args[2]['after_uid'], 7)
+            self.assertEqual(batch['after_uid'], 9)
+            self.assertTrue(batch['pending'])
+            attachment = batch['messages'][0]['attachments'][0]
+            self.assertEqual(attachment['name'], 'beleg.pdf')
+            self.assertEqual(attachment['data'], pdf)
+            self.assertEqual(attachment['sha256'], m.hashlib.sha256(pdf).hexdigest())
+            self.assertEqual(attachment['source']['account_id'], 'primary')
+            self.assertEqual(attachment['source']['uidvalidity'], 123)
+            self.assertEqual(attachment['source']['uid'], 8)
+            self.assertTrue(attachment['candidate_only'])
+            self.assertEqual(batch['messages'][1]['attachments'], [])
+            self.assertEqual(batch['messages'][0]['raw_sha256'], m.hashlib.sha256(raw).hexdigest())
+            self.assertNotIn('raw', batch['messages'][0])
+        with patch.object(m, '_request') as request:
+            with self.assertRaises(m.MailError):
+                m.MailClient(OPTIONS).invoice_batch('owner', 'primary', 7, after_uid=7)
+            request.assert_not_called()
+
+    def test_attachment_type_confusion_xml_entities_and_inline_excluded(self):
+        raw = self.document_mail([
+            (b'<html>not pdf</html>', 'application/pdf', 'bill.pdf', 'attachment'),
+            (b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///secret">]><x>&e;</x>', 'application/xml', 'bill.xml', 'attachment'),
+            (b'\x89PNG\r\n\x1a\nimage', 'image/png', 'logo.png', 'inline'),
+            (b'PKzip', 'application/zip', 'bundle.zip', 'attachment'),
+            (b'%PDF-1.4\ncorrect', 'application/octet-stream', 'receipt.pdf', 'attachment'),
+            (b'<?xml version="1.0"?><Invoice/>', 'application/xml', 'invoice.xml', 'attachment')])
+        message = m._invoice_message(raw, {'account_id': 'primary'}, 1, 2)
+        self.assertEqual([a['name'] for a in message['attachments']], ['receipt.pdf', 'invoice.xml'])
+        self.assertEqual(len(message['warnings']), 3)
+
+    def test_attachment_and_structure_limits_are_explicit(self):
+        raw = self.document_mail([(b'%PDF-1.4\nfixture', 'application/pdf', 'bill.pdf', 'attachment')] * 3)
+        with patch.object(m, 'MAX_ATTACHMENT', 4):
+            message = m._invoice_message(raw, {}, 1, 2)
+            self.assertEqual(message['attachments'], [])
+            self.assertTrue(message['warnings'])
+        with patch.object(m, 'MAX_ATTACHMENTS', 1):
+            message = m._invoice_message(raw, {}, 1, 2)
+            self.assertEqual(len(message['attachments']), 1)
+            self.assertIn('Mengenlimit', ' '.join(message['warnings']))
+        with patch.object(m, 'MAX_MIME_PARTS', 2):
+            message = m._invoice_message(raw, {}, 1, 2)
+            self.assertEqual(message['attachments'], [])
+            self.assertTrue(message['warnings'])
+        malformed = b'Content-Type: application/pdf\nContent-Disposition: attachment; filename="a.pdf"\nContent-Transfer-Encoding: base64\n\n%%%bad%%%%'
+        message = m._invoice_message(malformed, {}, 1, 2)
+        self.assertEqual(message['attachments'], [])
+        self.assertTrue(message['warnings'])
+
+    def test_skipped_attachment_still_advances_invoice_cursor(self):
+        raw = self.document_mail([(b'not a PDF', 'application/pdf', 'bad.pdf', 'attachment')])
+        with patch.object(m, '_request', side_effect=[{'accounts': [ACCOUNT]}, {'uidvalidity': 1, 'after_uid': 3},
+                {'uidvalidity': 1, 'messages': [{'uid': 3, 'raw_base64': base64.b64encode(raw).decode()}], 'pending': False}]):
+            result = m.MailClient(OPTIONS).invoice_batch('owner', 'primary', 7)
+        self.assertEqual(result['after_uid'], 3)
+        self.assertEqual(result['messages'][0]['attachments'], [])
+        self.assertTrue(result['messages'][0]['warnings'])
+
+    def test_invoice_since_is_stable_and_bounded(self):
+        start = (m.date.today() - m.timedelta(days=40)).isoformat()
+        with patch.object(m, '_request', side_effect=[{'accounts': [ACCOUNT]}, {'uidvalidity': 1, 'messages': [], 'pending': False}]) as request:
+            batch = m.MailClient(OPTIONS).invoice_batch('owner', 'primary', 7, after_uid=9, uidvalidity=1, since=start)
+            self.assertEqual(batch['since'], start)
+            self.assertEqual(request.call_args.args[2]['since'], start)
+            self.assertEqual(batch['after_uid'], 9)
+        with patch.object(m, '_request') as request:
+            for since in ['bad', (m.date.today() + m.timedelta(days=1)).isoformat(), (m.date.today() - m.timedelta(days=366)).isoformat()]:
+                with self.assertRaises(m.MailError):
+                    m.MailClient(OPTIONS).invoice_batch('owner', 'primary', 7, since=since)
+            request.assert_not_called()
 
 
 if __name__ == '__main__':

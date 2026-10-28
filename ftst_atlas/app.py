@@ -9,11 +9,16 @@ import time
 from mail_client import MailClient, MailError
 from online_client import OnlineClient, OnlineError
 from jobs import JobQueue, JobError
+from bookkeeping import Bookkeeping
+from bookkeeping_sync import BookkeepingSync, SyncError
+from atlas_billomat_client import BillomatClient
+from submissions import Submissions
+from bookkeeping_reports import build_report
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlsplit, unquote
+from urllib.parse import urlsplit, unquote, parse_qs
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 
 class NoRedirect(HTTPRedirectHandler):
@@ -28,7 +33,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.4.1'
+VERSION = '0.5.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -84,6 +89,11 @@ class App:
             db.executescript('''CREATE TABLE IF NOT EXISTS memories(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS profiles(user_id TEXT PRIMARY KEY, text TEXT NOT NULL);''')
         os.chmod(self.db_path, 0o600)
+        self.bookkeeping = Bookkeeping(self.db, self.data_dir)
+        self.submissions = Submissions(self.db, self.bookkeeping, owner_enabled=lambda user: self.bookkeeping_sync.enabled_for(user))
+        self.submissions_public_url = options.get('submissions_public_url', '')
+        self.billomat = BillomatClient(options)
+        self.bookkeeping_sync = BookkeepingSync(options, self.db, self.bookkeeping, self.mail, self.billomat)
         self.jobs = JobQueue(self.db, self.execute_job)
 
     def db(self):
@@ -141,11 +151,13 @@ class App:
 
     def execute_job(self, user_id, payload):
         try:
+            if payload.get('kind') == 'bookkeeping':
+                return self.bookkeeping_sync.sync(user_id)
             return self.respond(payload['message'], user_id, payload.get('history', []), payload.get('mode', 'auto'))
-        except (ModelError, BusyError, OnlineError) as exc:
+        except (ModelError, BusyError, OnlineError, SyncError) as exc:
             raise JobError(str(exc)) from None
 
-    def mail_preview(self, user_id, days=7):
+    def mail_preview(self, user_id, days=7, account_id=None):
         # Never retain originals or mail content in the knowledge database.
         if not self.mail.enabled_for(user_id):
             raise MailError('E-Mail-Zugriff ist für diesen Benutzer nicht freigegeben.')
@@ -153,7 +165,7 @@ class App:
             raise BusyError('Ein Postfachabruf läuft bereits. Bitte kurz warten.')
         try:
             self.mail_cache = {}
-            result = self.mail.preview(user_id, days=days)
+            result = self.mail.preview(user_id, days=days, **({"account_id": account_id} if account_id is not None else {}))
             deadline = time.monotonic() + 1800
             for message in result['messages']:
                 ident = secrets.token_urlsafe(24)
@@ -273,11 +285,13 @@ def make_handler(app):
             # Do not log paths, query strings, request bodies or credentials.
             pass
 
-        def send(self, status, body, content_type='application/json; charset=utf-8'):
+        def send(self, status, body, content_type='application/json; charset=utf-8', download=None):
             if not isinstance(body, bytes):
                 body = json.dumps(body, ensure_ascii=False).encode('utf-8')
             self.send_response(status)
             self.send_header('Content-Type', content_type)
+            if download:
+                self.send_header('Content-Disposition', 'attachment; filename="' + download + '"')
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
@@ -336,6 +350,20 @@ def make_handler(app):
             if not self.authorized():
                 return
             path = unquote(urlsplit(self.path).path)
+            if path == '/api/submissions/access':
+                if not app.bookkeeping_sync.enabled_for(self.user_id):
+                    return self.error(403, 'Belegverwaltung nicht freigegeben.')
+                return self.send(200, {'access': app.submissions.list_access(self.user_id), 'public_url': app.submissions_public_url})
+            if path == '/api/mail/accounts':
+                try:
+                    return self.send(200, {'accounts': app.mail.accounts(self.user_id)})
+                except MailError as exc:
+                    return self.error(503, str(exc))
+            if path.startswith('/api/bookkeeping'):
+                try:
+                    return self.bookkeeping_get(path)
+                except (ValueError, sqlite3.Error):
+                    return self.error(400, 'Belegabruf fehlgeschlagen. Auswahl und Speicher prüfen.')
             if path == '/api/status':
                 return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id), 'online': app.online.status(self.user_id), 'online_share_profile': app.online_share_profile})
             if path == '/api/jobs':
@@ -358,6 +386,39 @@ def make_handler(app):
                     return self.error(404, 'Oberfläche nicht gefunden.')
             self.error(404, 'Nicht gefunden.')
 
+        def bookkeeping_get(self, path):
+            enabled = app.bookkeeping_sync.enabled_for(self.user_id)
+            if path == '/api/bookkeeping':
+                records = app.bookkeeping.list(self.user_id) if enabled else []
+                with app.db() as db:
+                    total = db.execute('SELECT COUNT(*) FROM atlas_bookkeeping WHERE user_id=?', (self.user_id,)).fetchone()[0] if enabled else 0
+                return self.send(200, {'enabled': enabled, 'records': records, 'total': total, 'truncated': total > len(records),
+                                       'sync': app.bookkeeping_sync.status(self.user_id)})
+            if not enabled:
+                return self.error(403, 'Buchhaltungsvorbereitung ist für diesen Benutzer nicht freigegeben.')
+            if path == '/api/bookkeeping/report':
+                return self.send(200, build_report(app, self.user_id))
+            if path == '/api/bookkeeping/export':
+                values = parse_qs(urlsplit(self.path).query)
+                month = values.get('month', [''])[0]
+                if not re.fullmatch(r'\d{4}-\d{2}', month):
+                    raise ValueError('Invalid month')
+                return self.send(200, app.bookkeeping.export(self.user_id, month), 'application/zip',
+                                 'FTST-Belegvorbereitung-' + month + '.zip')
+            match = re.fullmatch(r'/api/bookkeeping/([A-Za-z0-9_-]{1,100})(/document)?', path)
+            if match:
+                if match[2]:
+                    document = app.bookkeeping.get_document(self.user_id, match[1])
+                    if not document:
+                        return self.error(404, 'Originalbeleg nicht gefunden.')
+                    data, filename, mime = document
+                    suffix = { 'application/pdf': '.pdf', 'application/xml': '.xml', 'text/xml': '.xml',
+                               'image/png': '.png', 'image/jpeg': '.jpg', 'image/tiff': '.tiff' }.get(mime, '.bin')
+                    return self.send(200, data, 'application/octet-stream', 'beleg-' + match[1] + suffix)
+                record = app.bookkeeping.get(self.user_id, match[1])
+                return self.send(200, record) if record else self.error(404, 'Beleg nicht gefunden.')
+            return self.error(404, 'Nicht gefunden.')
+
         def do_POST(self):
             self.mutate('POST')
 
@@ -375,9 +436,36 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             try:
+                if path.startswith('/api/submissions/access'):
+                    if not app.bookkeeping_sync.enabled_for(self.user_id):
+                        return self.error(403, 'Belegverwaltung nicht freigegeben.')
+                    if method == 'POST' and path == '/api/submissions/access':
+                        data = self.body()
+                        result = app.submissions.create_access(self.user_id, self.text(data, 'label', 80))
+                        base = urlsplit(app.submissions_public_url)
+                        if base.scheme == 'https' and base.hostname and not base.username and not base.password and not base.query and not base.fragment:
+                            result['url'] = base.scheme + '://' + base.netloc + '/submit#token=' + result['token']
+                        return self.send(201, result)
+                    match_access = re.fullmatch(r'/api/submissions/access/([A-Za-z0-9_-]{1,100})', path)
+                    if method == 'DELETE' and match_access:
+                        app.submissions.revoke_access(self.user_id, match_access[1])
+                        return self.send(200, {'revoked': True})
+                    return self.error(404, 'Unbekannter Zugang.')
+                if path.startswith('/api/bookkeeping'):
+                    if not app.bookkeeping_sync.enabled_for(self.user_id):
+                        return self.error(403, 'Buchhaltungsvorbereitung ist für diesen Benutzer nicht freigegeben.')
+                    if method == 'POST' and path == '/api/bookkeeping/sync':
+                        self.body()
+                        return self.send(202, app.jobs.submit(self.user_id, {'kind': 'bookkeeping', 'message': 'Rechnungen und Belege einlesen'}))
+                    match_book = re.fullmatch(r'/api/bookkeeping/([A-Za-z0-9_-]{1,100})', path)
+                    if method == 'PATCH' and match_book:
+                        data = self.body()
+                        if set(data) != {'fields'} or not isinstance(data['fields'], dict):
+                            raise ValueError('Invalid fields')
+                        return self.send(200, app.bookkeeping.review(self.user_id, match_book[1], data['fields']))
                 if method == 'POST' and path == '/api/mail/preview':
                     data = self.body()
-                    return self.send(200, app.mail_preview(self.user_id, data.get('days', 7)))
+                    return self.send(200, app.mail_preview(self.user_id, data.get('days', 7), data.get('account_id')))
                 if method == 'POST' and path == '/api/mail/assist':
                     data = self.body()
                     return self.send(200, app.mail_assist(self.user_id, self.text(data, 'id', 100), self.text(data, 'action', 20)))
@@ -463,11 +551,17 @@ def make_handler(app):
 def main():
     app = App()
     app.jobs.start()
+    app.bookkeeping_sync.start()
     if not app.dev:
         from telegram_bridge import start_bridge
         options_path = app.data_dir / 'options.json'
         options = json.loads(options_path.read_text()) if options_path.exists() else {}
         start_bridge(app, options)
+        from submissions_server import start_server, SubmissionsServerError
+        try:
+            start_server(app, options)
+        except (SubmissionsServerError, OSError):
+            print("Mitarbeiter-Upload deaktiviert: HTTPS-Konfiguration prüfen.", flush=True)
     host = '127.0.0.1' if app.dev else '0.0.0.0'
     port = int(os.environ.get('ATLAS_PORT', '8099'))
     server = ThreadingHTTPServer((host, port), make_handler(app))

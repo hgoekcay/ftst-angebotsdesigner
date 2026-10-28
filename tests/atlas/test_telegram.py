@@ -1,5 +1,7 @@
 import importlib.util
 import sqlite3
+import sys
+from datetime import datetime, timezone
 import tempfile
 import time
 import unittest
@@ -9,7 +11,11 @@ from unittest.mock import Mock, patch
 path = Path(__file__).parents[2] / 'ftst_atlas' / 'telegram_bridge.py'
 spec = importlib.util.spec_from_file_location('telegram_bridge', path)
 tg = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(tg)
+sys.path.insert(0, str(path.parent))
+try:
+    spec.loader.exec_module(tg)
+finally:
+    sys.path.pop(0)
 
 class App:
     def __init__(self, path):
@@ -88,5 +94,61 @@ class Tests(unittest.TestCase):
         self.app.chat.side_effect=RuntimeError('SECRET')
         self.bridge.handle(self.update())
         self.assertNotIn('SECRET',str(self.bridge.call.call_args))
+
+    def test_bookkeeping_commands_are_local_and_owner_scoped(self):
+        for i, command in enumerate(('/op', '/belege', '/buchhaltung'), 1):
+            with patch.object(tg, 'build_report', return_value={'safe': True}) as report, patch.object(tg, 'format_report', return_value='Bericht') as formatting:
+                self.bridge.handle(self.update(i=i, text=command))
+                report.assert_called_once_with(self.app, 'owner')
+                self.assertEqual(formatting.call_args.args[1], ('op', 'belege', 'summary')[i-1])
+                self.assertEqual(self.bridge.call.call_args.args[1]['text'], 'Bericht')
+        self.app.respond.assert_not_called()
+        with patch.object(tg, 'build_report', side_effect=RuntimeError('PRIVATE')):
+            self.bridge.handle(self.update(i=5, text='/op'))
+            self.assertNotIn('PRIVATE', self.bridge.call.call_args.args[1]['text'])
+
+    def test_daily_default_disabled_wrong_owner_and_unbound(self):
+        self.app.bookkeeping_sync = Mock()
+        self.app.bookkeeping_sync.enabled_for.return_value = True
+        with patch.object(tg, 'build_report') as report:
+            self.bridge.daily_bookkeeping()
+            report.assert_not_called()
+            bridge = tg.TelegramBridge(self.app, {**self.options, 'bookkeeping_telegram_daily': True, 'telegram_user_id': ''})
+            bridge.daily_bookkeeping()
+            report.assert_not_called()
+            self.app.bookkeeping_sync.enabled_for.return_value = False
+            bridge.user_id = 42
+            bridge.daily_bookkeeping()
+            report.assert_not_called()
+
+    def test_daily_berlin_time_restart_and_failure_dedup(self):
+        self.app.bookkeeping_sync = Mock()
+        self.app.bookkeeping_sync.enabled_for.return_value = True
+        options = {**self.options, 'bookkeeping_telegram_daily': True, 'bookkeeping_telegram_time': '09:00'}
+        bridge = tg.TelegramBridge(self.app, options); bridge.call = Mock()
+        with patch.object(tg, 'build_report', return_value={}), patch.object(tg, 'format_report', return_value='Tagesbericht'):
+            # Winter CET: 07:59 UTC is before 09:00 Berlin.
+            bridge.daily_bookkeeping(datetime(2026, 10, 28, 7, 59, tzinfo=timezone.utc))
+            bridge.call.assert_not_called()
+            bridge.daily_bookkeeping(datetime(2026, 10, 28, 8, 0, tzinfo=timezone.utc))
+            bridge.call.assert_called_once()
+            restart = tg.TelegramBridge(self.app, options); restart.call = Mock()
+            restart.daily_bookkeeping(datetime(2026, 10, 28, 12, tzinfo=timezone.utc))
+            restart.call.assert_not_called()
+            restart.call.side_effect = tg.TelegramError('unavailable')
+            with self.assertRaises(tg.TelegramError):
+                restart.daily_bookkeeping(datetime(2026, 10, 29, 8, tzinfo=timezone.utc))
+            restart.daily_bookkeeping(datetime(2026, 10, 29, 9, tzinfo=timezone.utc))
+            self.assertEqual(restart.call.call_count, 1)
+            failed_restart = tg.TelegramBridge(self.app, options); failed_restart.call = Mock()
+            failed_restart.daily_bookkeeping(datetime(2026, 10, 29, 10, tzinfo=timezone.utc))
+            failed_restart.call.assert_not_called()
+            with self.app.db() as db:
+                states = db.execute('SELECT local_date,state FROM telegram_bookkeeping_daily ORDER BY local_date').fetchall()
+            self.assertEqual(states, [('2026-10-28', 'sent'), ('2026-10-29', 'failed')])
+            # Summer CEST: 07:00 UTC is already 09:00 Berlin.
+            other = tg.TelegramBridge(self.app, options); other.call = Mock()
+            other.daily_bookkeeping(datetime(2027, 7, 1, 7, tzinfo=timezone.utc))
+            other.call.assert_called_once()
 
 if __name__=='__main__': unittest.main()
