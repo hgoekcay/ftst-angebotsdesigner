@@ -1,6 +1,7 @@
 """Read-only HA mail bridge; destination fixed, no redirects/proxy or IMAP fallback."""
 import base64
 import binascii
+import hashlib
 from datetime import date
 import http.client
 import json
@@ -9,6 +10,7 @@ import time
 from datetime import timedelta
 from email import policy
 from email.parser import BytesParser
+from email.message import EmailMessage
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 class MailError(Exception):
@@ -34,6 +36,111 @@ MAX_RESPONSE = ((MAX_BATCH + 2) // 3) * 4 + 65536
 TIMEOUT = 15
 RESPONSE_TIMEOUT = 85
 MAX_SECONDS = 130
+MAX_MIME_PARTS = 100
+MAX_MIME_DEPTH = 12
+MAX_ATTACHMENTS = 20
+MAX_ATTACHMENT = 8 * 1024 * 1024
+ATTACHMENT_TYPES = {'application/pdf': '.pdf', 'application/xml': '.xml',
+                    'text/xml': '.xml', 'image/png': '.png', 'image/jpeg': '.jpg',
+                    'image/tiff': '.tiff'}
+
+
+def _parse_message(raw):
+    count = 0
+    def factory(**kwargs):
+        nonlocal count
+        count += 1
+        if count > MAX_MIME_PARTS:
+            raise MailError('MIME-Struktur überschreitet das Limit.')
+        return EmailMessage(**kwargs)
+    return BytesParser(_class=factory, policy=policy.default).parsebytes(raw)
+
+
+def _attachment_type(part, name, data):
+    declared = part.get_content_type()
+    if declared == 'application/octet-stream':
+        extension = name.lower().rsplit('.', 1)[-1]
+        declared = {'pdf': 'application/pdf', 'xml': 'application/xml',
+                    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                    'tif': 'image/tiff', 'tiff': 'image/tiff'}.get(extension)
+    if declared not in ATTACHMENT_TYPES:
+        return None
+    stripped = data.lstrip(b'\xef\xbb\xbf \t\r\n')
+    valid = ((declared == 'application/pdf' and stripped.startswith(b'%PDF-'))
+             or (declared in ('application/xml', 'text/xml') and stripped.startswith(b'<')
+                 and b'\x00' not in data and b'<!DOCTYPE' not in data.upper() and b'<!ENTITY' not in data.upper())
+             or (declared == 'image/png' and data.startswith(b'\x89PNG\r\n\x1a\n'))
+             or (declared == 'image/jpeg' and data.startswith(b'\xff\xd8\xff'))
+             or (declared == 'image/tiff' and data.startswith((b'II*\x00', b'MM\x00*'))))
+    return declared if valid else None
+
+
+def _safe_filename(name, index, content_type):
+    # A display name only: storage must use its own opaque/hash key, never this name.
+    basename = re.split(r'[/\\]', name)[-1]
+    stem = basename.rsplit('.', 1)[0] if '.' in basename else basename
+    stem = re.sub(r'[^A-Za-z0-9_-]', '_', stem)[:80].strip('_-')
+    return (stem or 'attachment-' + str(index)) + ATTACHMENT_TYPES[content_type]
+
+
+def _invoice_message(raw, source, epoch, uid):
+    """Collect inert candidate bytes; never declare a document to be an invoice."""
+    reference = dict(source, uidvalidity=epoch, uid=uid)
+    result = {'source': reference, 'uid': uid, 'raw_sha256': hashlib.sha256(raw).hexdigest(),
+              'subject': '', 'from': '', 'date': '', 'message_id': '',
+              'attachments': [], 'warnings': []}
+    try:
+        message = _parse_message(raw)
+        for key, header in [('subject', 'subject'), ('from', 'from'), ('date', 'date'), ('message_id', 'message-id')]:
+            result[key] = str(message.get(header, ''))[:1000]
+        pending, count, attachments = [(message, 0)], 0, []
+        while pending:
+            part, depth = pending.pop()
+            count += 1
+            if count > MAX_MIME_PARTS or depth > MAX_MIME_DEPTH:
+                result['warnings'].append('MIME-Struktur überschreitet das Limit; keine Anhänge dieser Nachricht übernommen.')
+                result['attachments'] = []
+                return result
+            if part.get_content_type() == 'message/rfc822':
+                result['warnings'].append('Eingebettete E-Mail nicht ausgewertet.')
+                continue
+            if part.is_multipart():
+                children = part.get_payload()
+                if not isinstance(children, list) or len(children) + count > MAX_MIME_PARTS:
+                    result['warnings'].append('MIME-Struktur überschreitet das Limit; keine Anhänge dieser Nachricht übernommen.')
+                    return result
+                pending.extend((child, depth + 1) for child in reversed(children))
+                continue
+            filename = part.get_filename() or ''
+            disposition = part.get_content_disposition()
+            if disposition == 'inline' or (disposition != 'attachment' and not filename):
+                continue
+            if len(attachments) >= MAX_ATTACHMENTS:
+                result['warnings'].append('Weitere Anhänge wegen Mengenlimit nicht übernommen.')
+                break
+            if part.get_content_type() not in (*ATTACHMENT_TYPES, 'application/octet-stream'):
+                result['warnings'].append('Nicht unterstützter Anhang nicht übernommen.')
+                continue
+            data = part.get_payload(decode=True)
+            if part.defects or not isinstance(data, bytes) or not data or len(data) > MAX_ATTACHMENT:
+                result['warnings'].append('Fehlerhafter, leerer oder zu großer Anhang nicht übernommen.')
+                continue
+            content_type = _attachment_type(part, filename, data)
+            if content_type is None:
+                result['warnings'].append('Dateityp oder Dateisignatur nicht unterstützt; Anhang nicht übernommen.')
+                continue
+            attachments.append({'name': _safe_filename(filename, count, content_type),
+                'content_type': content_type, 'data': data, 'size': len(data),
+                'sha256': hashlib.sha256(data).hexdigest(),
+                'source': dict(reference, part_index=count), 'candidate_only': True})
+        result['attachments'] = attachments
+        if message.defects:
+            result['warnings'].append('Nachrichtenformat weist Fehler auf; Anhänge bitte prüfen.')
+    except Exception:
+        # A bad message must not keep every subsequent document permanently blocked.
+        result['attachments'] = []
+        result['warnings'].append('Nachrichtenformat nicht lesbar; Anhänge dieser Nachricht nicht übernommen.')
+    return result
 
 
 class _PlainHTML(HTMLParser):
@@ -57,7 +164,7 @@ class _PlainHTML(HTMLParser):
 
 
 def _message(raw, source, epoch, uid):
-    message = BytesParser(policy=policy.default).parsebytes(raw)
+    message = _parse_message(raw)
     body = message.get_body(preferencelist=('plain', 'html'))
     text = ''
     warnings = []
@@ -96,6 +203,9 @@ class MailClient:
         self.owner = options.get('mail_ha_user_id') or ''
         self.token = options.get('mail_bridge_token') or ''
         self.account_id = options.get('mail_account_id') or 'primary'
+        self.account_ids = options.get('mail_account_ids', [self.account_id])
+        if self.account_ids == []:
+            self.account_ids = [self.account_id]
         self.host = '76b650ab-ftst-strato-mail'
         if not self.enabled:
             return
@@ -109,6 +219,15 @@ class MailClient:
                     or not isinstance(self.token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43,128}', self.token)):
                 raise ValueError()
             validate_account_id(self.account_id)
+            if (not isinstance(self.account_ids, list) or not 1 <= len(self.account_ids) <= 21
+                    or any(not isinstance(account, str) for account in self.account_ids)
+                    or len(set(self.account_ids)) != len(self.account_ids)):
+                raise ValueError()
+            for account in self.account_ids:
+                validate_account_id(account)
+            if self.account_id not in self.account_ids:
+                self.account_id = self.account_ids[0]
+            self.account_ids = tuple(self.account_ids)
             self.host = parsed.hostname
         except (ValueError, TypeError, MailError):
             raise MailError('Mail-Anbindung unvollständig oder ungültig konfiguriert.') from None
@@ -116,22 +235,50 @@ class MailClient:
     def enabled_for(self, user_id):
         return self.enabled and bool(self.owner) and isinstance(user_id, str) and user_id == self.owner
 
-    def preview(self, user_id, days=7):
+    def accounts(self, user_id):
         if not self.enabled_for(user_id):
             raise MailAccessError('Mail-Zugriff für diesen Benutzer nicht freigegeben.')
-        if type(days) is not int or not 1 <= days <= 30:
-            raise MailError('Zeitraum muss zwischen 1 und 30 Tagen liegen.')
-        accounts = list_accounts(self.token, host=self.host)
-        selected = [a for a in accounts if a['id'] == self.account_id]
+        return [account for account in list_accounts(self.token, host=self.host)
+                if account['id'] in self.account_ids]
+
+    def _batch(self, user_id, days, account_id, after_uid=0, uidvalidity=None, since=None, max_days=30):
+        if not self.enabled_for(user_id):
+            raise MailAccessError('Mail-Zugriff für diesen Benutzer nicht freigegeben.')
+        if type(days) is not int or not 1 <= days <= max_days:
+            raise MailError('Zeitraum überschreitet das erlaubte Limit.')
+        if since is None:
+            since = (date.today() - timedelta(days=days - 1)).isoformat()
+        else:
+            try:
+                if not isinstance(since, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', since):
+                    raise ValueError()
+                start_date = date.fromisoformat(since)
+                if not 0 <= (date.today() - start_date).days < max_days:
+                    raise ValueError()
+            except ValueError:
+                raise MailError('Startdatum fehlt oder überschreitet das erlaubte Limit.') from None
+        account_id = self.account_id if account_id is None else validate_account_id(account_id)
+        if account_id not in self.account_ids:
+            raise MailAccessError('Postfach nicht für ATLAS freigegeben.')
+        after_uid = _number(after_uid, zero=True)
+        if after_uid and uidvalidity is None:
+            raise MailError('Fortsetzen erfordert die unveränderte Postfachgeneration.')
+        if uidvalidity is not None:
+            uidvalidity = _number(uidvalidity)
+        selected = [a for a in self.accounts(user_id) if a['id'] == account_id]
         if len(selected) != 1:
             raise MailError('Freigegebenes Postfach nicht verfügbar.')
         account = selected[0]
         expected = {k: account[k] for k in ('email', 'folder')}
-        checkpoint = activation_checkpoint(self.token, self.account_id, expected, host=self.host)
-        since = (date.today() - timedelta(days=days - 1)).isoformat()
-        batch = fetch_batch(self.token, since, checkpoint['uidvalidity'], 0,
-                            self.account_id, expected, host=self.host)
-        source = {'account_id': self.account_id, 'mailbox': account['email'], 'folder': account['folder']}
+        if uidvalidity is None:
+            uidvalidity = activation_checkpoint(self.token, account_id, expected, host=self.host)['uidvalidity']
+        batch = fetch_batch(self.token, since, uidvalidity, after_uid,
+                            account_id, expected, host=self.host)
+        source = {'account_id': account_id, 'mailbox': account['email'], 'folder': account['folder']}
+        return source, since, batch
+
+    def preview(self, user_id, days=7, account_id=None):
+        source, since, batch = self._batch(user_id, days, account_id)
         try:
             messages = [_message(raw, source, batch['uidvalidity'], uid) for uid, raw in batch['messages']]
         except Exception:
@@ -139,6 +286,31 @@ class MailClient:
         return {'source': source, 'uidvalidity': batch['uidvalidity'], 'since': since,
                 'messages': messages, 'pending': batch['pending'], 'order': 'oldest_first',
                 'read_only': True, 'scope': 'Bis zu 10 Nachrichten im Zeitraum; keine vollständige oder ungelesene Postfachliste.'}
+
+    def invoice_batch(self, user_id, account_id, days, after_uid=0, uidvalidity=None, since=None):
+        """Caller commits candidate documents before advancing this returned cursor.
+
+        This returns bytes and is not a JSON/HTTP response. Non-invoice, malformed
+        and skipped messages still advance the cursor and carry explicit warnings.
+        No mail is mutated. Original MIME is hashed but not retained by this client.
+        """
+        source, since, batch = self._batch(user_id, days, account_id, after_uid, uidvalidity,
+                                          since=since, max_days=365)
+        messages, total = [], 0
+        for uid, raw in batch['messages']:
+            message = _invoice_message(raw, source, batch['uidvalidity'], uid)
+            accepted = []
+            for attachment in message['attachments']:
+                if total + attachment['size'] > MAX_BATCH:
+                    message['warnings'].append('Anhang wegen Gesamtgrößenlimit nicht übernommen.')
+                    continue
+                total += attachment['size']
+                accepted.append(attachment)
+            message['attachments'] = accepted
+            messages.append(message)
+        return {'source': source, 'uidvalidity': batch['uidvalidity'], 'since': since,
+                'after_uid': max([after_uid] + [message['uid'] for message in messages]),
+                'pending': batch['pending'], 'messages': messages, 'read_only': True}
 
 
 def _number(value, zero=False):
