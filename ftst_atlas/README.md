@@ -20,3 +20,5 @@ müssen fachlich geprüft werden. Die Oberfläche zeigt fehlende Anbindungen off
 Fragen wieder eingeblendet. Das Sprachmodell wird nicht nachtrainiert.
 
 Einrichtung, Grenzen und Abnahme stehen im Reiter **Dokumentation**.
+
+Ab Version 0.3.0 gibt es zusätzlich einen optionalen Bereich **E-Mails**: lesende STRATO-Vorschau sowie lokale Zusammenfassungen und Antwortentwürfe. Standardmäßig deaktiviert, nur für einen ausdrücklich zugeordneten Home-Assistant-Benutzer. Kein Versand und keine automatische Wissensübernahme. Einrichtung und Grenzen stehen in der Dokumentation.
