@@ -1,3 +1,9 @@
+# 0.2.4
+
+- Explizite Qwen3-4B-Instruct-2507-Q4_K_M-Variante für direkte Antworten unterstützen.
+- Instruct ohne Denk-Prefill ansteuern; vier CPU-Threads und 384 Antworttokens.
+- Vorhandenes Modell bleibt erhalten; Instruct-Modell muss lokal vorbereitet sein.
+
 # 0.2.3
 
 - Aufeinanderfolgende Telegram-Nachrichten nicht mehr durch Zehn-Sekunden-Sperre verwerfen.
