@@ -115,7 +115,7 @@ class TelegramBridge:
             self.reply('Bitte maximal 2.000 Zeichen senden.')
             return
         if text in ('/start', '/help'):
-            self.reply('ATLAS: Schreibe deine Frage. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
+            self.reply('ATLAS: Schreibe deine Frage. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. /online FRAGE nutzt Online-Beratung mit Websuche, /lokal FRAGE bleibt lokal. Automatisch kann eine Recherchefrage oder ein lokaler Modellfehler an OpenAI gehen, wenn eingerichtet. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
         elif text == '/id':
             self.reply('Deine freigegebene Telegram-ID: ' + str(self.user_id))
         elif text.lower() in ('/tasks', 'tasks', 'aufgaben'):
@@ -132,19 +132,31 @@ class TelegramBridge:
                     db.execute('INSERT INTO memories(user_id,text,source,created_at) VALUES (?,?,?,?)',
                                (self.ha_user_id, note, 'Explizit über freigegebenes Telegram-Konto gespeichert', datetime.now(timezone.utc).isoformat()))
             self.reply('Wissen gespeichert.' if count < 500 else 'Wissensspeicher voll. Bitte in ATLAS aufräumen.')
-        elif text.startswith('/'):
+        elif text.startswith('/') and not text.startswith(('/online ', '/lokal ')):
             self.reply('Unbekannter Befehl. Nutze /help.')
         else:
-            self.reply('Ich bearbeite deine Frage mit der lokalen KI. Das kann einen Moment dauern.')
+            mode = 'online' if text.startswith('/online ') else 'local' if text.startswith('/lokal ') else 'auto'
+            question = text.split(' ', 1)[1].strip() if mode != 'auto' else text
+            if not question:
+                self.reply('Bitte eine Frage ergänzen.')
+                return
+            self.reply('Ich bearbeite deine Frage. Je nach Modus lokal oder über die eingerichtete Online-Beratung.')
             try:
-                result = self.app.chat(text, self.ha_user_id, history=self.history)
+                result = self.app.respond(question, self.ha_user_id, history=self.history, mode=mode)
                 answer = result['reply']
                 if not isinstance(answer, str) or not answer.strip():
                     raise ValueError()
             except Exception:
-                self.reply('Die lokale KI ist beschäftigt oder konnte keine vollständige Antwort liefern. Bitte später erneut versuchen.')
+                self.reply('ATLAS konnte keine vollständige Antwort liefern. Bei Online-Fragen den OpenAI-Zugang und das Tageslimit unter System prüfen; /lokal FRAGE bleibt lokal.')
                 return
-            self.reply(answer)
+            if result.get('online'):
+                source_lines = [str(item.get('title', 'Quelle'))[:80] + ': ' + item['url'] for item in result.get('sources', [])[:3]]
+                footer = '\n\nOpenAI · ' + result.get('model', '') + ('\nQuellen:\n' + '\n'.join(source_lines) if source_lines else '\nOhne Websuche')
+                footer = footer[:1800]
+                available = 3900 - len(footer)
+                self.reply((answer if len(answer) <= available else answer[:available-30] + '\n[Antwort gekürzt]') + footer)
+            else:
+                self.reply(answer)
             self.history = (self.history + [{'role': 'user', 'content': text[:500]}, {'role': 'assistant', 'content': answer[:500]}])[-4:]
 
     def run(self):
