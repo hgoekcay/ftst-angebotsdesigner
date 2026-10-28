@@ -105,11 +105,13 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(req.full_url, 'http://76b650ab-ftst-local-ai:11434/api/generate')
             payload = json.loads(req.data)
             self.assertEqual(payload['options']['num_ctx'], 4096)
-            self.assertEqual(payload['options']['num_predict'], 768)
-            self.assertEqual(payload['options']['num_thread'], 2)
+            self.assertEqual(payload['options']['num_predict'], 384)
+            self.assertEqual(payload['options']['num_thread'], 4)
             self.assertIn('FTRONICS', payload['prompt'])
             self.assertTrue(payload['raw'])
-            self.assertTrue(payload['prompt'].endswith('<|im_start|>assistant\n<think>\n\n</think>\n\n'))
+            self.assertTrue(payload['prompt'].endswith('<|im_start|>assistant\n'))
+            self.assertNotIn('<think>', payload['prompt'])
+            self.assertEqual(payload['model'], 'qwen3:4b-instruct-2507-q4_K_M')
             self.assertEqual(len(self.app.collection('memories', 'dev')), 1)
 
     def test_model_error_and_single_concurrency(self):
