@@ -1,3 +1,11 @@
+## 0.3.0
+
+- Neuer Bereich E-Mails mit lesender STRATO-Vorschau für einen explizit freigegebenen HA-Benutzer.
+- Bis zu 10 Nachrichten im gewählten Zeitraum, älteste zuerst; unvollständige Vorschauen und gekürzte Texte sind gekennzeichnet.
+- Lokale Zusammenfassungen und Antwortentwürfe, ohne Versand, Mailboxänderungen oder automatisches Speichern ins Firmenwissen.
+- Postfachzugriff standardmäßig aus. Vorschau bleibt nur im Arbeitsspeicher; Auswahl-IDs nach 30 Minuten, neuem Abruf oder Neustart ungültig.
+- E-Mail-Auswertung erhält keine privaten Firmenprofile oder gespeicherten Notizen; Roh-HTML und externe Bilder werden nicht geladen.
+
 # 0.2.4
 
 - Explizite Qwen3-4B-Instruct-2507-Q4_K_M-Variante für direkte Antworten unterstützen.
