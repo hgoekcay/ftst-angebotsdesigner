@@ -99,3 +99,41 @@ def test_worker_uidvalidity_failure_survives_process_boundary():
     with patch('strato_worker.subprocess.run', return_value=result):
         with pytest.raises(BridgeUIDValidityChanged):
             run_mail_operation('bridge_batch', {'uidvalidity':7,'after_uid':2,'since':'2026-09-20'})
+
+
+@pytest.mark.parametrize('code,exception_name,http_code', [
+    ('MAIL_AUTH_FAILED', 'BridgeAuthenticationError', 'mail_auth_failed'),
+    ('MAIL_MESSAGE_TOO_LARGE', 'BridgeMessageTooLarge', 'mail_message_too_large'),
+    ('MAIL_LIMIT_EXCEEDED', 'BridgeLimitError', 'mail_limit_exceeded'),
+])
+def test_safe_source_error_codes_survive_worker_and_http(code, exception_name, http_code):
+    from unittest.mock import patch
+    from types import SimpleNamespace
+    import strato_worker
+    result = SimpleNamespace(returncode=0, stdout=json.dumps({'ok': False, 'error_code': code}))
+    with patch('strato_worker.subprocess.run', return_value=result):
+        response = call(runner=strato_worker.run_mail_operation)
+    assert response.status_code == 502
+    assert response.json() == {'error': http_code}
+    response = call(runner=Mock(side_effect=getattr(strato_worker, exception_name)('private-secret')))
+    assert response.json() == {'error': http_code} and 'private' not in response.text
+
+
+@pytest.mark.parametrize('exception_name,code', [
+    ('ImapAuthenticationError', 'MAIL_AUTH_FAILED'),
+    ('ImapMessageTooLarge', 'MAIL_MESSAGE_TOO_LARGE'),
+    ('ImapLimitError', 'MAIL_LIMIT_EXCEEDED'),
+])
+def test_child_serializes_only_known_safe_error_codes(monkeypatch, capsys, exception_name, code):
+    import io
+    from types import SimpleNamespace
+    import strato_worker
+    import strato_bridge_transport
+    monkeypatch.setattr(strato_worker.sys, 'argv', ['strato_worker', '--child'])
+    request = json.dumps({'operation': 'bridge_checkpoint', 'arguments': {}}).encode()
+    monkeypatch.setattr(strato_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(request)))
+    monkeypatch.setattr(strato_worker, 'select_bridge_account', lambda value: None)
+    monkeypatch.setattr(strato_bridge_transport, 'bridge_checkpoint',
+                        Mock(side_effect=getattr(strato_bridge_transport, exception_name)('private-secret')))
+    strato_worker.main()
+    assert json.loads(capsys.readouterr().out) == {'ok': False, 'error_code': code}

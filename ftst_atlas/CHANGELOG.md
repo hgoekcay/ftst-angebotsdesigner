@@ -1,3 +1,9 @@
+## 0.6.0
+
+- Firmenwissen mit Schlagwörtern suchen und mit nachvollziehbarer Versionshistorie korrigieren. Gleichzeitige Änderungen werden erkannt.
+- Aufgaben mit eigenen Wissenseinträgen verknüpfen; passende aktuelle Notizen werden lokal als Antwortkontext verwendet.
+- Rohmails bis 32 MiB und Mailbatches bis 40 MiB mit STRATO 0.3.1 verarbeiten. Einzelne Beleganhänge bleiben auf 8 MiB begrenzt. Anmelde- und Größenfehler werden gezielt angezeigt.
+
 # 0.5.1
 
 - Include the bookkeeping list-limit hint in the shipped HTML.

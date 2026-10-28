@@ -6,7 +6,8 @@ import re
 from datetime import date
 
 from starlette.responses import JSONResponse
-from strato_worker import BridgeUIDValidityChanged
+from strato_worker import (BridgeUIDValidityChanged, BridgeAuthenticationError,
+                           BridgeMessageTooLarge, BridgeLimitError)
 
 INTERNAL_HOST = b'local-ftst-strato-mail:8098'
 MAX_BODY = 4096
@@ -108,6 +109,12 @@ class InternalBridge:
             result = await asyncio.to_thread(self.runner, operation, arguments)
         except BridgeUIDValidityChanged:
             return await reply(409, 'uidvalidity_changed')
+        except BridgeAuthenticationError:
+            return await reply(502, 'mail_auth_failed')
+        except BridgeMessageTooLarge:
+            return await reply(502, 'mail_message_too_large')
+        except BridgeLimitError:
+            return await reply(502, 'mail_limit_exceeded')
         except Exception:
             return await reply(502, 'mail_operation_failed')
         return await reply(200, result=result)

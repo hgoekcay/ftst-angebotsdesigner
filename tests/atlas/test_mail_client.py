@@ -1,5 +1,6 @@
 """Mail preview isolation, source integrity and hostile transport regression tests."""
 import base64
+import json
 import importlib.util
 import pathlib
 import unittest
@@ -17,6 +18,28 @@ RAW = b'Subject: Anfrage\r\nFrom: client@example.test\r\nTo: office@example.test
 
 
 class MailClientTests(unittest.TestCase):
+    def test_bridge_failures_are_actionable_without_exposing_server_text(self):
+        for code, expected in [('mail_auth_failed', 'Anmeldung'), ('mail_message_too_large', '32 MiB'), ('mail_limit_exceeded', 'Sicherheitsgrenze'), ('unknown', 'Antwort ungültig')]:
+            connection = MagicMock()
+            response = connection.getresponse.return_value
+            response.status = 502
+            payload = json.dumps({'error': code, 'detail': 'secret password server trace'}).encode()
+            response.getheader.side_effect = lambda key, default=None: 'application/json' if key == 'Content-Type' else str(len(payload))
+            response.read1.side_effect = [payload, b'']
+            with self.subTest(code=code), patch.object(m.http.client, 'HTTPConnection', return_value=connection):
+                with self.assertRaises(m.ImapFetchError) as caught:
+                    m._request(TOKEN, '/internal/mail/batch')
+                self.assertIn(expected, str(caught.exception))
+                self.assertNotIn('secret', str(caught.exception))
+                connection.close.assert_called_once()
+
+    def test_large_mime_is_received_but_oversized_attachment_remains_flagged(self):
+        raw = b'Content-Type: text/plain\r\n\r\n' + b'a' * (9 * 1024 * 1024)
+        with patch.object(m, '_request', return_value={'uidvalidity': 1, 'pending': False, 'messages': [{'uid': 2, 'raw_base64': base64.b64encode(raw).decode()}]}):
+            batch = m.fetch_batch(TOKEN, '2026-10-28', 1, 0)
+        self.assertEqual(batch['messages'][0][1], raw)
+        self.assertEqual(m.MAX_ATTACHMENT, 8 * 1024 * 1024)
+
     def test_disabled_and_other_user_never_contact_bridge(self):
         with patch.object(m, '_request') as request:
             for client, user in [(m.MailClient({}), 'owner'), (m.MailClient(OPTIONS), 'other'), (m.MailClient(OPTIONS), '')]:
