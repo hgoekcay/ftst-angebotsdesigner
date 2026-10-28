@@ -130,3 +130,16 @@ STRATO 0.3.1 and ATLAS 0.6.0 align raw MIME32MiB, batch40MiB and bounded base64 
 Validation: initial full Python suite1224 tests and101 subtests passed; independent review found a richly tagged note could exceed the prompt budget and disappear. Corrected with actual serialized-budget truncation and an additional regression; seven knowledge tests passed. Both Node UI harnesses passed. Real Playwright visual check unavailable locally because browser download was truncated. No live deployment at this checkpoint. Earlier activation remains as documented above.
 
 Development graph2.3.9 available; existing import relationships source-checked. Release-tree graph rebuilt with staged new files and no embeddings; knowledge import into app.py verified. One intermediate concurrent validation snapshot was inconsistent; staged source was restored and validation rerun serially before release. Next: complete release validation, inspect UI, update installed addons with backup and verify bounded import/error behavior. No new external permissions, cloud context sharing or mail sending.
+
+
+## Verified live knowledge release (2026-10-29)
+
+PR66 merged as 9144ce66abf8a53d3d3fd9e86d0c63ec7d5fcd6c after all six CI jobs passed; Python3.13 reported1225 tests and104 subtests. Node suite29 checks passed. A stale static footer label found during live inspection was corrected in PR67, all six jobs passed, merged as e8cc39284cfab1321d25f2eca468e9bb335a544f.
+
+Installed and observed running: ATLAS0.6.1 and local STRATO0.3.1. Supervisor updates used backup=true. The local STRATO source files were backed up separately and replacement files verified by SHA256 against the merged public source; credentials/options were preserved.
+
+Live verification: existing knowledge survived migration; saved a confirmed public company-brand fact, found it by search, corrected its source, and observed both revisions. Created a linked development task; note/history/link survived the subsequent update and restart. Local Qwen answered a question using the stored company-brand fact correctly. Desktop dark UI was visually inspected and captured. Mobile/light rendering remains unverified.
+
+The formerly size-blocked primary and personal mailbox imports now advance and yield additional document candidates. The primary mailbox's previously uncertain blocker was confirmed as an over8MiB message. Invoice-mailbox authentication still fails; the mail preview now explicitly displays the sanitized STRATO login-rejected message. Its saved credentials need correction by the owner. Bookkeeping's per-source summary still uses its generic incomplete-import error; do not claim that view has the detailed error. Further PDFs and unresolved attachment/document warnings remain; no complete or bank-reconciled accounting claim.
+
+Next development: entity/project knowledge organization and bounded multi-step workflows, then voice integration and central dashboard. Current task links aid context retrieval but do not execute workflows. No automatic mail-to-memory ingestion or model training; optional cloud service still lacks a configured API key. Do not re-enable scopes or resend invitations merely because earlier historical sections describe disabled state.
