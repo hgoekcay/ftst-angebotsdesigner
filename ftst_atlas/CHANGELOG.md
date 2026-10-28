@@ -1,3 +1,8 @@
+# 0.2.1
+
+- Telegram-Felder optional: ID-Ermittlung lässt sich ohne Telegram-Nutzer-ID speichern.
+- Verbindungsstatus im Protokoll ohne Token oder Nachrichteninhalte.
+
 # 0.2.0
 
 - Optionale Telegram-Textanbindung per Long Polling, standardmäßig deaktiviert.
