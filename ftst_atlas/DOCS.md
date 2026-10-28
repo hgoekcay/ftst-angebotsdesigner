@@ -123,3 +123,37 @@ Nachrichten werden ausschließlich als Text dargestellt; externe Bilder/Links we
 Die Vorschau wird nicht dauerhaft gespeichert. Ein neuer Abruf ersetzt sie, ein Neustart entfernt sie. Auswahl-IDs gelten höchstens 30 Minuten. Entwürfe stehen nur auf der geöffneten Seite und gehen beim Neuladen verloren. Kein automatisches Lernen aus eingehenden Nachrichten.
 
 Abnahme: mit dem freigegebenen Benutzer eine bekannte E-Mail abrufen, Quelle/Text prüfen und einen Entwurf erzeugen. Danach sicherstellen, dass ein anderer HA-Benutzer keinen Zugriff erhält und die Originalmail unverändert bleibt. Live-Abnahme ist erst nach Einrichtung des Verbindungsschlüssels möglich.
+
+
+## Online-Beratung und Hintergrundaufträge ab 0.4.0
+
+ATLAS kann die OpenAI Responses API als zusätzlichen Berater nutzen. Dies ist kein Zugriff auf den privaten ChatGPT-Chat oder dessen Erinnerungen. Die bisherige lokale KI bleibt verfügbar. Die Online-Anbindung braucht einen eigenen API-Schlüssel, Modellzugriff und Abrechnung im OpenAI-Projekt; sie ist standardmäßig ausgeschaltet.
+
+### Einrichtung
+
+1. `openai_api_key`: eigenen API-Schlüssel ausschließlich im maskierten ATLAS-Konfigurationsfeld eingeben. Nicht im Chat, Firmenprofil, Quellcode oder Screenshot hinterlegen.
+2. `online_ha_user_id`: die eindeutige HA-Benutzer-ID aus ATLAS → System. Nur dieser Benutzer und sein bereits zugeordnetes Telegram-Konto können den Online-Zugang verwenden.
+3. `online_model`: standardmäßig `gpt-6-astra`. Das OpenAI-Projekt muss Zugriff auf das Modell und die verwendeten Funktionen haben.
+4. `online_daily_limit`: standardmäßig 10 Anfragen pro UTC-Tag. Jeder gestartete externe Versuch zählt, auch bei Timeout oder fehlgeschlagener Antwort. Keine automatischen Wiederholungen. Das ist ein Anfragelimit, KEIN verbindlicher Geldbetrag. Abrechnung und Projektbudget separat beim Anbieter verwalten.
+5. `online_share_profile`: standardmäßig aus. Eingeschaltet wird zusätzlich das maximal 2.000 Zeichen lange Firmenprofil an OpenAI übergeben. Gespeicherte Notizen, Aufgaben, Postfach, Anhänge und frühere Chatnachrichten werden nicht automatisch mitgesendet.
+6. `online_enabled` einschalten, speichern und ATLAS neu starten. Die Anzeige „konfiguriert“ bestätigt nur die lokalen Einstellungen, keine erfolgreiche API-Verbindung. Erst eine erfolgreiche Online-Antwort ist ein Verbindungstest.
+
+### Arbeitsweise
+
+Im Modus **Automatisch** lösen Recherche-/Aktualitäts-/Vergleichsbegriffe und Webadressen eine Online-Anfrage mit Websuche aus. Andere Fragen werden lokal beantwortet; bei einem lokalen Modellfehler kann die aktuelle Frage an den freigegebenen Online-Zugang gehen. Dies ist eine einfache nachvollziehbare Regel, kein allgemeiner autonomer Planer. Ohne eingerichteten Online-Zugang werden aktuelle Recherchefragen mit einem Hinweis abgelehnt, nicht als vermeintlich recherchierte lokale Antwort ausgegeben.
+
+**Nur lokal** verhindert sämtliche Online-Aufrufe für die Anfrage. Auch ausdrückliche Formulierungen wie „nur lokal“, „ohne Internet“ oder „keine Cloud“ haben Vorrang. **Online-Beratung + Websuche** nutzt OpenAI und verlangt belegte Suchergebnisse. Pro Anfrage höchstens 1.500 Ausgabetokens inklusive interner Verarbeitung und zwei Web-Werkzeugaufrufe. Unvollständige Antworten werden nicht als fertige Ergebnisse angezeigt.
+
+Online werden die aktuelle Frage und gegebenenfalls das freigegebene Firmenprofil verarbeitet. Websuchbegriffe können ebenfalls externe Verarbeitung auslösen. `store:false` wird gesetzt; dies ist keine Zusicherung, dass der Anbieter keinerlei Sicherheits- oder Betriebsdaten speichert. Maßgeblich sind die Einstellungen und Bedingungen des OpenAI-Projekts. Keine automatische Übertragung von Zugangsdaten. Folgefragen online müssen den nötigen Kontext enthalten, da der bisherige Chatverlauf nicht übertragen wird.
+
+### Dauerhafte Aufträge
+
+Die Weboberfläche legt Chat-/Online-Anfragen zunächst in einer lokalen Warteschlange ab. Ein Hintergrundarbeiter führt sie aus, während die Oberfläche den Status abfragt. So bleibt die Arbeit beim Schließen des Browserfensters aktiv. Ergebnisse und kurze Auftragstitel sind sieben Tage unter **Aufgaben → Hintergrundaufträge** verfügbar. Eingaben werden nach Abschluss aus dem Auftrag entfernt; Ergebnisse und Titel bleiben bis zur Bereinigung lokal in der geschützten SQLite-Datei. Aufträge gehören jeweils einem HA-Benutzer.
+
+Ein aktiver Auftrag je Benutzer und maximal zehn wartende Aufträge verhindern unkontrollierte Parallelverarbeitung. Wartende Aufträge werden nach einem Neustart fortgesetzt; bereits laufende Aufträge werden als unterbrochen markiert und nicht automatisch wiederholt, weil eine kostenpflichtige Anfrage bereits ausgeführt worden sein könnte. Bei Verbindungsabbruch erst unter Aufgaben nachsehen, bevor eine Anfrage erneut gesendet wird.
+
+Telegram unterstützt `/online FRAGE`, `/lokal FRAGE` und automatische Auswahl für normale Nachrichten. Telegram-Anfragen laufen weiterhin direkt über den Bot und erscheinen nicht in der Auftragsliste. Die E-Mail-Auswertung bleibt lokal und wird nicht automatisch an OpenAI übertragen.
+
+Noch nicht enthalten: selbstständig geplante Hintergrundzyklen, E-Mail-Versand, Zahlungen, Buchungen, Geräteaktionen oder freier Shell-/Browserzugriff durch das Modell. Diese Erweiterung schafft Online-Beratung und verlässliche Ausführung ausdrücklich gestarteter Aufträge; sie ist keine uneingeschränkte „Jarvis“-Vollautomatik.
+
+Technische Grundlagen: https://developers.openai.com/api/docs/guides/tools-web-search und https://developers.openai.com/api/reference/cli/resources/responses/methods/create .
