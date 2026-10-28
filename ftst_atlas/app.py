@@ -24,7 +24,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.2.1'
+VERSION = '0.2.2'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -153,7 +153,10 @@ class App:
                 reply = result['response']
                 if not isinstance(reply, str) or not reply.strip():
                     raise ValueError('Empty response')
-                if re.search(r'<\s*/?\s*think\b|<\|(?:im_start|im_end|endoftext)\|>', reply, flags=re.IGNORECASE) or result.get('thinking'):
+                # Ollama may separate thinking or return a completed thinking prefix.
+                # Only the final segment after the last closing marker may be shown.
+                reply = re.split(r'</\s*think\s*>', reply, flags=re.IGNORECASE)[-1].strip()
+                if not reply or re.search(r'<\s*/?\s*think\b|<\|(?:im_start|im_end|endoftext)\|>', reply, flags=re.IGNORECASE):
                     raise ModelError('Die lokale KI hat keine saubere Endantwort geliefert. Bitte erneut versuchen; die interne Ausgabe wurde nicht angezeigt.')
                 return {'reply': reply.strip(), 'model': self.model}
             except (URLError, HTTPError, TimeoutError, OSError, ValueError, KeyError, TypeError):
