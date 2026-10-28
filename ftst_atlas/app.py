@@ -24,12 +24,12 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.2.3'
+VERSION = '0.2.4'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
 
-def qwen3_prompt(messages):
+def qwen3_prompt(messages, thinking_prefill=True):
     """Render Qwen3 non-thinking ChatML without Ollama's model template.
 
     Qwen's official tokenizer template appends this empty thinking block when
@@ -43,7 +43,7 @@ def qwen3_prompt(messages):
             raise ValueError('Unsupported prompt role')
         content = message['content'].replace('<|', '＜|').replace('|>', '|＞')
         parts.append('<|im_start|>' + message['role'] + '\n' + content + '<|im_end|>\n')
-    return ''.join(parts) + '<|im_start|>assistant\n<think>\n\n</think>\n\n'
+    return ''.join(parts) + '<|im_start|>assistant\n' + ('<think>\n\n</think>\n\n' if thinking_prefill else '')
 
 
 def now():
@@ -65,9 +65,9 @@ class App:
         parsed = urlsplit(self.ollama_url)
         if parsed.scheme != 'http' or parsed.hostname not in ('76b650ab-ftst-local-ai', 'localhost', '127.0.0.1') or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
             raise ValueError('Ollama muss auf den freigegebenen lokalen Dienst zeigen.')
-        self.model = options.get('model', 'qwen3:4b')
-        if self.model not in ('qwen3:4b',):
-            raise ValueError('Nur das geprüfte Textmodell qwen3:4b ist freigegeben.')
+        self.model = options.get('model', 'qwen3:4b-instruct-2507-q4_K_M')
+        if self.model not in ('qwen3:4b', 'qwen3:4b-instruct-2507-q4_K_M'):
+            raise ValueError('Nur die freigegebenen lokalen Qwen-Textmodelle sind erlaubt.')
         with self.db() as db:
             db.executescript('''CREATE TABLE IF NOT EXISTS memories(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS profiles(user_id TEXT PRIMARY KEY, text TEXT NOT NULL);''')
@@ -138,8 +138,8 @@ class App:
                       'Firmenprofil: ' + profile + '\nBestätigte Notizen: ' + knowledge + '\nOffene Aufgaben: ' + tasks)
             messages = [{'role': 'system', 'content': system}] + (history or []) + [{'role': 'user', 'content': message}]
             payload = {'model': self.model, 'stream': False, 'raw': True, 'think': False,
-                       'prompt': qwen3_prompt(messages),
-                       'options': {'num_thread': 2, 'num_ctx': 4096, 'num_predict': 768, 'temperature': 0.2,
+                       'prompt': qwen3_prompt(messages, thinking_prefill=self.model == 'qwen3:4b'),
+                       'options': {'num_thread': 4, 'num_ctx': 4096, 'num_predict': 384, 'temperature': 0.2,
                                    'stop': ['<|im_end|>', '<|endoftext|>', '<|im_start|>']}, 'keep_alive': '60s'}
             req = Request(self.ollama_url + '/api/generate', data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'}, method='POST')
             try:
