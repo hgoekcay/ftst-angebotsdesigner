@@ -65,11 +65,17 @@ class Tests(unittest.TestCase):
         b.opener.open=Mock(side_effect=RuntimeError(self.options['telegram_token']))
         with self.assertRaises(tg.TelegramError) as ctx: b.call('getUpdates',{})
         self.assertNotIn(self.options['telegram_token'],str(ctx.exception))
-    def test_stale_and_rate_limit(self):
+    def test_stale_and_consecutive_messages(self):
         old=self.update(); old['message']['date']=1
         self.bridge.handle(old); self.app.chat.assert_not_called()
         self.bridge.handle(self.update(i=2)); self.bridge.handle(self.update(i=3))
-        self.assertEqual(self.app.chat.call_count,1)
+        self.assertEqual(self.app.chat.call_count,2)
+    def test_tasks_alias_and_followup(self):
+        self.bridge.handle(self.update(text="tasks"))
+        self.app.chat.assert_not_called()
+        self.assertIn("Aufgabe owner", self.bridge.call.call_args.args[1]["text"])
+        self.bridge.handle(self.update(i=2, text="Was weißt du?"))
+        self.app.chat.assert_called_once()
     def test_error_reply_no_exception(self):
         self.app.chat.side_effect=RuntimeError('SECRET')
         self.bridge.handle(self.update())
