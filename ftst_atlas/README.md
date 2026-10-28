@@ -24,3 +24,6 @@ Einrichtung, Grenzen und Abnahme stehen im Reiter **Dokumentation**.
 Ab Version 0.3.0 gibt es zusätzlich einen optionalen Bereich **E-Mails**: lesende STRATO-Vorschau sowie lokale Zusammenfassungen und Antwortentwürfe. Standardmäßig deaktiviert, nur für einen ausdrücklich zugeordneten Home-Assistant-Benutzer. Kein Versand und keine automatische Wissensübernahme. Einrichtung und Grenzen stehen in der Dokumentation.
 
 Ab 0.4.0: optionale OpenAI-Beratung mit Websuche, Quellen und Tageslimit sowie dauerhafte Hintergrundaufträge für ausdrücklich gestartete Anfragen. Ein eigener API-Zugang ist erforderlich. „Nur lokal“ bleibt verfügbar. Keine automatische Übernahme der privaten ChatGPT-Gesprächshistorie.
+
+
+Ab 0.5.0: Belegvorbereitung aus freigegebenen STRATO-Postfächern und Billomat, prüfbare Monatsausgabe, Telegram-OP-/Beleglisten und getrennte mobile Mitarbeiter-Uploads. Neue Zugänge werden gesondert konfiguriert; Einrichtung und Grenzen siehe DOCS.md.
