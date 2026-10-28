@@ -41,7 +41,6 @@ class TelegramBridge:
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
         self.stop_event = threading.Event()
         self.history = []
-        self.last_request = float('-inf')
         self.state = 'bereit'
         self.discovery_times = {}
 
@@ -111,9 +110,6 @@ class TelegramBridge:
             return
         if sender['id'] != self.user_id:
             return
-        if time.monotonic() - self.last_request < 10:
-            return
-        self.last_request = time.monotonic()
         text = text.strip()
         if len(text) > 2000:
             self.reply('Bitte maximal 2.000 Zeichen senden.')
@@ -122,7 +118,7 @@ class TelegramBridge:
             self.reply('ATLAS: Schreibe deine Frage. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
         elif text == '/id':
             self.reply('Deine freigegebene Telegram-ID: ' + str(self.user_id))
-        elif text == '/tasks':
+        elif text.lower() in ('/tasks', 'tasks', 'aufgaben'):
             tasks = self.app.collection('tasks', self.ha_user_id)
             lines = [('- ' if not t['done'] else '✓ ') + t['title'] for t in tasks[:20]]
             self.reply('\n'.join(lines) if lines else 'Keine Aufgaben gespeichert.')
@@ -139,6 +135,7 @@ class TelegramBridge:
         elif text.startswith('/'):
             self.reply('Unbekannter Befehl. Nutze /help.')
         else:
+            self.reply('Ich bearbeite deine Frage mit der lokalen KI. Das kann einen Moment dauern.')
             try:
                 result = self.app.chat(text, self.ha_user_id, history=self.history)
                 answer = result['reply']
