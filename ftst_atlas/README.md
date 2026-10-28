@@ -3,7 +3,7 @@
 Lokaler Assistent für Fragen, Arbeitsvorbereitung, Firmenwissen und Aufgaben.
 Verwendet die bereits installierte **FTST Lokale KI** als Modellserver.
 Ab 0.2.4 ist für direkte Antworten `qwen3:4b-instruct-2507-q4_K_M` vorgesehen
-(einmaliger Download etwa 2,5 GB). Kein Cloud-Fallback.
+(einmaliger Download etwa 2,5 GB). Online-Beratung ist ab 0.4.0 optional und ausdrücklich konfigurierbar.
 
 - Chat mit Firmenprofil und ausdrücklich gespeicherten Erinnerungen.
 - Wissen mit Quellenangabe, einsehbar und löschbar.
@@ -22,3 +22,5 @@ Fragen wieder eingeblendet. Das Sprachmodell wird nicht nachtrainiert.
 Einrichtung, Grenzen und Abnahme stehen im Reiter **Dokumentation**.
 
 Ab Version 0.3.0 gibt es zusätzlich einen optionalen Bereich **E-Mails**: lesende STRATO-Vorschau sowie lokale Zusammenfassungen und Antwortentwürfe. Standardmäßig deaktiviert, nur für einen ausdrücklich zugeordneten Home-Assistant-Benutzer. Kein Versand und keine automatische Wissensübernahme. Einrichtung und Grenzen stehen in der Dokumentation.
+
+Ab 0.4.0: optionale OpenAI-Beratung mit Websuche, Quellen und Tageslimit sowie dauerhafte Hintergrundaufträge für ausdrücklich gestartete Anfragen. Ein eigener API-Zugang ist erforderlich. „Nur lokal“ bleibt verfügbar. Keine automatische Übernahme der privaten ChatGPT-Gesprächshistorie.
