@@ -42,8 +42,7 @@ to perform unapproved external actions. Check live versions before deployment.
    limits request count, not currency cost; actual provider access remains untested.
 3. Activate the narrowly scoped mail bridge only through the applicable access-grant
    workflow. Do not expose existing tokens or copy them into project files.
-4. Bookkeeping ingestion, reconciliation, adviser exports, scheduled workflows and
-   broader assistant actions are future implementation, not completed functionality.
+4. Bookkeeping 0.5.0 implementation is in release validation (see below). Bank reconciliation, full historical coverage and tax filing remain future work.
 5. Do not treat generated replies as sent mail or prepared documents as filed accounts.
 
 ## Component map
@@ -78,3 +77,19 @@ The existing local STRATO mail addon stopped during configuration validation aft
 After explicit user confirmation, enabled read-only primary-mailbox access for the existing owner HA account. Reused the existing bridge token entirely on the Home Assistant host without exposing it. Supervisor validated the options and restarted ATLAS. UI preview successfully returned ten messages and correctly indicated more matching messages outside the bounded preview. No mail was sent, deleted or marked read. Additional mailboxes and attachment ingestion are not included in this ATLAS connection.
 
 Live follow-up: local summary of one retrieved message completed successfully. No customer content was copied into the project record.
+
+
+## ATLAS 0.5.0 preparation (2026-10-28)
+
+Implemented locally: explicit multi-mailbox selection, bounded invoice MIME import, immutable document store and review history, owner-scoped Billomat GET client, durable resumable periodic synchronization, monthly original/CSV/manifest/unresolved ZIP, upstream documents/1 export bridge, Telegram reporting and separate employee upload service. New access scopes, periodic jobs and public exposure default off. Existing primary-mail access is preserved when the mailbox allowlist is empty.
+
+User additionally requested all configured mailboxes, Telegram open-items/missing-document reporting, and employee upload access. Personal upload links grant upload-only access; no employee receives company-mail or full-bookkeeping reads. URLs require a separately configured HTTPS origin, not an ingress-session URL. Tokens must never enter the public repository or logs.
+
+Module map: `bookkeeping.py` stores/extracts/reviews; `bookkeeping_export.py` emits conservative AI Bookkeeping interchange; `atlas_billomat_client.py` avoids collision with Designer's distinct client; `bookkeeping_sync.py` persists bounded source cursors; `bookkeeping_reports.py` builds deterministic reports; `submissions.py` handles scoped invitation hashes and uploads; `submissions_server.py` serves only employee upload routes. `app.py` keeps owner routes behind ingress+CSRF. The existing Telegram owner gate also protects reports.
+
+Original AI Bookkeeping skill installed in the user's skills, full upstream scripts/license/references at revision 8ccff9c7cbd1b568e3bd469a4d457b50ab381781. Synthetic upstream tests passed. This is separate from the production service. The upstream ready check warns rather than fails on missing receipts; ATLAS therefore retains its own unresolved status. The documents bridge was accepted by upstream staging and intentionally remained review-blocked with needs_tax=true. No inferred chart of accounts, payment reconciliation or tax filing.
+
+Release validation and deployment are pending at this checkpoint. Live ATLAS remains0.4.1 until a verified update. New all-mail/Billomat access and external upload routing have not yet been activated. PDF/image/OCR, pagination and export limits are documented in addon DOCS.md. Avoid claiming complete books or a bank-reconciled OP list.
+
+
+0.5.0 validation checkpoint: 154 ATLAS unit/integration tests passed locally, including owner/CSRF isolation, immutable originals/month exports, revocable employee access and separate public HTTP routes. JavaScript syntax and whitespace checks passed. Code Review Graph was refreshed against the working tree including new files via a temporary Git index; import edges for bookkeeping and submissions were inspected and source-verified. UI fragment-token adjustment is receiving its final integration check; full repository/container CI and live installation still pending.
