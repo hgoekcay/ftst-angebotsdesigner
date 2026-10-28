@@ -76,3 +76,5 @@ The existing local STRATO mail addon stopped during configuration validation aft
 ## ATLAS mail connection enabled (2026-10-28)
 
 After explicit user confirmation, enabled read-only primary-mailbox access for the existing owner HA account. Reused the existing bridge token entirely on the Home Assistant host without exposing it. Supervisor validated the options and restarted ATLAS. UI preview successfully returned ten messages and correctly indicated more matching messages outside the bounded preview. No mail was sent, deleted or marked read. Additional mailboxes and attachment ingestion are not included in this ATLAS connection.
+
+Live follow-up: local summary of one retrieved message completed successfully. No customer content was copied into the project record.
