@@ -1,3 +1,7 @@
+## 0.4.1
+
+- Bei vorübergehenden Datenbankfehlern wird nur das Speichern eines bereits berechneten Auftragsergebnisses wiederholt. Die KI-Anfrage wird nicht erneut ausgeführt.
+
 ## 0.4.0
 
 - Neue Apple-inspirierte Oberfläche mit Systemschrift, adaptivem Hell-/Dunkelmodus und mobiler Navigation.
