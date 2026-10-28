@@ -9,6 +9,12 @@ import re
 import threading
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+try:
+    from .bookkeeping_reports import build_report, format_report
+except ImportError:
+    from bookkeeping_reports import build_report, format_report
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 
 
@@ -36,6 +42,7 @@ class TelegramBridge:
             if not db.execute('SELECT 1 FROM profiles WHERE user_id=?', (ha_uid,)).fetchone():
                 raise ValueError('ATLAS-Profil muss zuerst gespeichert werden.')
             db.execute('CREATE TABLE IF NOT EXISTS telegram_offsets(bot_id TEXT PRIMARY KEY, next_id INTEGER NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS telegram_bookkeeping_daily(bot_id TEXT, owner TEXT, local_date TEXT, state TEXT NOT NULL, PRIMARY KEY(bot_id,owner,local_date))')
         self.app, self.user_id, self.ha_user_id = app, int(uid) if uid else None, ha_uid
         self._token, self.bot_id = token, token.split(':')[0]
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
@@ -43,6 +50,11 @@ class TelegramBridge:
         self.history = []
         self.state = 'bereit'
         self.discovery_times = {}
+        self.daily = options.get('bookkeeping_telegram_daily') is True
+        self.daily_time = options.get('bookkeeping_telegram_time', '09:00')
+        if not isinstance(self.daily_time, str) or not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', self.daily_time):
+            self.daily = False
+        self._daily_checked = None
 
     def call(self, method, body):
         if method not in ('getUpdates', 'sendMessage'):
@@ -115,7 +127,9 @@ class TelegramBridge:
             self.reply('Bitte maximal 2.000 Zeichen senden.')
             return
         if text in ('/start', '/help'):
-            self.reply('ATLAS: Schreibe deine Frage. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. /online FRAGE nutzt Online-Beratung mit Websuche, /lokal FRAGE bleibt lokal. Automatisch kann eine Recherchefrage oder ein lokaler Modellfehler an OpenAI gehen, wenn eingerichtet. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
+            self.reply('ATLAS: Schreibe deine Frage. /op zeigt offene Ausgangsrechnungen, /belege zeigt fehlende/ungeprüfte Belege, /buchhaltung zeigt den Überblick. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. /online FRAGE nutzt Online-Beratung mit Websuche, /lokal FRAGE bleibt lokal. Automatisch kann eine Recherchefrage oder ein lokaler Modellfehler an OpenAI gehen, wenn eingerichtet. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
+        elif text.lower() in ('/op', '/belege', '/buchhaltung'):
+            self.bookkeeping_reply({'/op': 'op', '/belege': 'belege', '/buchhaltung': 'summary'}[text.lower()])
         elif text == '/id':
             self.reply('Deine freigegebene Telegram-ID: ' + str(self.user_id))
         elif text.lower() in ('/tasks', 'tasks', 'aufgaben'):
@@ -159,9 +173,57 @@ class TelegramBridge:
                 self.reply(answer)
             self.history = (self.history + [{'role': 'user', 'content': text[:500]}, {'role': 'assistant', 'content': answer[:500]}])[-4:]
 
+    def bookkeeping_reply(self, kind):
+        # Exact owner authorization is checked by the helper, independently of chat binding.
+        try:
+            text = format_report(build_report(self.app, self.ha_user_id), kind)
+        except Exception:
+            text = 'Buchhaltungsbericht nicht verfügbar. Freigabe und Belegimport in ATLAS prüfen.'
+        self.reply(text)
+
+    def daily_bookkeeping(self, now=None):
+        """At most one durable delivery attempt per Berlin day, only when opted in.
+
+        Claim before sending: a crash/failure may lose this day's message, but
+        never silently retries a possibly delivered company-data message.
+        """
+        sync = getattr(self.app, 'bookkeeping_sync', None)
+        if not self.daily or self.user_id is None or sync is None or not sync.enabled_for(self.ha_user_id):
+            return
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            raise ValueError('Timezone required')
+        local = now.astimezone(ZoneInfo('Europe/Berlin'))
+        today = local.date().isoformat()
+        if local.strftime('%H:%M') < self.daily_time or self._daily_checked == today:
+            return
+        # Build locally before reserving; incomplete sources remain explicit in the report.
+        text = format_report(build_report(self.app, self.ha_user_id), 'summary')
+        with self.app.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            claimed = db.execute('INSERT OR IGNORE INTO telegram_bookkeeping_daily VALUES(?,?,?,?)',
+                                 (self.bot_id, self.ha_user_id, today, 'claimed')).rowcount
+        self._daily_checked = today
+        if not claimed:
+            return
+        state = 'sent'
+        try:
+            self.reply(text)
+        except Exception:
+            state = 'failed'
+            raise
+        finally:
+            with self.app.db() as db:
+                db.execute('UPDATE telegram_bookkeeping_daily SET state=? WHERE bot_id=? AND owner=? AND local_date=?',
+                           (state, self.bot_id, self.ha_user_id, today))
+
     def run(self):
         while not self.stop_event.is_set():
             try:
+                try:
+                    self.daily_bookkeeping()
+                except Exception:
+                    print('Telegram: Buchhaltungs-Tagesbericht derzeit nicht verfügbar.', flush=True)
                 updates = self.call('getUpdates', {'offset': self.offset(), 'timeout': 25, 'limit': 10, 'allowed_updates': ['message']})
                 if not isinstance(updates, list):
                     raise TelegramError('Ungültige Antwort.')
