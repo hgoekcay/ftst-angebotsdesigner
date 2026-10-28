@@ -16,10 +16,10 @@ to perform unapproved external actions. Check live versions before deployment.
 
 ## Delivered before the current release
 
-- ATLAS 0.3.0 is installed. Telegram and the explicit Qwen3 Instruct model were tested.
+- ATLAS 0.3.0 was the installed starting point. Telegram and the explicit Qwen3 Instruct model were tested.
 - STRATO mail preview, local summaries and reply drafts are implemented. ATLAS mail
   access is still disabled; the existing separate mail service is running.
-- AngebotsDesigner 0.27.4 is installed.
+- AngebotsDesigner 0.27.4 was the installed starting point.
 
 ## Current release: PR 62
 
@@ -37,7 +37,7 @@ to perform unapproved external actions. Check live versions before deployment.
 
 ## Remaining work and concrete blockers
 
-1. Release 0.4.1 fixes a transient SQLite finalization failure found during review; its CI and deployment remain pending. Verify the Designer interface after its completed update.
+1. ATLAS 0.4.1 and Designer 0.27.5 are installed and running. All five CI jobs passed (1131 tests plus 35 subtests on Python 3.13). PR 63 merged as `d0bff4a0c060c9c9d5a985939b0e02ce54725b05`. The local job and its answer remained accessible after the 0.4.1 update/restart. Designer shared interface was visually verified. Continue with API access and the remaining integrations below.
 2. Online service needs an API key entered directly into the masked Home Assistant
    configuration. No key is available in this working session. Ten requests per day
    limits request count, not currency cost; actual provider access remains untested.
@@ -65,7 +65,7 @@ or start automatic repository hooks merely to use a review skill.
 ## Development continuity and graph review
 
 - Personal Code Review Graph skill installed and independently tested. CLI 2.3.9 is available in the development environment.
-- Initial complete index: 154 parsed files, built against the current working tree including new source files, rather than falsely claiming an exact clean release commit. The rebuildable `.code-review-graph/` cache is ignored by Git.
+- Initial complete index: 154 parsed files; after the fix, an incremental refresh updated five files. The graph was built against the current working tree including new source files, rather than falsely claiming an exact clean release commit. The rebuildable `.code-review-graph/` cache is ignored by Git.
 - Graph findings require source verification: dynamic Telegram calls were missing and a naming-based test query returned unrelated tests. Do not treat the graph as proof of complete call or test coverage.
 - Review reproduced a queue finalization bug after temporary SQLite write failure. The fix retries local result persistence only, preserving exactly-once execution attempts.
 - No graph service, development hook or embedding provider was installed in production.
