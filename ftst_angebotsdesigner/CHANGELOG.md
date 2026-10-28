@@ -1,3 +1,9 @@
+# 0.27.5
+
+- Einheitliche, ruhigere Oberfläche mit Systemschrift, klarer Typografie, besser lesbaren Formularen und großzügigen Bedienflächen.
+- Tastaturfokus, reduzierten Bewegungseffekt und erhöhten Kontrast berücksichtigen. Navigation und Inhalte bleiben auch mobil bedienbar.
+- Gestaltung ausschließlich für die Weboberfläche; PDF-Ausgabe und Druckansichten bleiben unverändert.
+
 # 0.27.4
 
 - Geprüfte Produktbilder je Angebotsposition aus der internen Bilderbibliothek freigeben: Kameras, Rekorder, Türsprechanlagen und Zubehör.
