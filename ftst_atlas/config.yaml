@@ -1,5 +1,5 @@
 name: "FTST ATLAS"
-version: "0.2.0"
+version: "0.2.1"
 slug: "ftst_atlas"
 description: "Lokaler Firmenassistent mit Chat, überprüfbarem Wissen und Aufgaben."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
@@ -19,13 +19,10 @@ options:
   ollama_url: "http://76b650ab-ftst-local-ai:11434"
   model: "qwen3:4b"
   telegram_enabled: false
-  telegram_token: ""
-  telegram_user_id: ""
-  telegram_ha_user_id: ""
 schema:
   ollama_url: url
   model: str
   telegram_enabled: bool
-  telegram_token: password
-  telegram_user_id: str
-  telegram_ha_user_id: str
+  telegram_token: "password?"
+  telegram_user_id: "str?"
+  telegram_ha_user_id: "str?"
