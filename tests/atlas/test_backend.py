@@ -105,7 +105,7 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(req.full_url, 'http://76b650ab-ftst-local-ai:11434/api/generate')
             payload = json.loads(req.data)
             self.assertEqual(payload['options']['num_ctx'], 4096)
-            self.assertEqual(payload['options']['num_predict'], 256)
+            self.assertEqual(payload['options']['num_predict'], 768)
             self.assertEqual(payload['options']['num_thread'], 2)
             self.assertIn('FTRONICS', payload['prompt'])
             self.assertTrue(payload['raw'])
