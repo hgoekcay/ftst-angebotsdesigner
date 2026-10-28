@@ -13,7 +13,10 @@ app_path = next(p for p in (Path(__file__).parents[1] / 'app.py', Path(__file__)
 sys.path.insert(0, str(app_path.parent))
 spec = importlib.util.spec_from_file_location('atlas_app', app_path)
 module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+try:
+    spec.loader.exec_module(module)
+finally:
+    sys.path.remove(str(app_path.parent))
 
 
 class Response:
