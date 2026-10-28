@@ -102,3 +102,24 @@ Instanz pro Bot betreiben. Vorhandene Webhooks werden nicht automatisch gelösch
 Bei Anbieterfehlern wird gewartet; Token und Nachrichten werden nicht protokolliert.
 Die Zustellung einer Antwort ist bei Netzwerkfehlern nicht garantiert. Es gibt
 keinen automatischen Versand an Kunden und keine Telefonie/Sprachnachrichten.
+
+
+## E-Mail-Assistenz ab 0.3.0
+
+Der Bereich **E-Mails** verwendet ausschließlich den bestehenden internen Lesedienst von FTST STRATO Mail. Kein SMTP, Versand, Löschen, Verschieben, Markieren als gelesen oder Speichern von Entwürfen im Postfach. E-Mail-Inhalte werden nicht in Telegram oder in den allgemeinen Chat übernommen.
+
+Einrichtung in der ATLAS-Konfiguration:
+
+- `mail_enabled`: zunächst aus; erst nach bewusster Freigabe einschalten.
+- `mail_bridge_url`: `http://76b650ab-ftst-strato-mail:8098` (alternativ lokale Installation `http://local-ftst-strato-mail:8098`). Kein öffentlicher Endpunkt.
+- `mail_bridge_token`: vorhandener Verbindungsschlüssel der STRATO-Mail-App; ausschließlich im maskierten Konfigurationsfeld, niemals im Chat oder Firmenwissen eintragen.
+- `mail_ha_user_id`: HA-Benutzer-ID aus ATLAS → System. Nur dieser Benutzer darf lesen und Entwürfe erstellen.
+- `mail_account_id`: explizite Postfach-ID der Mail-App, standardmäßig `primary`.
+
+Speichern und ATLAS neu starten. Danach E-Mails → Zeitraum wählen → E-Mails abrufen. Das Postfach bleibt unverändert. Die Vorschau umfasst höchstens 10 Nachrichten, älteste zuerst, nicht nur ungelesene Nachrichten. Bei mehr Treffern wird die Unvollständigkeit angezeigt; diese erste Ausbaustufe unterstützt keine Folgeseiten. Postfachordner und UIDVALIDITY werden bei jedem Abruf geprüft.
+
+Nachrichten werden ausschließlich als Text dargestellt; externe Bilder/Links werden nicht geladen. Anhänge werden nicht ausgewertet. Bis zu 12.000 Zeichen werden angezeigt, höchstens 4.500 Textzeichen und begrenzte Kopfzeilen an das lokale Modell übergeben. Gekürzte Inhalte sind gekennzeichnet. Die KI erhält keine gespeicherten Firmengeheimnisse oder Notizen und hat keine ausführbaren Werkzeuge. Mailinhalte sind unvertrauenswürdige Daten; Entwürfe und Zusammenfassungen müssen geprüft werden.
+
+Die Vorschau wird nicht dauerhaft gespeichert. Ein neuer Abruf ersetzt sie, ein Neustart entfernt sie. Auswahl-IDs gelten höchstens 30 Minuten. Entwürfe stehen nur auf der geöffneten Seite und gehen beim Neuladen verloren. Kein automatisches Lernen aus eingehenden Nachrichten.
+
+Abnahme: mit dem freigegebenen Benutzer eine bekannte E-Mail abrufen, Quelle/Text prüfen und einen Entwurf erzeugen. Danach sicherstellen, dass ein anderer HA-Benutzer keinen Zugriff erhält und die Originalmail unverändert bleibt. Live-Abnahme ist erst nach Einrichtung des Verbindungsschlüssels möglich.
