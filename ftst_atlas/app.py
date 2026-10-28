@@ -1,4 +1,4 @@
-"""ATLAS local assistant. No shell execution, autonomous tools or cloud fallback."""
+"""ATLAS assistant with local inference, optional online advice and durable jobs."""
 import json
 import os
 import re
@@ -7,6 +7,8 @@ import sqlite3
 import threading
 import time
 from mail_client import MailClient, MailError
+from online_client import OnlineClient, OnlineError
+from jobs import JobQueue, JobError
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,7 +28,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -67,7 +69,12 @@ class App:
         parsed = urlsplit(self.ollama_url)
         if parsed.scheme != 'http' or parsed.hostname not in ('76b650ab-ftst-local-ai', 'localhost', '127.0.0.1') or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
             raise ValueError('Ollama muss auf den freigegebenen lokalen Dienst zeigen.')
-        self.mail = MailClient(options)
+        try:
+            self.mail = MailClient(options)
+        except MailError:
+            self.mail = MailClient({})
+        self.online_share_profile = options.get('online_share_profile') is True
+        self.online = OnlineClient(options, self.db)
         self.mail_lock = threading.Lock()
         self.mail_cache = {}
         self.model = options.get('model', 'qwen3:4b-instruct-2507-q4_K_M')
@@ -77,6 +84,7 @@ class App:
             db.executescript('''CREATE TABLE IF NOT EXISTS memories(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS profiles(user_id TEXT PRIMARY KEY, text TEXT NOT NULL);''')
         os.chmod(self.db_path, 0o600)
+        self.jobs = JobQueue(self.db, self.execute_job)
 
     def db(self):
         db = sqlite3.connect(self.db_path, timeout=10)
@@ -111,6 +119,31 @@ class App:
             return str(value.get('text', raw))[:2000] if isinstance(value, dict) else raw[:2000]
         except ValueError:
             return raw[:2000]
+
+    def respond(self, message, user_id, history=None, mode='auto'):
+        if mode not in ('auto', 'local', 'online'):
+            raise ValueError('Ungültiger Antwortmodus.')
+        if re.search(r'\b(nur lokal|ohne internet|ohne cloud|keine cloud|nicht online|nicht ins internet)\b', message, re.I):
+            mode = 'local'
+        wants_online = mode == 'online' or (mode == 'auto' and bool(re.search(
+            r'\b(online|internet|recherch\w*|aktuell\w*|neueste\w*|websuche|vergleich\w*|empfiehl\w*|empfehl\w*)\b|https?://', message, re.I)))
+        if wants_online:
+            context = self.profile(user_id) if self.online_share_profile else ''
+            return self.online.answer(user_id, message, context=context, web=True)
+        try:
+            return {**self.chat(message, user_id, history), 'provider': 'Lokal', 'sources': []}
+        except ModelError:
+            if mode == 'auto' and self.online.status(user_id).get('configured') and self.online.status(user_id).get('enabled'):
+                context = self.profile(user_id) if self.online_share_profile else ''
+                result = self.online.answer(user_id, message, context=context, web=False)
+                return {**result, 'routing_note': 'Lokale Antwort fehlgeschlagen; Online-Beratung verwendet.'}
+            raise
+
+    def execute_job(self, user_id, payload):
+        try:
+            return self.respond(payload['message'], user_id, payload.get('history', []), payload.get('mode', 'auto'))
+        except (ModelError, BusyError, OnlineError) as exc:
+            raise JobError(str(exc)) from None
 
     def mail_preview(self, user_id, days=7):
         # Never retain originals or mail content in the knowledge database.
@@ -304,7 +337,13 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             if path == '/api/status':
-                return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id)})
+                return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id), 'online': app.online.status(self.user_id), 'online_share_profile': app.online_share_profile})
+            if path == '/api/jobs':
+                return self.send(200, {'jobs': app.jobs.list(self.user_id)})
+            match = re.fullmatch(r'/api/jobs/([A-Za-z0-9_-]{1,100})', path)
+            if match:
+                job = app.jobs.get(self.user_id, match[1])
+                return self.send(200, job) if job else self.error(404, 'Auftrag nicht gefunden.')
             if path == '/api/profile':
                 return self.send(200, {'text': app.profile(self.user_id)})
             if path == '/api/memories':
@@ -342,7 +381,7 @@ def make_handler(app):
                 if method == 'POST' and path == '/api/mail/assist':
                     data = self.body()
                     return self.send(200, app.mail_assist(self.user_id, self.text(data, 'id', 100), self.text(data, 'action', 20)))
-                if method == 'POST' and path == '/api/chat':
+                if method == 'POST' and path in ('/api/chat', '/api/jobs'):
                     data = self.body()
                     message = self.text(data, 'message', 2000)
                     history = data.get('history', [])
@@ -351,6 +390,11 @@ def make_handler(app):
                     for entry in history:
                         if not isinstance(entry, dict) or set(entry) != {'role', 'content'} or entry['role'] not in ('user', 'assistant') or not isinstance(entry['content'], str) or len(entry['content']) > 500:
                             raise ValueError('Verlauf ungültig.')
+                    if path == '/api/jobs':
+                        mode = data.get('mode', 'auto')
+                        if mode not in ('auto', 'local', 'online'):
+                            raise ValueError('Ungültiger Antwortmodus.')
+                        return self.send(202, app.jobs.submit(self.user_id, {'message': message, 'history': history, 'mode': mode}))
                     return self.send(200, app.chat(message, self.user_id, history))
                 if method == 'PUT' and path == '/api/profile':
                     text = self.text(self.body(), 'text', 2000)
@@ -400,6 +444,8 @@ def make_handler(app):
                     task['done'] = bool(task['done'])
                     return self.send(200, {'task': task})
                 self.error(404, 'Nicht gefunden.')
+            except (OnlineError, JobError) as exc:
+                self.error(503, str(exc))
             except MailError as exc:
                 self.error(503, str(exc))
             except BusyError as exc:
@@ -416,6 +462,7 @@ def make_handler(app):
 
 def main():
     app = App()
+    app.jobs.start()
     if not app.dev:
         from telegram_bridge import start_bridge
         options_path = app.data_dir / 'options.json'

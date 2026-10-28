@@ -15,6 +15,7 @@ class App:
     def __init__(self, path):
         self.path = path
         self.chat = Mock(return_value={'reply':'Antwort'})
+        self.respond = self.chat
         with self.db() as db:
             db.executescript('CREATE TABLE profiles(user_id TEXT PRIMARY KEY,text TEXT); INSERT INTO profiles VALUES ("owner","Firma"); CREATE TABLE memories(user_id TEXT,text TEXT,source TEXT,created_at TEXT);')
     def db(self): return sqlite3.connect(self.path)
@@ -41,9 +42,16 @@ class Tests(unittest.TestCase):
         self.bridge.call.assert_not_called(); self.app.chat.assert_not_called()
     def test_profile_mapping_history(self):
         self.bridge.handle(self.update())
-        self.app.chat.assert_called_once_with('Hallo','owner',history=[])
+        self.app.chat.assert_called_once_with('Hallo','owner',history=[],mode='auto')
         self.assertEqual(self.bridge.call.call_args.args[1]['chat_id'],42)
         self.assertEqual(len(self.bridge.history),2)
+    def test_online_and_local_modes_are_explicit(self):
+        self.bridge.handle(self.update(text='/online Neue Kameras'))
+        self.app.respond.assert_called_with('Neue Kameras', 'owner', history=[], mode='online')
+        self.bridge.handle(self.update(i=2, text='/lokal Meine Aufgaben'))
+        self.assertEqual(self.app.respond.call_args.kwargs['mode'], 'local')
+        self.assertEqual(self.app.respond.call_args.args[0], 'Meine Aufgaben')
+
     def test_dedup_restart(self):
         self.bridge.handle(self.update())
         second = tg.TelegramBridge(self.app,self.options); second.call=Mock()

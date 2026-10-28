@@ -1,3 +1,14 @@
+## 0.4.0
+
+- Neue Apple-inspirierte Oberfläche mit Systemschrift, adaptivem Hell-/Dunkelmodus und mobiler Navigation.
+
+- Optionale OpenAI-Beratung mit Websuche und anklickbaren Quellen. Keine Verbindung zu einem privaten ChatGPT-Chat.
+- Automatischer Modus für Recherchebegriffe und lokale Modellfehler; „Nur lokal“ verhindert Online-Anfragen.
+- Hintergrundaufträge bleiben beim Schließen der Oberfläche aktiv. Ergebnisse sind bis zu sieben Tage unter Aufgaben abrufbar.
+- Begrenzte Online-Anfragen pro UTC-Tag, keine automatische Wiederholung unsicher abgeschlossener API-Aufrufe.
+- Online-Kontext standardmäßig nur die aktuelle Frage; Firmenprofil separat zuschaltbar. Postfach, Erinnerungen und Chatverlauf werden nicht automatisch übertragen.
+- Telegram: /online FRAGE, /lokal FRAGE und automatische Auswahl.
+
 ## 0.3.0
 
 - Neuer Bereich E-Mails mit lesender STRATO-Vorschau für einen explizit freigegebenen HA-Benutzer.
