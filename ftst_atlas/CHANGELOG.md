@@ -1,3 +1,8 @@
+# 0.2.2
+
+- Abgeschlossene Modellantworten von separaten oder vorangestellten Denk-Ausgaben trennen.
+- Leere, unvollständige oder weiterhin markierte Antworten bleiben gesperrt.
+
 # 0.2.1
 
 - Telegram-Felder optional: ID-Ermittlung lässt sich ohne Telegram-Nutzer-ID speichern.
