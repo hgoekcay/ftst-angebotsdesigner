@@ -69,3 +69,7 @@ or start automatic repository hooks merely to use a review skill.
 - Graph findings require source verification: dynamic Telegram calls were missing and a naming-based test query returned unrelated tests. Do not treat the graph as proof of complete call or test coverage.
 - Review reproduced a queue finalization bug after temporary SQLite write failure. The fix retries local result persistence only, preserving exactly-once execution attempts.
 - No graph service, development hook or embedding provider was installed in production.
+
+## STRATO service repair (2026-10-28)
+
+The existing local STRATO mail addon stopped during configuration validation after four additional accounts were entered with invalid account IDs (uppercase/spaces) and blank folders. Corrected only their logical IDs to lowercase underscore names and set folders to INBOX, preserving credentials and enabled states. Saved through Home Assistant and started the service. Live logs confirmed application startup and a successful mailbox monitor check. This verifies the primary monitored mailbox, not each additional account's authentication. ATLAS mail access remains separately disabled.
