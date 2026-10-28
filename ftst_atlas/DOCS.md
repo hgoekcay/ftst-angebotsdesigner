@@ -77,3 +77,26 @@ Der sichtbare Verlauf bleibt nur während der geöffneten Seite erhalten. Dauerh
 Wissen muss ausdrücklich gespeichert werden. Pro Antwort werden ausgewählte
 Wissensauszüge und offene Aufgaben in begrenztem Umfang berücksichtigt; dies ist
 noch keine vollständige Dokumentensuche.
+
+## Telegram (ab 0.2.0)
+
+Telegram ist optional und standardmäßig ausgeschaltet. Nachrichten und Antworten
+laufen über Telegram, auch wenn das Sprachmodell lokal bleibt. Bot-Chats sind
+keine Ende-zu-Ende-verschlüsselten Secret Chats. Keine Zugangsdaten senden.
+
+1. Beim offiziellen @BotFather mit /newbot einen eigenen Bot erstellen.
+2. Den Token ausschließlich in HA → Apps → FTST ATLAS → Konfiguration im Feld
+   telegram_token eintragen. Niemals in Chat, Screenshots, GitHub oder Protokolle.
+3. In ATLAS → Wissen das Profil speichern; unter System die HA-Benutzer-ID
+   ablesen und als telegram_ha_user_id eintragen. Damit bleibt die Wissenszuordnung
+   ausdrücklich festgelegt; es gibt keine automatische Besitzerübernahme.
+4. telegram_enabled einschalten. Die persönliche Telegram-ID wird als
+   telegram_user_id eingetragen. Nur freigegebene private Chats dürfen KI und
+   Firmenwissen verwenden. Für die ID-Ermittlung telegram_user_id zunächst leer lassen, starten und dem eigenen Bot /id schicken. Er zeigt nur die eigene Nummern-ID. Diese in telegram_user_id speichern und neu starten; erst danach sind Fragen und Firmenwissen freigegeben.
+5. Speichern, App neu starten und zuerst /help, anschließend eine kurze Frage testen.
+
+Long Polling braucht keine Portfreigabe und keinen öffentlichen Webhook. Nur eine
+Instanz pro Bot betreiben. Vorhandene Webhooks werden nicht automatisch gelöscht.
+Bei Anbieterfehlern wird gewartet; Token und Nachrichten werden nicht protokolliert.
+Die Zustellung einer Antwort ist bei Netzwerkfehlern nicht garantiert. Es gibt
+keinen automatischen Versand an Kunden und keine Telefonie/Sprachnachrichten.
