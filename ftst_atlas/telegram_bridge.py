@@ -24,7 +24,7 @@ class NoRedirect(HTTPRedirectHandler):
 class TelegramBridge:
     def __init__(self, app, options):
         token = options.get('telegram_token', '')
-        uid = options.get('telegram_user_id', '')
+        uid = options.get('telegram_user_id') or ''
         ha_uid = options.get('telegram_ha_user_id', '')
         if not isinstance(token, str) or not re.fullmatch(r'[0-9]{5,20}:[A-Za-z0-9_-]{20,100}', token):
             raise ValueError('Telegram-Zugang ist unvollständig.')
@@ -156,6 +156,8 @@ class TelegramBridge:
                 updates = self.call('getUpdates', {'offset': self.offset(), 'timeout': 25, 'limit': 10, 'allowed_updates': ['message']})
                 if not isinstance(updates, list):
                     raise TelegramError('Ungültige Antwort.')
+                if self.state != 'verbunden':
+                    print('Telegram verbunden: ' + ('ID-Ermittlung aktiv.' if self.user_id is None else 'Privater Nutzer freigegeben.'), flush=True)
                 self.state = 'verbunden'
                 for update in updates:
                     if self.stop_event.is_set():
@@ -163,6 +165,8 @@ class TelegramBridge:
                     self.handle(update)
                 self.stop_event.wait(1)
             except Exception:
+                if self.state != 'Verbindung oder Verarbeitung gestört':
+                    print('Telegram: Verbindung oder Verarbeitung gestört. Zugang und Netzwerk prüfen.', flush=True)
                 self.state = 'Verbindung oder Verarbeitung gestört'
                 self.stop_event.wait(30)
 
