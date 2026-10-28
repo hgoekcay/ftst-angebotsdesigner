@@ -94,6 +94,13 @@ class Tests(unittest.TestCase):
             self.assertIn('kein Bankabgleich', text)
         self.assertIn('Weitere', reports.format_report(result, 'belege'))
 
+    def test_no_completed_import_is_not_a_complete_empty_ledger(self):
+        self.setup_records([])
+        self.app.bookkeeping_sync.status.return_value = {'pending': False}
+        result = reports.build_report(self.app, 'owner')
+        self.assertTrue(result['incomplete'])
+        self.assertIn('noch kein abgeschlossener Import', reports.format_report(result, 'op'))
+
     def test_report_uses_only_local_services_and_keeps_inputs(self):
         original = record()
         expected = copy.deepcopy(original)

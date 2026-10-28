@@ -76,7 +76,7 @@ def build_report(app, user_id):
                         'unknown_open': unknown_open, 'unreviewed': unreviewed, 'missing_originals': missing,
                         'review_items': len(review_items), 'open_by_currency': {key: format(value, 'f') for key, value in sorted(balances.items())}},
             'open_items': open_items, 'review_items': review_items, 'sync': status,
-            'incomplete': total != len(records) or bool(status.get('pending') or status.get('errors')),
+            'incomplete': total != len(records) or not status.get('last_finished') or bool(status.get('pending') or status.get('errors')),
             'limitations': ['Nur lokal importierte Daten; Zahlungsstände können inzwischen geändert sein.',
                             'Eingangs-OP und weitere fehlende Belege sind ohne vollständigen Bankabgleich nicht verlässlich bestimmbar.',
                             'Belegvorbereitung zur Prüfung, keine fertige Buchhaltung.']}
@@ -92,7 +92,7 @@ def format_report(report, kind='summary'):
     if report['incomplete']:
         lines.append('Import/Auswahl unvollständig – Angaben sind ein Teilbestand.')
     if kind in ('summary', 'op'):
-        lines.append(str(summary['open_items']) + ' offene Ausgangsrechnungen laut Billomat.')
+        lines.append(str(summary['open_items']) + ' offene Ausgangsrechnungen im importierten Billomat-Bestand.')
         lines.extend(amount + ' ' + currency + ' offen' for currency, amount in list(summary['open_by_currency'].items())[:8])
         if len(summary['open_by_currency']) > 8:
             lines.append('Weitere Währungen in ATLAS → Buchhaltung.')
