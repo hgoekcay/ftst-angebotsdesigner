@@ -24,7 +24,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.2.2'
+VERSION = '0.2.3'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -139,7 +139,7 @@ class App:
             messages = [{'role': 'system', 'content': system}] + (history or []) + [{'role': 'user', 'content': message}]
             payload = {'model': self.model, 'stream': False, 'raw': True, 'think': False,
                        'prompt': qwen3_prompt(messages),
-                       'options': {'num_thread': 2, 'num_ctx': 4096, 'num_predict': 256, 'temperature': 0.2,
+                       'options': {'num_thread': 2, 'num_ctx': 4096, 'num_predict': 768, 'temperature': 0.2,
                                    'stop': ['<|im_end|>', '<|endoftext|>', '<|im_start|>']}, 'keep_alive': '60s'}
             req = Request(self.ollama_url + '/api/generate', data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'}, method='POST')
             try:
