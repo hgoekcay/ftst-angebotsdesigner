@@ -217,6 +217,41 @@ Im Chat Aufnahme ausdrücklich starten und stoppen, oder WAV/MP4/OGG/WebM hochla
 Grenzen: 5 MiB, 60 Sekunden. Der erkannte Text landet im Eingabefeld und wird erst
 nach eigener Prüfung und Klick auf Senden verarbeitet. Home-Assistant-Ingress oder
 der Browser können Mikrofonzugriff verhindern; dann Audiodatei verwenden.
-Vorlesen erfolgt nur auf Klick, mit maximal 2000 Zeichen, über lokales Piper.
+Im bisherigen Aufnahmemodus erfolgt Vorlesen auf Klick, mit maximal 2000 Zeichen, über lokales Piper.
 Aufnahmen werden nicht dauerhaft gespeichert. Die Spracherkennung erteilt keine
-zusätzlichen Rechte und löst keine selbstständigen Firmenaktionen aus.
+zusätzlichen Rechte.
+
+
+### Gesprächsmodus ab 0.8.0
+
+Im Chat **Gespräch starten** auswählen und das Mikrofon für diese Seite freigeben.
+ATLAS zeigt an, wann es zuhört, verarbeitet oder spricht. Eine Sprechpause beendet
+die Aufnahme; das erkannte Gesagte erscheint im Chat und wird automatisch verarbeitet.
+Während der Antwort ist das Mikrofon geschlossen. Nach dem Vorlesen beginnt die
+nächste Runde. Lokale Verarbeitung kann abhängig von der Hardware dauern.
+
+**Gespräch beenden** stoppt Aufnahme, Wiedergabe und weitere Runden. Bereits vom
+Server angenommene Aufträge können weiterlaufen und sind unter **Aufgaben** sichtbar.
+Bei Fehlern wird das Gespräch pausiert; unsichere Übertragungen werden nicht
+unbemerkt erneut gesendet. Nach einem Neuladen ist der Gesprächsmodus ausgeschaltet.
+Die Sitzung endet spätestens nach zehn Minuten und bei ausbleibender Sprache.
+
+Beispiele für ausdrückliche Aufträge:
+
+- „Aufgabe anlegen: Angebot prüfen.“ speichert eine offene Aufgabe; es erstellt kein Angebot.
+- „Starte den Tagesüberblick.“ führt den vorhandenen Ablauf aus.
+- „Bereite Buchhaltung für Oktober 2026 vor.“ startet die vorhandene Monatsvorbereitung.
+
+Andere Fragen gehen an den ausgewählten Antwortmodus. Online-Verarbeitung benötigt
+weiterhin einen separat konfigurierten Zugang. Aufnahmen und Sprachausgabe bleiben
+lokal; erkannter Text kann je nach Antwortmodus online verarbeitet werden.
+Keine Sprachfreigabe für Zahlungen, Kundenversand, Steuerabgabe oder Shellbefehle.
+
+Wenn der Browser Mikrofon oder automatisches Abspielen blockiert, steht weiterhin
+Aufnahme mit Textprüfung beziehungsweise **Vorlesen** zur Verfügung. Ein blockiertes
+Mikrofon lässt sich alternativ durch Audiodatei-Upload im bisherigen Modus umgehen.
+
+Das Mikrofon hört während der Sprachausgabe nicht zu. Zum Unterbrechen deshalb
+**Gespräch beenden** drücken. Kennungen angenommener Sprachaufträge bleiben zur
+Vermeidung doppelter Ausführung erhalten (höchstens 100.000 je Benutzer); die
+Auftragsinhalte und Ergebnisse haben weiterhin die reguläre Aufbewahrungsdauer.

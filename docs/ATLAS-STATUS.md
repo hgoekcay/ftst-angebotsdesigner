@@ -206,3 +206,42 @@ Next concrete work: resolve invoice-mailbox authentication through masked owner
 configuration, review unresolved documents/coverage, then organize project/entity
 knowledge and a consolidated dashboard. Optional online access still requires an
 API key. Voice input is reviewed text, not a general autonomous action permission.
+
+
+## Voice dialogue implementation checkpoint (2026-10-29)
+
+ATLAS0.8.0 adds an explicit half-duplex conversation mode in the existing chat.
+Local Whisper transcription is dispatched only while this mode is actively enabled;
+Piper reads the result and the microphone reopens only after playback ends. Stop,
+page change, backgrounding, failure and the ten-minute session limit stop future
+turns. The original review-before-send recording mode remains available. Browser
+silence detection uses bounded local audio levels, not semantic speech detection.
+
+`dialog.py` accepts only explicit task-create, briefing and monthly-preparation
+commands. General questions use existing response routing; model output cannot
+select or execute tools. Existing Ingress, CSRF, voice-owner and workflow grants
+apply, with a new check before queued execution. UUID request keys are committed
+atomically with jobs; retries reuse the original job. Retained bounded tombstones
+prevent replay after seven-day result cleanup. A saved task is explicitly described
+as an open list item, not completed real-world work. No new sends/payments/filing.
+
+Source-verified graph baseline:169 files,2398 nodes at32b26a6 on the release branch;
+app imports of jobs/workflows/voice checked. Graph is local tooling, not a running
+business-memory service. Review and release validation continue below. Installation
+remains0.7.3 at this implementation checkpoint; physical microphone capture and
+mobile autoplay are unverified. Online access still lacks its API key. The invoice
+mailbox again returned login rejection; no credential changes attempted.
+
+Private document triage found mixed document classes and incomplete extraction;
+do not interpret every imported document as an unpaid invoice or missing receipt.
+No review statuses, tax amounts or payment states were changed by that read-only
+inspection. Next accounting work: classification and extraction with provenance,
+correction/duplicate relationships and owner/period review before missing-receipt
+requests. Private findings are intentionally absent from this public repository.
+
+Validation: complete local suite1322 tests and116 subtests passed; after the final
+parser/test additions the affected dialog/HTTP/queue/workflow/voice suite72 tests
+and17 subtests passed. All31 Node checks, targeted Python lint and whitespace
+checks passed. Independent review found no blocking authorization/replay issue.
+Physical microphone/iOS/autoplay remain unverified. Publication and installation
+are pending at this checkpoint.

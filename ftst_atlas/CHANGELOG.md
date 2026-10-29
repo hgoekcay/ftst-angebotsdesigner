@@ -1,3 +1,9 @@
+## 0.8.0
+
+- Ausdrücklich einschaltbarer Gesprächsmodus: lokal zuhören, eine Anfrage bearbeiten und die Antwort vorlesen; Stoppen beendet die Aufnahme und weitere Gesprächsrunden.
+- Gesprochene Aufträge für Aufgaben, Tagesüberblick und Monatsvorbereitung mit bestehenden Benutzerrechten; wiederholte Übertragung derselben Anfrage führt nicht zu doppelten Aufträgen.
+- Aufnahme mit Textprüfung und manuelles Vorlesen bleiben verfügbar. Mikrofon und Sprachausgabe wechseln sich ab; kein dauerhaftes Hintergrundmikrofon.
+
 ## 0.7.3
 
 - Für große Downloads gilt ein eigenes begrenztes Übertragungszeitfenster; die kurzen Zeitlimits beim Lesen von Anfragen bleiben unverändert.

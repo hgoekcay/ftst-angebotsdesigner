@@ -5,6 +5,6 @@ LABEL io.hass.version="${BUILD_VERSION}" io.hass.type="app" io.hass.arch="${BUIL
 WORKDIR /app
 RUN apk add --no-cache ffmpeg
 RUN pip install --no-cache-dir pypdf==6.21.2
-COPY voice.py workflows.py knowledge.py submissions.py submissions_server.py bookkeeping_reports.py bookkeeping_export.py bookkeeping.py bookkeeping_sync.py atlas_billomat_client.py app.py telegram_bridge.py mail_client.py online_client.py jobs.py index.html style.css app.js profile.json /app/
+COPY dialog.py voice.py workflows.py knowledge.py submissions.py submissions_server.py bookkeeping_reports.py bookkeeping_export.py bookkeeping.py bookkeeping_sync.py atlas_billomat_client.py app.py telegram_bridge.py mail_client.py online_client.py jobs.py index.html style.css app.js profile.json /app/
 ENV PYTHONUNBUFFERED=1
 CMD ["python3", "/app/app.py"]
