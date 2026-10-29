@@ -36,7 +36,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.7.2'
+VERSION = '0.7.3'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -333,8 +333,21 @@ def make_handler(app):
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'")
-            self.end_headers()
-            self.wfile.write(body)
+            # Socket sendall uses an overall timeout. Large owner downloads may
+            # legitimately take longer than the short request-read timeout.
+            previous_timeout = self.connection.gettimeout()
+            if download:
+                self.connection.settimeout(120)
+            try:
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                # Headers may already be sent: never append a JSON error to a
+                # partially transmitted ZIP or retry private download bytes.
+                self.close_connection = True
+            finally:
+                if download:
+                    self.connection.settimeout(previous_timeout)
 
         def error(self, status, message):
             self.send(status, {'error': message})
