@@ -293,3 +293,16 @@ command after canceled greeting/decode, blocked resume timeout, manual quiet-inp
 finish and WebAudio start/cleanup failures. Python compileall and whitespace check
 pass. pytest is not present in this resumed environment; Python and container
 validation will run in release CI. No claim of an iPhone hardware fix is verified.
+
+Release0.8.1: PR73 merged10a2d2cfa423a812d4b382eef6357ebfd43d1a98 after
+all six CI jobs succeeded. Independent review identified a stale recorder-stop
+event affecting the next session; the live/recorder-identity guard and regression
+test were added before publication and relevant UI tests passed again.
+
+Installation is still pending. Secure browser login submitted but did not produce
+a confirmed authenticated page; fresh verification returned the sign-in form.
+Owner now clarifies that input produces text but no audible reply. This narrows
+the symptom toward the output path, but the device-specific cause remains unknown.
+The prepared release reuses the gesture-enabled WebAudio context for all automatic
+replies. Next step: restore authenticated HA access, install with backup, verify
+Piper greeting/output through the actual UI, then verify on the owner's device.
