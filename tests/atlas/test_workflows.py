@@ -4,6 +4,7 @@ import unittest
 import zipfile
 from unittest.mock import patch
 import test_backend as backend
+from workflows import BookkeepingError, SAFE_EXPORT_ERRORS
 
 
 class WorkflowTests(unittest.TestCase):
@@ -75,6 +76,41 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual([s['status'] for s in failed['steps']],['completed','failed','pending','pending'])
         self.assertNotIn('SECRET',json.dumps(failed))
         self.assertIsNone(self.app.workflows.download('dev',job['id']))
+
+    def test_real_undated_record_limit_reaches_step_four_with_safe_reason(self):
+        self.enable()
+        for index in range(101):
+            self.app.bookkeeping.ingest_document('dev', b'\x89PNG\r\n\x1a\nsynthetic' + str(index).encode(),
+                                                 'scan.png', 'image/png', {'provider': 'upload'})
+        job = self.submit('bookkeeping', month='2026-10')
+        self.app.jobs._process_one()
+        failed = self.app.jobs.get('dev', job['id'])
+        self.assertEqual(failed['status'], 'failed')
+        self.assertEqual([step['status'] for step in failed['steps']], ['completed', 'completed', 'completed', 'failed'])
+        self.assertIn('Export enthält mehr als 100 Belege; Auswahl eingrenzen.', failed['error'])
+        self.assertIn('mehr als 100 Belege', failed['steps'][3]['detail'])
+        self.assertIsNone(self.app.workflows.download('dev', job['id']))
+
+    def test_export_errors_are_exact_allowlist_and_type_checked(self):
+        self.enable()
+        cases = [(BookkeepingError(message), message) for message in SAFE_EXPORT_ERRORS]
+        cases.extend([(BookkeepingError('SECRET /private/path credential'), None),
+                      (RuntimeError('Originaldatei nicht verfügbar.'), None),
+                      (BookkeepingError('Originaldatei nicht verfügbar. SECRET'), None)])
+        for error, expected in cases:
+            with self.subTest(error_type=type(error).__name__, expected=expected):
+                job = self.submit('bookkeeping', month='2026-10')
+                with patch.object(self.app.bookkeeping, 'export', side_effect=error):
+                    self.app.jobs._process_one()
+                failed = self.app.jobs.get('dev', job['id'])
+                self.assertEqual(failed['status'], 'failed')
+                self.assertNotIn('SECRET', json.dumps(failed))
+                if expected:
+                    self.assertIn(expected, failed['error'])
+                    self.assertIn(expected, failed['steps'][3]['detail'])
+                else:
+                    self.assertIn('Quellen und Protokoll prüfen.', failed['error'])
+                    self.assertNotIn('Originaldatei', failed['error'])
 
     def test_queued_permission_recheck_and_restart(self):
         self.enable()

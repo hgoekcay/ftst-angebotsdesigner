@@ -2,6 +2,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 from bookkeeping_reports import build_report, format_report
+from bookkeeping import BookkeepingError
 from jobs import JobError
 
 TEMPLATES = {
@@ -11,6 +12,19 @@ TEMPLATES = {
                     ['Berechtigung und Monat prüfen', 'Freigegebene Quellen abgleichen', 'Prüfbericht erstellen', 'Monatspaket vorbereiten']),
 }
 MAX_ARCHIVE = 100 * 1024 * 1024
+# Exact, source-reviewed messages only. Never reflect arbitrary exception text,
+# paths, document contents, remote responses or credentials into a job result.
+SAFE_EXPORT_ERRORS = frozenset({
+    'Export enthält mehr als 100 Belege; Auswahl eingrenzen.',
+    'Export überschreitet 100 MiB.',
+    'Export einschließlich Prüfdaten überschreitet 100 MiB.',
+    'Originalpfad ungültig.',
+    'Originaldatei ist zu groß.',
+    'Originaldatei nicht verfügbar.',
+    'Originaldatei ist beschädigt.',
+    'Billomat-Datenstand ist ungültig.',
+    'Billomat-Datenstand ist beschädigt.',
+})
 
 
 class Workflows:
@@ -90,9 +104,14 @@ class Workflows:
             progress(index, 'running')
             try:
                 result = action()
-            except Exception:
-                progress(index, 'failed', 'Schritt fehlgeschlagen. Keine automatische Wiederholung.')
-                raise JobError('Arbeitsablauf bei Schritt ' + str(index + 1) + ' unterbrochen. Quellen und Protokoll prüfen.') from None
+            except Exception as exc:
+                message = 'Quellen und Protokoll prüfen.'
+                if index == 3 and isinstance(exc, BookkeepingError) and str(exc) in SAFE_EXPORT_ERRORS:
+                    message = str(exc)
+                elif index == 3 and isinstance(exc, JobError) and str(exc) == 'Monatspaket überschreitet das Größenlimit von 100 MiB.':
+                    message = str(exc)
+                progress(index, 'failed', message + ' Keine automatische Wiederholung.')
+                raise JobError('Arbeitsablauf bei Schritt ' + str(index + 1) + ' unterbrochen. ' + message) from None
             progress(index, 'completed', detail)
             return result
 
