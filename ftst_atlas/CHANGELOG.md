@@ -1,3 +1,9 @@
+## 0.8.1
+
+- Gesprächsstart mit lokaler Begrüßung und erkennbaren Startphasen.
+- Sprachausgabe im beim Start freigegebenen Audiokontext; klare Meldungen bei blockierter Ausgabe oder fehlendem Mikrofon.
+- „Jetzt antworten“ beendet die Aufnahme ausdrücklich, wenn die automatische Sprechpausenerkennung nicht greift.
+
 ## 0.8.0
 
 - Ausdrücklich einschaltbarer Gesprächsmodus: lokal zuhören, eine Anfrage bearbeiten und die Antwort vorlesen; Stoppen beendet die Aufnahme und weitere Gesprächsrunden.

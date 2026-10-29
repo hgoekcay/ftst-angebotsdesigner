@@ -225,7 +225,9 @@ zusätzlichen Rechte.
 ### Gesprächsmodus ab 0.8.0
 
 Im Chat **Gespräch starten** auswählen und das Mikrofon für diese Seite freigeben.
-ATLAS zeigt an, wann es zuhört, verarbeitet oder spricht. Eine Sprechpause beendet
+Ab 0.8.1 begrüßt ATLAS dich zuerst über lokales Piper. Warte auf die Anzeige
+**Ich höre zu**, bevor du sprichst. ATLAS zeigt an, wann es zuhört, verarbeitet oder
+spricht. Eine Sprechpause beendet
 die Aufnahme; das erkannte Gesagte erscheint im Chat und wird automatisch verarbeitet.
 Während der Antwort ist das Mikrofon geschlossen. Nach dem Vorlesen beginnt die
 nächste Runde. Lokale Verarbeitung kann abhängig von der Hardware dauern.
@@ -255,3 +257,9 @@ Das Mikrofon hört während der Sprachausgabe nicht zu. Zum Unterbrechen deshalb
 **Gespräch beenden** drücken. Kennungen angenommener Sprachaufträge bleiben zur
 Vermeidung doppelter Ausführung erhalten (höchstens 100.000 je Benutzer); die
 Auftragsinhalte und Ergebnisse haben weiterhin die reguläre Aufbewahrungsdauer.
+
+Wenn nach deinem Satz keine Verarbeitung beginnt, drücke **Jetzt antworten**.
+Das beendet die aktuelle Aufnahme ausdrücklich. Der Knopf ist nur während einer
+Aufnahme aktiv; die Aufnahme muss mindestens eine halbe Sekunde lang sein.
+Wenn Mikrofonfreigabe oder Audioausgabe nicht starten, zeigt ATLAS eine konkrete
+Meldung. Ein fehlendes Mikrofon kann nicht durch einen Serverneustart ersetzt werden.

@@ -267,3 +267,29 @@ Next voice check: start the installed mode on the owner's microphone device, ask
 simple question, verify playback/rearm, then explicitly save one task and verify it
 once. Accounting classification/extraction and masked invoice-mailbox credential
 correction remain outstanding; online access still needs a configured API key.
+
+
+## Voice-start correction preparation (2026-10-29)
+
+Owner reports no answer or greeting after clicking conversation. Source confirms
+0.8.0 had no startup greeting and relied exclusively on an audio-level pause
+heuristic to finish each utterance. The actual owner's device failure is not yet
+identified; no claim that autoplay or permission was the observed root cause.
+
+Preparing0.8.1: local Piper greeting before listening; the AudioContext is resumed
+inside the start gesture and reused for decoded WAV playback. Explicit phase text,
+German microphone/output errors and bounded waits avoid an unexplained silent
+start. Jetzt antworten provides a deliberate recording finish independent of the
+pause detector. Existing owner/CSRF boundaries and manual review mode remain.
+
+Code Review Graph CLI is absent in the resumed environment; this change uses rg,
+source/diff tracing and tests, not a claimed refreshed graph. The previously built
+graph is historical. Cloud Browser now displays the HA sign-in page; live logs,
+installation and physical microphone validation remain blocked by authentication.
+Do not mark this release installed until Supervisor and UI are observed again.
+
+Local validation:31 Node checks pass, including greeting-before-microphone, no
+command after canceled greeting/decode, blocked resume timeout, manual quiet-input
+finish and WebAudio start/cleanup failures. Python compileall and whitespace check
+pass. pytest is not present in this resumed environment; Python and container
+validation will run in release CI. No claim of an iPhone hardware fix is verified.
