@@ -306,3 +306,19 @@ the symptom toward the output path, but the device-specific cause remains unknow
 The prepared release reuses the gesture-enabled WebAudio context for all automatic
 replies. Next step: restore authenticated HA access, install with backup, verify
 Piper greeting/output through the actual UI, then verify on the owner's device.
+
+## Designer document delivery preparation (2026-10-29)
+
+Designer0.28.0 adds a read-only Billomat invoice/delivery-note browser with bounded30-item pages, document-number search and original PDF retrieval. Existing device-share controls prepare WhatsApp or email-app attachments after recipient/text review; native recipient selection and the final send remain in the chosen app. No document creation, completion, payment, external message, or delivery receipt is performed. Draft/canceled/unknown statuses are rejected again at PDF retrieval. Documents with a separate contact do not prefill the main customer's recipient.
+
+Prepared on current origin/main bf72dca in an isolated worktree after discovering that the old local Designer checkout was stale. Existing portal and ATLAS changes retained. rg/source/diff review used; no Code Review Graph run claimed. Initial targeted tests passed23 Python and10 JavaScript checks. Full current-suite Windows run encountered pre-existing ATLAS SQLite cleanup locks (WinError32); stopped rather than changing unrelated ATLAS code. Current Designer regression suite and Linux release CI are pending.
+
+Not installed. Browser inventory exposes no available browser or app session; recent upstream checkpoint also reports HA authentication unresolved. Backup, authenticated Billomat list/PDF verification, visual/mobile check and physical WhatsApp sharing remain outstanding. Do not call this release installed or messages sent. Next: complete CI, restore authenticated HA access, make backup, deploy, verify read-only original-document path and owner-driven sharing.
+
+Validation checkpoint: current Designer/non-ATLAS suite1077 tests passed;10 existing device-share JavaScript tests and Ruff passed. Draft PR74 contains the implementation; CI run40923562864 queued at this checkpoint. No installed-version claim. The earlier 962-test run used the stale local checkout and is not the release evidence. New branch uses current0.27.5 Designer baseline with portal functions preserved.
+
+## Document usability follow-up (2026-10-29)
+
+Previous release CI40923562864 completed successfully in all six jobs, including both Python versions and all container/browser checks. Added readable invoice status filtering (open/overdue/paid), retained filters across pagination and a manual-recipient fallback when customer lookup fails. A separate contact remains explicitly flagged rather than guessed. Targeted validation:30 Python tests plus Ruff passed. No visual/mobile browser session is exposed; installation, backup and live Billomat/WhatsApp checks still pending. Released no customer messages.
+
+Development disk ran out of space; removed only four verified task-owned pytest scratch directories under this workspace's work folder, freeing33MiB. Shell execution recovered. No customer data, PDFs or installed application files removed. New changes stay in draft PR74 until UI/live verification and backup are available.

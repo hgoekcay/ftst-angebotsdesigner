@@ -1,3 +1,12 @@
+# 0.28.0
+
+- Rechnungen nach offen, überfällig oder bezahlt filtern; Filter bleibt beim Blättern erhalten. Fehlende Kundenkontakte blockieren das Dokument nicht: Empfänger kann mit sichtbarem Hinweis manuell ergänzt werden.
+
+- Dokumentbereich für bestehende Rechnungen und Lieferscheine aus Billomat: bis zu 30 Einträge pro Seite, Suche nach Dokumentnummer und Original-PDF.
+- Empfänger und Nachricht prüfen, anschließend PDF über das native Teilen-Menü an WhatsApp oder E-Mail-App übergeben. Download und Textkopie als Alternative; kein automatischer Versand oder Zustellnachweis.
+- Entwürfe und stornierte Rechnungen nicht zum Teilen freigeben; Status vor jedem PDF-Abruf erneut prüfen. Keine Neuausstellung, Änderung oder Buchung in Billomat.
+- Bei abweichendem Billomat-Kontakt keine Hauptkundenadresse als Empfänger vorauswählen. Zugangsdaten bleiben am konfigurierten Billomat-Host; Weiterleitungen und fehlerhafte PDF-Antworten werden abgewiesen.
+
 # 0.27.5
 
 - Einheitliche, ruhigere Oberfläche mit Systemschrift, klarer Typografie, besser lesbaren Formularen und großzügigen Bedienflächen.
