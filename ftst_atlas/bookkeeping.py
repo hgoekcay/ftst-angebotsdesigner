@@ -24,7 +24,7 @@ from bookkeeping_export import documents_v1
 
 MAX_FILE = 12 * 1024 * 1024
 MAX_RECORDS = 2000
-MAX_EXPORT_FILES = 100
+MAX_EXPORT_FILES = MAX_RECORDS
 MAX_EXPORT_BYTES = 100 * 1024 * 1024
 FIELDS = {'supplier', 'invoice_number', 'invoice_date', 'currency', 'net', 'tax', 'gross', 'payment_status', 'direction', 'source_status', 'source_open_amount', 'source_due_date', 'source_currency'}
 SOURCE_KEYS = {'type', 'provider', 'reference', 'account_id', 'message_uid', 'attachment_id', 'invoice_id', 'access_id', 'label', 'project', 'note'}
@@ -555,14 +555,14 @@ class Bookkeeping:
                 FROM atlas_bookkeeping WHERE user_id=? AND
                 (json_extract(fields_json, '$.invoice_date') LIKE ? OR COALESCE(json_extract(fields_json, '$.invoice_date'),'')='')
                 ORDER BY created_at DESC,rowid DESC LIMIT ?''', (user, month + '-%', MAX_EXPORT_FILES + 1)).fetchall()
-        if len(rows) > MAX_EXPORT_FILES: raise BookkeepingError('Export enthält mehr als 100 Belege; Auswahl eingrenzen.')
+        if len(rows) > MAX_EXPORT_FILES: raise BookkeepingError('Export enthält mehr als 2000 Belege; Auswahl eingrenzen.')
         records = [self._record(row) for row in rows]
         output, csv_out = io.BytesIO(), io.StringIO(newline='')
         writer = csv.writer(csv_out, delimiter=';')
         columns = ['id','status','direction','supplier','invoice_number','invoice_date','currency','net','tax','gross','payment_status','sha256','original']
         writer.writerow(columns)
         manifest = {'format': 'ATLAS Belegvorbereitung 1', 'month': month, 'created_at': _now(), 'notice': 'Vorbereitung für Prüfung; kein DATEV-Import und keine Buchung. Undatierte Belege sind als ungeklärt enthalten. Zahlungsstatus unknown bedeutet nicht bezahlt oder unbezahlt. ai-bookkeeping.documents.json folgt documents/1; enthaltene Belege bleiben prüfpflichtig, ausgelassene Fälle sind dort in notes dokumentiert.', 'records': []}
-        unresolved, total = [], 0
+        unresolved, total, manifest_bytes = [], 0, 0
         with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
             for record in records:
                 data, name, mime = self.get_document(user, record['id'])
@@ -589,7 +589,14 @@ class Bookkeeping:
                     snapshot_name = 'datenstaende/' + record['id'] + '-' + snapshot_sha[:16] + '.json'
                     archive.writestr(snapshot_name, snapshot)
                     full['snapshot_files'].append({'file':snapshot_name,'sha256':snapshot_sha})
-                manifest['records'].append({**full, 'original':original, 'original_sha256':hashlib.sha256(data).hexdigest()})
+                manifest_record = {**full, 'original':original, 'original_sha256':hashlib.sha256(data).hexdigest()}
+                # Bound accumulation across many small documents before keeping
+                # another full history in memory. The exact final check below
+                # also includes bridge, CSV, unresolved items and wrapper bytes.
+                manifest_bytes += len(_json(manifest_record).encode('utf-8'))
+                if total + manifest_bytes > MAX_EXPORT_BYTES:
+                    raise BookkeepingError('Export einschließlich Prüfdaten überschreitet 100 MiB.')
+                manifest['records'].append(manifest_record)
                 if record['status'] != 'reviewed' or record['fields']['payment_status'] == 'unknown':
                     unresolved.append({'id':record['id'], 'filename':name, 'issues':record['issues'], 'manual_review_required':record['status'] != 'reviewed', 'payment_unknown':record['fields']['payment_status'] == 'unknown'})
             bridge = documents_v1(manifest['records'])

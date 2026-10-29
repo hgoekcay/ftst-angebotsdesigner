@@ -15,7 +15,7 @@ MAX_ARCHIVE = 100 * 1024 * 1024
 # Exact, source-reviewed messages only. Never reflect arbitrary exception text,
 # paths, document contents, remote responses or credentials into a job result.
 SAFE_EXPORT_ERRORS = frozenset({
-    'Export enthält mehr als 100 Belege; Auswahl eingrenzen.',
+    'Export enthält mehr als 2000 Belege; Auswahl eingrenzen.',
     'Export überschreitet 100 MiB.',
     'Export einschließlich Prüfdaten überschreitet 100 MiB.',
     'Originalpfad ungültig.',
