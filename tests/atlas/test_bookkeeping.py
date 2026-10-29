@@ -192,6 +192,50 @@ class BookkeepingTests(unittest.TestCase):
             self.store.ingest_document('alice',PNG,'undated.png','image/png',{'provider':'upload'})
             with self.assertRaises(module.BookkeepingError): self.store.export('alice','2026-01')
 
+    def test_export_count_ceiling_is_owner_scoped_and_rejects_overflow_before_reading(self):
+        self.assertEqual(module.MAX_EXPORT_FILES, 2000)
+        self.assertEqual(module.MAX_EXPORT_FILES, module.MAX_RECORDS)
+        record = self.store.ingest_document('alice', PNG, 'scan.png', 'image/png', {'provider': 'upload'})
+        with self.db() as db:
+            # Synthetic DB fixture tests the boundary independently of the ingest
+            # ceiling, without creating thousands of files or reading originals.
+            for index in range(2000):
+                db.execute("""INSERT INTO atlas_bookkeeping
+                    SELECT ?,user_id,?,filename,mime,original_path,source_json,fields_json,notes_json,reviewed,created_at
+                    FROM atlas_bookkeeping WHERE id=?""", ('extra-' + str(index), 'sha-' + str(index), record['id']))
+        with patch.object(self.store, 'get_document', side_effect=AssertionError('must reject before file reads')):
+            with self.assertRaisesRegex(module.BookkeepingError, 'mehr als 2000 Belege'):
+                self.store.export('alice', '2026-10')
+            with zipfile.ZipFile(io.BytesIO(self.store.export('bob', '2026-10'))) as archive:
+                self.assertEqual(json.loads(archive.read('manifest.json'))['records'], [])
+
+    def test_more_than_100_exports_keep_original_byte_budget(self):
+        records = [self.store.ingest_document('alice', PNG + str(i).encode(), 'scan.png', 'image/png', {'provider': 'upload'})
+                   for i in range(101)]
+        with zipfile.ZipFile(io.BytesIO(self.store.export('alice', '2026-10'))) as archive:
+            exported = json.loads(archive.read('manifest.json'))['records']
+            self.assertEqual({r['id'] for r in exported}, {r['id'] for r in records})
+        # Keep the production100MiB limit; a small test budget proves early
+        # rejection rather than allocating a hundred megabytes in this test.
+        with patch.object(module, 'MAX_EXPORT_BYTES', len(PNG) * 3):
+            with self.assertRaisesRegex(module.BookkeepingError, '100 MiB'):
+                self.store.export('alice', '2026-10')
+
+    def test_export_high_metadata_stops_before_reading_later_records(self):
+        self.store.ingest_document('alice', PNG + b'older', 'older.png', 'image/png', {'provider': 'upload'})
+        newest = self.store.ingest_document('alice', PNG + b'newer', 'newer.png', 'image/png', {'provider': 'upload'})
+        original_get = self.store.get
+        def large_history(user, ident):
+            result = original_get(user, ident)
+            result['audit'] = [{'note': 'x' * 12000}]
+            return result
+        with patch.object(module, 'MAX_EXPORT_BYTES', 10000), \
+             patch.object(self.store, 'get', side_effect=large_history), \
+             patch.object(self.store, 'get_document', wraps=self.store.get_document) as reads:
+            with self.assertRaisesRegex(module.BookkeepingError, 'einschließlich Prüfdaten'):
+                self.store.export('alice', '2026-10')
+            reads.assert_called_once_with('alice', newest['id'])
+
     def test_tampered_original_detected(self):
         record=self.xml()
         with self.db() as db: path=db.execute('SELECT original_path FROM atlas_bookkeeping WHERE id=?',(record['id'],)).fetchone()[0]

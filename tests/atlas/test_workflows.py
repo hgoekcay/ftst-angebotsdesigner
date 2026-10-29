@@ -77,19 +77,23 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('SECRET',json.dumps(failed))
         self.assertIsNone(self.app.workflows.download('dev',job['id']))
 
-    def test_real_undated_record_limit_reaches_step_four_with_safe_reason(self):
+    def test_month_package_includes_more_than_100_undated_records(self):
         self.enable()
+        expected = set()
         for index in range(101):
-            self.app.bookkeeping.ingest_document('dev', b'\x89PNG\r\n\x1a\nsynthetic' + str(index).encode(),
-                                                 'scan.png', 'image/png', {'provider': 'upload'})
+            record = self.app.bookkeeping.ingest_document('dev', b'\x89PNG\r\n\x1a\nsynthetic' + str(index).encode(),
+                                                         'scan.png', 'image/png', {'provider': 'upload'})
+            expected.add(record['id'])
         job = self.submit('bookkeeping', month='2026-10')
         self.app.jobs._process_one()
-        failed = self.app.jobs.get('dev', job['id'])
-        self.assertEqual(failed['status'], 'failed')
-        self.assertEqual([step['status'] for step in failed['steps']], ['completed', 'completed', 'completed', 'failed'])
-        self.assertIn('Export enthält mehr als 100 Belege; Auswahl eingrenzen.', failed['error'])
-        self.assertIn('mehr als 100 Belege', failed['steps'][3]['detail'])
-        self.assertIsNone(self.app.workflows.download('dev', job['id']))
+        completed = self.app.jobs.get('dev', job['id'])
+        self.assertEqual(completed['status'], 'completed', completed)
+        self.assertEqual([step['status'] for step in completed['steps']], ['completed'] * 4)
+        artifact = self.app.workflows.download('dev', job['id'])
+        with zipfile.ZipFile(io.BytesIO(artifact[1])) as archive:
+            records = json.loads(archive.read('manifest.json'))['records']
+            self.assertEqual({record['id'] for record in records}, expected)
+            self.assertEqual(len([name for name in archive.namelist() if name.startswith('originale/')]), 101)
 
     def test_export_errors_are_exact_allowlist_and_type_checked(self):
         self.enable()
