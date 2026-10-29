@@ -1,3 +1,7 @@
+## 0.7.3
+
+- Für große Downloads gilt ein eigenes begrenztes Übertragungszeitfenster; die kurzen Zeitlimits beim Lesen von Anfragen bleiben unverändert.
+
 ## 0.7.2
 
 - Monatsausgaben können den begrenzten Gesamtbestand bis 2.000 Belegen enthalten. Die 100-MiB-Prüfung für Originale und Prüfdaten bleibt erhalten; keine stille Kürzung auf 100 Belege.
