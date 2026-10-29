@@ -143,3 +143,20 @@ Live verification: existing knowledge survived migration; saved a confirmed publ
 The formerly size-blocked primary and personal mailbox imports now advance and yield additional document candidates. The primary mailbox's previously uncertain blocker was confirmed as an over8MiB message. Invoice-mailbox authentication still fails; the mail preview now explicitly displays the sanitized STRATO login-rejected message. Its saved credentials need correction by the owner. Bookkeeping's per-source summary still uses its generic incomplete-import error; do not claim that view has the detailed error. Further PDFs and unresolved attachment/document warnings remain; no complete or bank-reconciled accounting claim.
 
 Next development: entity/project knowledge organization and bounded multi-step workflows, then voice integration and central dashboard. Current task links aid context retrieval but do not execute workflows. No automatic mail-to-memory ingestion or model training; optional cloud service still lacks a configured API key. Do not re-enable scopes or resend invitations merely because earlier historical sections describe disabled state.
+
+
+## Workflow and voice release preparation (2026-10-29)
+
+ATLAS0.7.0 implementation adds bounded briefing/monthly preparation workflows,
+durable step progress, owner-scoped retained ZIP artifacts and explicit Telegram
+start/status commands. Local Whisper/Piper voice uses fixed Wyoming endpoints;
+recordings or uploaded audio produce a reviewable composer transcript, never an
+automatic command. Speech output is explicit. Voice defaults off, owner-scoped,
+5MiB/60s input and2000characters output, one request at a time.
+
+Live prerequisite check: existing Whisper3.5.3 and Piper2.5.2 are running and TCP
+reachable. This does not yet verify end-to-end transcription or speech generation.
+Code integration, full validation and installation are pending at this checkpoint.
+No new customer sends, payments, tax filing or external cloud access.
+
+Validation checkpoint: complete local suite1280 tests and104 subtests passed; all30 Node checks passed, targeted Python lint and whitespace checks clean. Independent module review corrected UI/server speech timeouts and added current-permission filtering for historical mixed briefing results. Code Review Graph rebuilt against the staged release tree:177files,2448nodes; app imports of workflow/voice/jobs and voice importer source-verified. No embeddings or production graph service. Release CI and live update remain pending.

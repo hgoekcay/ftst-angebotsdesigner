@@ -28,3 +28,5 @@ Ab 0.4.0: optionale OpenAI-Beratung mit Websuche, Quellen und Tageslimit sowie d
 
 
 Ab 0.5.0: Belegvorbereitung aus freigegebenen STRATO-Postfächern und Billomat, prüfbare Monatsausgabe, Telegram-OP-/Beleglisten und getrennte mobile Mitarbeiter-Uploads. Neue Zugänge werden gesondert konfiguriert; Einrichtung und Grenzen siehe DOCS.md.
+
+Ab 0.7.0: feste Arbeitsabläufe für Tagesüberblick und Monatsvorbereitung, Telegram-Statusabfragen sowie optionale lokale Spracheingabe und Sprachausgabe über Whisper/Piper. Erkannte Texte werden vor dem Senden geprüft.

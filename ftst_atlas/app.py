@@ -9,6 +9,8 @@ import time
 from mail_client import MailClient, MailError
 from online_client import OnlineClient, OnlineError
 from jobs import JobQueue, JobError
+from workflows import Workflows
+from voice import VoiceClient, VoiceError, VoiceAccessError, VoiceBusyError, MAX_UPLOAD
 from knowledge import Knowledge, KnowledgeConflict
 from bookkeeping import Bookkeeping
 from bookkeeping_sync import BookkeepingSync, SyncError
@@ -34,7 +36,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.6.1'
+VERSION = '0.7.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -79,6 +81,7 @@ class App:
             self.mail = MailClient(options)
         except MailError:
             self.mail = MailClient({})
+        self.voice = VoiceClient(options, dev=self.dev)
         self.online_share_profile = options.get('online_share_profile') is True
         self.online = OnlineClient(options, self.db)
         self.mail_lock = threading.Lock()
@@ -96,7 +99,8 @@ class App:
         self.submissions_public_url = options.get('submissions_public_url', '')
         self.billomat = BillomatClient(options)
         self.bookkeeping_sync = BookkeepingSync(options, self.db, self.bookkeeping, self.mail, self.billomat)
-        self.jobs = JobQueue(self.db, self.execute_job)
+        self.workflows = Workflows(self)
+        self.jobs = JobQueue(self.db, self.execute_job, self.workflows.execute, result_filter=self.workflows.filter_result)
 
     def db(self):
         db = sqlite3.connect(self.db_path, timeout=10)
@@ -328,7 +332,7 @@ def make_handler(app):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.send_header('Referrer-Policy', 'no-referrer')
-            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'")
+            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -372,6 +376,41 @@ def make_handler(app):
                 raise ValueError('JSON-Objekt erforderlich.')
             return result
 
+        def voice_request(self, path):
+            # Authorize before reading even one audio byte. This route exists only
+            # on Ingress, never on the separate employee-upload listener.
+            self.close_connection = True
+            state = app.voice.status(self.user_id)
+            if not state['enabled']:
+                return self.error(403, state['reason'])
+            lengths = self.headers.get_all('Content-Length', [])
+            if self.headers.get_all('Transfer-Encoding') or len(lengths) != 1 or not re.fullmatch(r'[0-9]{1,10}', lengths[0]):
+                return self.error(400, 'Eindeutige Inhaltslänge erforderlich; Streaming-Uploads werden nicht unterstützt.')
+            length = int(lengths[0])
+            limit = MAX_UPLOAD if path.endswith('/transcribe') else MAX_BODY
+            if not 0 < length <= limit:
+                return self.error(413, 'Die Sprach-Anfrage fehlt oder ist zu groß.')
+            mime = self.headers.get('Content-Type', '')
+            if path.endswith('/transcribe') and mime.partition(';')[0].strip().lower() not in ('audio/webm', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/x-wav'):
+                return self.error(415, 'WebM, Ogg, MP4 oder WAV erforderlich.')
+            try:
+                if path.endswith('/transcribe'):
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        return self.error(400, 'Die Sprachaufnahme wurde nicht vollständig übertragen.')
+                    return self.send(200, app.voice.transcribe(self.user_id, raw, mime))
+                data = self.body()
+                text = self.text(data, 'text', 2000)
+                return self.send(200, app.voice.synthesize(self.user_id, text), 'audio/wav')
+            except VoiceAccessError as exc:
+                return self.error(403, str(exc))
+            except VoiceBusyError as exc:
+                return self.error(429, str(exc))
+            except VoiceError as exc:
+                return self.error(503, str(exc))
+            except (TimeoutError, OSError):
+                return self.error(408, 'Die Sprach-Anfrage konnte nicht rechtzeitig übertragen werden.')
+
         def text(self, data, key, maxlen):
             value = data.get(key)
             if not isinstance(value, str) or not value.strip() or len(value) > maxlen:
@@ -397,7 +436,15 @@ def make_handler(app):
                 except (ValueError, sqlite3.Error):
                     return self.error(400, 'Belegabruf fehlgeschlagen. Auswahl und Speicher prüfen.')
             if path == '/api/status':
-                return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id), 'online': app.online.status(self.user_id), 'online_share_profile': app.online_share_profile})
+                return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id), 'online': app.online.status(self.user_id), 'online_share_profile': app.online_share_profile, 'voice': app.voice.status(self.user_id)})
+            if path == '/api/workflows/catalog':
+                return self.send(200, app.workflows.catalog(self.user_id))
+            workflow_download = re.fullmatch(r'/api/workflows/([A-Za-z0-9_-]{1,100})/download', path)
+            if workflow_download:
+                artifact = app.workflows.download(self.user_id, workflow_download[1])
+                if artifact is None:
+                    return self.error(404, 'Paket nicht verfügbar oder abgelaufen.')
+                return self.send(200, artifact[1], 'application/zip', download=artifact[0])
             if path == '/api/jobs':
                 return self.send(200, {'jobs': app.jobs.list(self.user_id)})
             match = re.fullmatch(r'/api/jobs/([A-Za-z0-9_-]{1,100})', path)
@@ -476,6 +523,10 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             try:
+                if method == 'POST' and path in ('/api/voice/transcribe', '/api/voice/synthesize'):
+                    return self.voice_request(path)
+                if method == 'POST' and path == '/api/workflows':
+                    return self.send(202, app.workflows.submit(self.user_id, self.body()))
                 if path.startswith('/api/submissions/access'):
                     if not app.bookkeeping_sync.enabled_for(self.user_id):
                         return self.error(403, 'Belegverwaltung nicht freigegeben.')

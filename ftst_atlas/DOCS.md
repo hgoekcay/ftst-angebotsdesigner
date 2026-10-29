@@ -189,3 +189,34 @@ Der Upload-Dienst startet nur mit `submissions_enabled: true` und gültiger `sub
 Unter Wissen können bestätigte Notizen mit Quelle und bis zu acht Schlagwörtern für Kunden oder Projekte gespeichert und gesucht werden. „Korrigieren“ bewahrt die vorherige Version; „Verlauf“ zeigt die Änderungen. Bei gleichzeitiger Bearbeitung wird eine veraltete Speicherung abgelehnt. Bestehende Notizen bleiben erhalten. Maximal 500 Notizen und 100 Versionen je Notiz. Löschen entfernt auch die Historie und Aufgabenverknüpfungen.
 
 „Aufgabe daraus“ verknüpft eine neue Aufgabe mit der Notiz. Aufgaben zeigen ihre verknüpften Notizen; lokale Chatantworten nutzen passende aktuelle Wissensstände mit Quelle und Datum. Dies ist eine lokale Aufgabenliste, keine autonome Ausführung. Keine automatische Übernahme von E-Mails ins Firmenwissen und kein Modelltraining. Online-Anfragen erhalten weiterhin nur den ausdrücklich konfigurierten Kontext.
+
+
+## Arbeitsabläufe und lokale Sprache ab 0.7.0
+
+Unter **Aufgaben** stehen zwei feste Abläufe bereit. **Tagesüberblick** liest eigenes
+Profil, gespeichertes Wissen, offene Aufgaben und den bereits importierten Belegstand.
+Er ruft keine neuen E-Mails ab. **Monatsvorbereitung** gleicht freigegebene Quellen
+in einem begrenzten Durchlauf ab, erstellt einen Prüfbericht und ein ZIP für den
+gewählten Monat. Der Bericht beschreibt den Gesamtbestand; das ZIP den gewählten
+Monat. Warnungen und ausstehende Importe bleiben sichtbar. Dies ist keine vollständige
+Buchhaltung und kein Zahlungsabgleich.
+
+Schritte und Ergebnisse bleiben sieben Tage abrufbar. Monatspakete sind auf 100 MiB,
+drei je Benutzer und zehn insgesamt begrenzt; ältere Pakete können früher entfallen.
+Ein beim Neustart laufender Auftrag wird als unterbrochen markiert und nicht automatisch
+wiederholt. Telegram kann mit `/briefing` und `/vorbereiten YYYY-MM` starten;
+`/auftraege` und `/auftrag ID` zeigen den Stand. Der Paketdownload erfolgt in ATLAS.
+
+Für lokale Sprache müssen die vorhandenen Home-Assistant-Apps **Whisper** und
+**Piper** laufen. Optionen: `voice_enabled: true`, `voice_ha_user_id` auf die interne
+ID des erlaubten HA-Benutzers setzen, Hosts `core-whisper` und `core-piper` beibehalten.
+Standardmäßig ist Sprache deaktiviert. Die Dienste werden ausschließlich lokal über
+die festen Wyoming-Ports 10300 und 10200 angesprochen.
+
+Im Chat Aufnahme ausdrücklich starten und stoppen, oder WAV/MP4/OGG/WebM hochladen.
+Grenzen: 5 MiB, 60 Sekunden. Der erkannte Text landet im Eingabefeld und wird erst
+nach eigener Prüfung und Klick auf Senden verarbeitet. Home-Assistant-Ingress oder
+der Browser können Mikrofonzugriff verhindern; dann Audiodatei verwenden.
+Vorlesen erfolgt nur auf Klick, mit maximal 2000 Zeichen, über lokales Piper.
+Aufnahmen werden nicht dauerhaft gespeichert. Die Spracherkennung erteilt keine
+zusätzlichen Rechte und löst keine selbstständigen Firmenaktionen aus.

@@ -20,9 +20,11 @@ def _now():
 
 
 class JobQueue:
-    def __init__(self, db_factory, execute_callable):
+    def __init__(self, db_factory, execute_callable, workflow_callable=None, result_filter=None):
         self.db = db_factory
         self.execute = execute_callable
+        self.workflow = workflow_callable
+        self.result_filter = result_filter
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._lifecycle = threading.Lock()
@@ -35,6 +37,10 @@ class JobQueue:
                 id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, title TEXT NOT NULL,
                 status TEXT NOT NULL, created_at TEXT NOT NULL,
                 finished_at TEXT, result TEXT, error TEXT)''')
+            db.execute('''CREATE TABLE IF NOT EXISTS atlas_job_steps (
+                job_id TEXT NOT NULL, step_index INTEGER NOT NULL, label TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending', started_at TEXT, finished_at TEXT, detail TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY(job_id, step_index))''')
             db.execute('CREATE INDEX IF NOT EXISTS atlas_jobs_owner ON atlas_jobs(user_id, created_at)')
 
     @staticmethod
@@ -42,14 +48,19 @@ class JobQueue:
         if not isinstance(user_id, str) or not user_id or len(user_id) > 128:
             raise JobError('Benutzerkennung fehlt oder ist ungültig.')
 
-    @staticmethod
-    def _public(row):
+    def _public(self, row, user_id):
         if row is None:
             return None
         # Avoid dependence on a caller-specific row_factory.
         ident, status, created, finished, result, error, title = tuple(row)
-        return {'id': ident, 'status': status, 'created_at': created,
-                'finished_at': finished, 'result': json.loads(result) if result else None,
+        with self.db() as db:
+            steps = [dict(zip(('index', 'label', 'status', 'started_at', 'finished_at', 'detail'), tuple(step))) for step in db.execute(
+                'SELECT step_index,label,status,started_at,finished_at,detail FROM atlas_job_steps WHERE job_id=? ORDER BY step_index', (ident,))]
+        result = json.loads(result) if result else None
+        if result is not None and self.result_filter is not None:
+            result = self.result_filter(user_id, result)
+        return {'steps': steps, 'id': ident, 'status': status, 'created_at': created,
+                'finished_at': finished, 'result': result,
                 'error': error, 'title': title}
 
     @staticmethod
@@ -57,8 +68,13 @@ class JobQueue:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         db.execute("DELETE FROM atlas_jobs WHERE status IN ('completed','failed') AND finished_at < ?", (cutoff,))
 
-    def submit(self, user_id, payload):
+        db.execute('DELETE FROM atlas_job_steps WHERE job_id NOT IN (SELECT id FROM atlas_jobs)')
+
+    def submit(self, user_id, payload, steps=None):
         self._user(user_id)
+        steps = [] if steps is None else steps
+        if not isinstance(steps, list) or len(steps) > 8 or any(not isinstance(s, str) or not 1 <= len(s) <= 100 for s in steps):
+            raise JobError('Ungültiger Ablaufplan.')
         if not isinstance(payload, dict):
             raise JobError('Auftrag muss ein Objekt sein.')
         try:
@@ -79,9 +95,10 @@ class JobQueue:
                 raise JobError('Die Warteschlange ist voll. Bitte später erneut versuchen.')
             db.execute('INSERT INTO atlas_jobs(id,user_id,payload,status,created_at,title) VALUES (?,?,?,?,?,?)',
                        (ident, user_id, encoded, 'queued', stamp, title))
+            db.executemany('INSERT INTO atlas_job_steps(job_id,step_index,label) VALUES(?,?,?)',
+                           [(ident, index, label) for index, label in enumerate(steps)])
         self._wake.set()
-        return {'id': ident, 'status': 'queued', 'created_at': stamp,
-                'finished_at': None, 'result': None, 'error': None, 'title': title}
+        return self.get(user_id, ident)
 
     def get(self, user_id, ident):
         self._user(user_id)
@@ -90,7 +107,7 @@ class JobQueue:
         with self.db() as db:
             row = db.execute('''SELECT id,status,created_at,finished_at,result,error,title
                 FROM atlas_jobs WHERE id=? AND user_id=?''', (ident, user_id)).fetchone()
-        return self._public(row)
+        return self._public(row, user_id)
 
     def list(self, user_id):
         self._user(user_id)
@@ -98,7 +115,17 @@ class JobQueue:
             self._cleanup(db)
             rows = db.execute('''SELECT id,status,created_at,finished_at,result,error,title
                 FROM atlas_jobs WHERE user_id=? ORDER BY created_at DESC, rowid DESC LIMIT 20''', (user_id,)).fetchall()
-        return [self._public(row) for row in rows]
+        return [self._public(row, user_id) for row in rows]
+
+    def progress(self, ident, index, status, detail=''):
+        if status not in ('running', 'completed', 'failed'):
+            raise JobError('Ungültiger Schrittstatus.')
+        with self.db() as db:
+            db.execute("""UPDATE atlas_job_steps SET status=?,detail=?,
+                started_at=COALESCE(started_at,?),finished_at=?
+                WHERE job_id=? AND step_index=? AND EXISTS
+                (SELECT 1 FROM atlas_jobs WHERE id=? AND status='running')""",
+                (status, detail[:500], _now(), None if status == 'running' else _now(), ident, index, ident))
 
     def start(self):
         with self._lifecycle:
@@ -109,6 +136,9 @@ class JobQueue:
                     error=? WHERE status='running' AND id<>?""", (_now(),
                     'ATLAS wurde neu gestartet. Der begonnene Auftrag wird nicht automatisch wiederholt.',
                     self._pending_completion[-1] if self._pending_completion else ''))
+                db.execute("""UPDATE atlas_job_steps SET status='failed',finished_at=?,detail=?
+                    WHERE status='running' AND job_id IN (SELECT id FROM atlas_jobs WHERE status='failed')""",
+                    (_now(), 'Neustart: Schritt wird nicht automatisch wiederholt.'))
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, name='atlas-jobs', daemon=True)
             self._thread.start()
@@ -133,7 +163,13 @@ class JobQueue:
             db.execute("UPDATE atlas_jobs SET status='running' WHERE id=?", (ident,))
         result, error, status = None, None, 'completed'
         try:
-            result = self.execute(user_id, json.loads(payload))
+            decoded = json.loads(payload)
+            if decoded.get('kind') == 'workflow':
+                if self.workflow is None:
+                    raise JobError('Arbeitsabläufe sind nicht verfügbar.')
+                result = self.workflow(user_id, decoded, ident, lambda index, state, detail='': self.progress(ident, index, state, detail))
+            else:
+                result = self.execute(user_id, decoded)
             if not isinstance(result, dict):
                 raise ValueError('Result must be an object')
             result = json.dumps(result, ensure_ascii=False, allow_nan=False)
@@ -157,6 +193,10 @@ class JobQueue:
             # Inputs are no longer required after execution. Retain only output.
             db.execute("UPDATE atlas_jobs SET status=?,finished_at=?,result=?,error=?,payload='{}' WHERE id=? AND status='running'",
                        completion)
+            if completion[0] == 'failed':
+                db.execute("""UPDATE atlas_job_steps SET status='failed',finished_at=?,detail=?
+                    WHERE job_id=? AND status='running'""", (completion[1],
+                    'Schritt konnte nicht sicher abgeschlossen werden. Keine automatische Wiederholung.', completion[-1]))
         # Clear only after the transaction context committed successfully. A
         # retry after an uncertain commit is harmless because this UPDATE is
         # conditional and never executes the original external operation.

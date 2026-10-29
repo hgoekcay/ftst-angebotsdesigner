@@ -1,3 +1,10 @@
+## 0.7.0
+
+- Tagesüberblick und Monatsvorbereitung als feste Arbeitsabläufe mit dauerhaftem Schrittstatus und geschütztem Downloadpaket.
+- Telegram: `/briefing`, `/vorbereiten YYYY-MM`, `/auftraege` und `/auftrag ID`.
+- Lokale Spracheingabe mit Whisper, Prüfung des Transkripts vor dem Senden und ausdrückliches Vorlesen mit Piper. Audiodatei-Upload als Alternative zum Mikrofon.
+- Sprachzugriff nur für den konfigurierten Eigentümer; höchstens 60 Sekunden und 5 MiB. Keine automatische Ausführung gesprochener Befehle.
+
 ## 0.6.1
 
 - Veraltete fest eingetragene Versionsnummer aus der Fußzeile entfernt. Unter System wird die tatsächliche Backend-Version angezeigt.
