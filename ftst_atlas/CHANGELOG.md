@@ -1,3 +1,7 @@
+## 0.7.1
+
+- Bekannte Exportgrenzen und Originaldatei-Probleme im fehlgeschlagenen Vorbereitungsschritt gezielt anzeigen; unbekannte Fehler bleiben geschützt.
+
 ## 0.7.0
 
 - Tagesüberblick und Monatsvorbereitung als feste Arbeitsabläufe mit dauerhaftem Schrittstatus und geschütztem Downloadpaket.
