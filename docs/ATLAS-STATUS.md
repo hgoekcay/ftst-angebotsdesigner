@@ -1,7 +1,15 @@
 # ATLAS and FTST project state
 
-Updated: 2026-10-28. This file is the current continuity record, not an instruction
+Updated: 2026-10-29. This file is the current continuity record, not an instruction
 to perform unapproved external actions. Check live versions before deployment.
+
+## Latest verified state
+
+ATLAS0.7.3 is installed and running. Briefing and monthly preparation workflows,
+Telegram start/status commands, and owner-only local Whisper/Piper voice are shipped.
+The live monthly ZIP download passed CRC and original SHA256 checks after fixing
+large-response truncation. See the final checkpoint below; earlier sections are
+historical. Cloud API access and invoice-mailbox credential repair remain pending.
 
 ## Goal and decisions
 
@@ -166,3 +174,35 @@ Live0.7.0 installed with backup=true after all six CI jobs passed; PR68 merged13
 Live0.7.1 installed with backup after all six CI jobs passed; PR69 mergedd97c19d9becaae59f391f8bc7626ae77ee11d6b9. Exact export blocker confirmed: the100-document selection ceiling, including undated records. Preparing0.7.2 to align that count with the existing2000-record store ceiling while retaining cumulative100MiB original/snapshot/metadata limits and no omission. Synthetic audio-file upload through the actual ATLAS UI transcribed correctly into the composer without sending; browser automation timed out after the operation, but the resulting DOM text was verified. Local readaloud completed without UI error; physical microphone capture remains untested.
 
 Live0.7.2 installed with backup; PR70 merged1d1f1090d7b268f1a4472d964aaa85ccbb33ceaf, all six CI jobs passed (Python3.13:1281 passed,4 ffmpeg-dependent skips,116 subtests; real codec tests were verified locally earlier). October workflow now completed all four steps and created an artifact with incomplete-source warnings preserved. Live large-download checks produced truncated ZIPs; investigating the handler's15-second socket-write timeout. Do not claim a verified downloadable package until CRC/hash checks succeed.
+
+
+## Final verified workflow and voice checkpoint (2026-10-29)
+
+PR71 merged394ab736955ae74667ffde3bad21e494bc8ea910 after all six CI jobs passed.
+Python3.13:1284 passed,4 codec-dependent skips,116 subtests. The real codec tests
+passed locally and a live uploaded synthetic WAV produced the expected composer
+text without sending it. Piper/Whisper local protocol roundtrip was verified; live
+readaloud completed without a UI error. Physical microphone capture, mobile and
+light-mode visual checks remain unverified. Telegram command routing is covered by
+tests; no new live owner Telegram command was sent during this release check.
+
+Installed ATLAS0.7.3 observed started; all four release updates used backup=true.
+Tagesüberblick completed all steps. Monthly preparation completed and preserved
+incomplete-source warnings. The retained artifact survived the subsequent addon
+update. After the scoped120-second attachment write timeout correction, the actual
+monthly archive downloaded completely; ZIP CRC, all manifest original SHA256
+hashes, month, CSV, unresolved report and documents/1 presence were verified. No
+financial counts, invoice contents, credentials or private identifiers are stored
+in this public record. Earlier truncated test downloads are not usable deliverables.
+
+Current boundaries: up to2000 selected records including undated originals and
+100MiB total original/snapshot/metadata budget. Incremental metadata checks prevent
+unbounded accumulation across records; one record's history is still loaded eagerly,
+so this is not a strict process-memory cap. Artifacts are owner-scoped, seven days,
+latest three per owner and ten globally. No automatic replay of interrupted jobs,
+no arbitrary tool execution, mail sends, payments, filing or bank reconciliation.
+
+Next concrete work: resolve invoice-mailbox authentication through masked owner
+configuration, review unresolved documents/coverage, then organize project/entity
+knowledge and a consolidated dashboard. Optional online access still requires an
+API key. Voice input is reviewed text, not a general autonomous action permission.
