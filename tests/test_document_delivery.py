@@ -3,6 +3,47 @@ import app
 import document_delivery as d
 
 
+def test_status_filter_survives_pagination(client, monkeypatch):
+    def read(path, params):
+        assert params['status'] == 'OVERDUE'
+        return {'invoices': {'invoice': [dict(id=str(i+1), status='OVERDUE', invoice_number='RE-'+str(i)) for i in range(30)]}}
+    monkeypatch.setattr(d, 'read', read)
+    response = client.get('/documents?status=OVERDUE&q=RE')
+    assert response.status_code == 200
+    assert 'value="OVERDUE" selected' in response.text
+    assert 'page=2' in response.text and 'q=RE' in response.text
+    assert 'status=OVERDUE' in response.text
+    assert 'Überfällig' in response.text
+
+
+@pytest.mark.parametrize('query', ['status=DRAFT', 'status=CANCELED', 'kind=delivery-notes&status=PAID'])
+def test_status_filter_rejects_disallowed_values_before_io(client, monkeypatch, query):
+    monkeypatch.setattr(d, 'read', lambda *a, **k: pytest.fail('unexpected read'))
+    assert client.get('/documents?'+query).status_code == 400
+
+
+def test_customer_lookup_failure_preserves_manual_delivery(client, monkeypatch):
+    def read(path, **kwargs):
+        if path.startswith('clients/'):
+            raise d.DocumentError('lookup failed')
+        return {'invoice': {'id': '12', 'client_id': '7', 'status': 'OPEN'}}
+    monkeypatch.setattr(d, 'read', read)
+    response = client.get('/documents/invoices/12')
+    assert response.status_code == 200
+    assert 'Empfänger bitte manuell' in response.text
+    assert 'id="delivery-email" type="email" value=""' in response.text
+    assert 'data-deliver="whatsapp"' in response.text
+
+
+def test_server_filter_mismatch_is_not_displayed(client, monkeypatch):
+    monkeypatch.setattr(d, 'read', lambda *a, **k: {'invoices': {'invoice': [
+        {'id':'1','status':'PAID','invoice_number':'SHOULD-NOT-APPEAR'},
+        {'id':'2','status':'OPEN','invoice_number':'RE-2'}]}})
+    result = client.get('/documents?status=OPEN')
+    assert 'SHOULD-NOT-APPEAR' not in result.text
+    assert 'RE-2' in result.text
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.delenv('FTST_REQUIRE_INGRESS', raising=False)

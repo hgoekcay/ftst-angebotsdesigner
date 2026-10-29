@@ -316,3 +316,9 @@ Prepared on current origin/main bf72dca in an isolated worktree after discoverin
 Not installed. Browser inventory exposes no available browser or app session; recent upstream checkpoint also reports HA authentication unresolved. Backup, authenticated Billomat list/PDF verification, visual/mobile check and physical WhatsApp sharing remain outstanding. Do not call this release installed or messages sent. Next: complete CI, restore authenticated HA access, make backup, deploy, verify read-only original-document path and owner-driven sharing.
 
 Validation checkpoint: current Designer/non-ATLAS suite1077 tests passed;10 existing device-share JavaScript tests and Ruff passed. Draft PR74 contains the implementation; CI run40923562864 queued at this checkpoint. No installed-version claim. The earlier 962-test run used the stale local checkout and is not the release evidence. New branch uses current0.27.5 Designer baseline with portal functions preserved.
+
+## Document usability follow-up (2026-10-29)
+
+Previous release CI40923562864 completed successfully in all six jobs, including both Python versions and all container/browser checks. Added readable invoice status filtering (open/overdue/paid), retained filters across pagination and a manual-recipient fallback when customer lookup fails. A separate contact remains explicitly flagged rather than guessed. Targeted validation:30 Python tests plus Ruff passed. No visual/mobile browser session is exposed; installation, backup and live Billomat/WhatsApp checks still pending. Released no customer messages.
+
+Development disk ran out of space; removed only four verified task-owned pytest scratch directories under this workspace's work folder, freeing33MiB. Shell execution recovered. No customer data, PDFs or installed application files removed. New changes stay in draft PR74 until UI/live verification and backup are available.
