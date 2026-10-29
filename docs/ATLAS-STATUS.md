@@ -245,3 +245,25 @@ and17 subtests passed. All31 Node checks, targeted Python lint and whitespace
 checks passed. Independent review found no blocking authorization/replay issue.
 Physical microphone/iOS/autoplay remain unverified. Publication and installation
 are pending at this checkpoint.
+
+
+## Installed voice dialogue checkpoint (2026-10-29)
+
+PR72 merged5400b3307ac947dcada26d35187bb909a4e3eccc after all six CI jobs passed.
+Python3.13 reported1323 passed,4 codec-dependent skips and116 subtests. The release
+was installed through Supervisor with backup=true; version0.8.0 and started state
+were observed. Existing voice-owner options were retained, no scopes expanded.
+Live UI displayed the enabled Gespräch starten button, command help and default-off
+microphone state. A real click in the cloud browser returned no microphone device
+and safely left dialogue stopped. This verifies failure handling, not a spoken
+end-to-end conversation. Physical microphone/iOS/autoplay remain to be tested on
+the user's device. Prior local Whisper/Piper protocol and synthetic-file tests do
+not establish that hardware behavior. No new real-world task was sent for this test.
+
+Final local graph rebuild:181files,2508nodes; app/test imports of dialog.py were
+checked against source. Graph parsing has unresolved/ambiguous static imports and
+is not proof of full dynamic call coverage. No graph service, embeddings or hooks.
+Next voice check: start the installed mode on the owner's microphone device, ask a
+simple question, verify playback/rearm, then explicitly save one task and verify it
+once. Accounting classification/extraction and masked invoice-mailbox credential
+correction remain outstanding; online access still needs a configured API key.
