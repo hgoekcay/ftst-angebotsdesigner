@@ -5,6 +5,8 @@ completed even when its response was lost. SQLite contains the local inputs and
 results; callers must protect the database and validate the requested action.
 """
 import json
+import hashlib
+import re
 import secrets
 import sqlite3
 import threading
@@ -41,6 +43,9 @@ class JobQueue:
                 job_id TEXT NOT NULL, step_index INTEGER NOT NULL, label TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending', started_at TEXT, finished_at TEXT, detail TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY(job_id, step_index))''')
+            db.execute('''CREATE TABLE IF NOT EXISTS atlas_job_requests (
+                user_id TEXT NOT NULL, request_key TEXT NOT NULL, fingerprint TEXT NOT NULL, job_id TEXT NOT NULL,
+                PRIMARY KEY(user_id, request_key))''')
             db.execute('CREATE INDEX IF NOT EXISTS atlas_jobs_owner ON atlas_jobs(user_id, created_at)')
 
     @staticmethod
@@ -70,8 +75,10 @@ class JobQueue:
 
         db.execute('DELETE FROM atlas_job_steps WHERE job_id NOT IN (SELECT id FROM atlas_jobs)')
 
-    def submit(self, user_id, payload, steps=None):
+    def submit(self, user_id, payload, steps=None, request_key=None):
         self._user(user_id)
+        if request_key is not None and (not isinstance(request_key, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,100}', request_key)):
+            raise JobError('Ungültige Auftragskennung.')
         steps = [] if steps is None else steps
         if not isinstance(steps, list) or len(steps) > 8 or any(not isinstance(s, str) or not 1 <= len(s) <= 100 for s in steps):
             raise JobError('Ungültiger Ablaufplan.')
@@ -85,16 +92,38 @@ class JobQueue:
             raise JobError('Auftrag ist zu groß.')
         message = payload.get('message')
         title = message[:120] if isinstance(message, str) and message.strip() else 'ATLAS-Auftrag'
+        fingerprint = None
+        if request_key is not None:
+            try:
+                fingerprint = hashlib.sha256(json.dumps([payload, steps], sort_keys=True, ensure_ascii=False, allow_nan=False).encode('utf-8')).hexdigest()
+            except (ValueError, TypeError, OverflowError):
+                raise JobError('Auftrag enthält ungültige Daten.') from None
         ident, stamp = secrets.token_urlsafe(24), _now()
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
             self._cleanup(db)
+            if request_key is not None:
+                previous = db.execute('SELECT fingerprint,job_id FROM atlas_job_requests WHERE user_id=? AND request_key=?',
+                                      (user_id, request_key)).fetchone()
+                if previous:
+                    if previous[0] != fingerprint:
+                        raise JobError('Diese Auftragskennung wurde bereits für eine andere Anfrage verwendet.')
+                    previous_job = db.execute('SELECT 1 FROM atlas_jobs WHERE id=? AND user_id=?', (previous[1], user_id)).fetchone()
+                    if not previous_job:
+                        raise JobError('Das frühere Ergebnis ist abgelaufen. Dieser Auftrag wird nicht erneut ausgeführt.')
+                    # The request reservation and job insertion commit together;
+                    # tombstones intentionally outlive seven-day result cleanup.
+                    return self.get(user_id, previous[1])
+                if db.execute('SELECT COUNT(*) FROM atlas_job_requests WHERE user_id=?', (user_id,)).fetchone()[0] >= 100000:
+                    raise JobError('Das Limit gespeicherter Sprachauftragskennungen ist erreicht. Wartung erforderlich.')
             if db.execute("SELECT 1 FROM atlas_jobs WHERE user_id=? AND status IN ('queued','running')", (user_id,)).fetchone():
                 raise JobError('Ein Auftrag läuft bereits. Bitte das Ergebnis abwarten.')
             if db.execute("SELECT COUNT(*) FROM atlas_jobs WHERE status='queued'").fetchone()[0] >= 10:
                 raise JobError('Die Warteschlange ist voll. Bitte später erneut versuchen.')
             db.execute('INSERT INTO atlas_jobs(id,user_id,payload,status,created_at,title) VALUES (?,?,?,?,?,?)',
                        (ident, user_id, encoded, 'queued', stamp, title))
+            if request_key is not None:
+                db.execute('INSERT INTO atlas_job_requests VALUES (?,?,?,?)', (user_id, request_key, fingerprint, ident))
             db.executemany('INSERT INTO atlas_job_steps(job_id,step_index,label) VALUES(?,?,?)',
                            [(ident, index, label) for index, label in enumerate(steps)])
         self._wake.set()

@@ -10,6 +10,7 @@ from mail_client import MailClient, MailError
 from online_client import OnlineClient, OnlineError
 from jobs import JobQueue, JobError
 from workflows import Workflows
+from dialog import Dialog
 from voice import VoiceClient, VoiceError, VoiceAccessError, VoiceBusyError, MAX_UPLOAD
 from knowledge import Knowledge, KnowledgeConflict
 from bookkeeping import Bookkeeping
@@ -36,7 +37,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.7.3'
+VERSION = '0.8.0'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -100,7 +101,8 @@ class App:
         self.billomat = BillomatClient(options)
         self.bookkeeping_sync = BookkeepingSync(options, self.db, self.bookkeeping, self.mail, self.billomat)
         self.workflows = Workflows(self)
-        self.jobs = JobQueue(self.db, self.execute_job, self.workflows.execute, result_filter=self.workflows.filter_result)
+        self.dialog = Dialog(self)
+        self.jobs = JobQueue(self.db, self.execute_job, self.execute_workflow, result_filter=self.workflows.filter_result)
 
     def db(self):
         db = sqlite3.connect(self.db_path, timeout=10)
@@ -159,8 +161,15 @@ class App:
                 return {**result, 'routing_note': 'Lokale Antwort fehlgeschlagen; Online-Beratung verwendet.'}
             raise
 
+    def execute_workflow(self, user_id, payload, ident, progress):
+        if payload.get('voice_dialog'):
+            self.dialog.authorize(user_id)
+        return self.workflows.execute(user_id, payload, ident, progress)
+
     def execute_job(self, user_id, payload):
         try:
+            if payload.get('voice_dialog'):
+                return self.dialog.execute(user_id, payload)
             if payload.get('kind') == 'bookkeeping':
                 return self.bookkeeping_sync.sync(user_id)
             return self.respond(payload['message'], user_id, payload.get('history', []), payload.get('mode', 'auto'))
@@ -413,6 +422,8 @@ def make_handler(app):
                         return self.error(400, 'Die Sprachaufnahme wurde nicht vollständig übertragen.')
                     return self.send(200, app.voice.transcribe(self.user_id, raw, mime))
                 data = self.body()
+                if path.endswith('/turn'):
+                    return self.send(202, app.dialog.submit(self.user_id, data))
                 text = self.text(data, 'text', 2000)
                 return self.send(200, app.voice.synthesize(self.user_id, text), 'audio/wav')
             except VoiceAccessError as exc:
@@ -536,7 +547,7 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             try:
-                if method == 'POST' and path in ('/api/voice/transcribe', '/api/voice/synthesize'):
+                if method == 'POST' and path in ('/api/voice/transcribe', '/api/voice/synthesize', '/api/voice/turn'):
                     return self.voice_request(path)
                 if method == 'POST' and path == '/api/workflows':
                     return self.send(202, app.workflows.submit(self.user_id, self.body()))

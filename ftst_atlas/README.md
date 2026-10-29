@@ -30,3 +30,5 @@ Ab 0.4.0: optionale OpenAI-Beratung mit Websuche, Quellen und Tageslimit sowie d
 Ab 0.5.0: Belegvorbereitung aus freigegebenen STRATO-Postfächern und Billomat, prüfbare Monatsausgabe, Telegram-OP-/Beleglisten und getrennte mobile Mitarbeiter-Uploads. Neue Zugänge werden gesondert konfiguriert; Einrichtung und Grenzen siehe DOCS.md.
 
 Ab 0.7.0: feste Arbeitsabläufe für Tagesüberblick und Monatsvorbereitung, Telegram-Statusabfragen sowie optionale lokale Spracheingabe und Sprachausgabe über Whisper/Piper. Erkannte Texte werden vor dem Senden geprüft.
+
+Ab 0.8.0 kann im Chat zusätzlich **Gespräch starten** eingeschaltet werden. ATLAS verarbeitet erkannte Sätze und liest Antworten automatisch vor. Ausdrückliche Sprachbefehle können Aufgaben anlegen, den Tagesüberblick starten oder einen Monat vorbereiten. Die bestehenden Benutzerrechte gelten weiterhin. Gespräch beenden stoppt das Mikrofon; bereits angenommene Aufträge bleiben unter Aufgaben sichtbar.
