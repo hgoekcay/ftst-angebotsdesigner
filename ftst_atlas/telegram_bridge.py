@@ -127,9 +127,11 @@ class TelegramBridge:
             self.reply('Bitte maximal 2.000 Zeichen senden.')
             return
         if text in ('/start', '/help'):
-            self.reply('ATLAS: Schreibe deine Frage. /op zeigt offene Ausgangsrechnungen, /belege zeigt fehlende/ungeprüfte Belege, /buchhaltung zeigt den Überblick. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. /online FRAGE nutzt Online-Beratung mit Websuche, /lokal FRAGE bleibt lokal. Automatisch kann eine Recherchefrage oder ein lokaler Modellfehler an OpenAI gehen, wenn eingerichtet. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
+            self.reply('ATLAS: Schreibe deine Frage. /op zeigt offene Ausgangsrechnungen, /belege zeigt fehlende/ungeprüfte Belege, /buchhaltung zeigt den Überblick. /briefing startet ein Firmenbriefing, /vorbereiten YYYY-MM startet die Buchhaltungsvorbereitung, /auftraege zeigt Aufträge, /auftrag ID zeigt Fortschritt und Ergebnis. /tasks zeigt Aufgaben, /remember TEXT speichert ausdrücklich Wissen, /id zeigt deine freigegebene ID. /online FRAGE nutzt Online-Beratung mit Websuche, /lokal FRAGE bleibt lokal. Automatisch kann eine Recherchefrage oder ein lokaler Modellfehler an OpenAI gehen, wenn eingerichtet. Keine Geräteaktionen. Nachrichten laufen über Telegram.')
         elif text.lower() in ('/op', '/belege', '/buchhaltung'):
             self.bookkeeping_reply({'/op': 'op', '/belege': 'belege', '/buchhaltung': 'summary'}[text.lower()])
+        elif text.split()[0].lower() in ('/briefing', '/vorbereiten', '/auftraege', '/auftrag'):
+            self.workflow_command(text)
         elif text == '/id':
             self.reply('Deine freigegebene Telegram-ID: ' + str(self.user_id))
         elif text.lower() in ('/tasks', 'tasks', 'aufgaben'):
@@ -172,6 +174,64 @@ class TelegramBridge:
             else:
                 self.reply(answer)
             self.history = (self.history + [{'role': 'user', 'content': text[:500]}, {'role': 'assistant', 'content': answer[:500]}])[-4:]
+
+    @staticmethod
+    def job_status(status):
+        return {'queued': 'wartet', 'running': 'läuft', 'completed': 'abgeschlossen',
+                'failed': 'fehlgeschlagen', 'pending': 'offen'}.get(status, 'unbekannt')
+
+    def workflow_command(self, text):
+        """Explicit submission and polling only; handle() already claimed the update."""
+        parts = text.split()
+        command = parts[0].lower()
+        if command == '/vorbereiten' and (len(parts) != 2 or not re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', parts[1]) or parts[1][:4] == '0000'):
+            self.reply('Nutze /vorbereiten YYYY-MM, zum Beispiel /vorbereiten 2026-10.')
+            return
+        if command == '/auftrag' and (len(parts) != 2 or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', parts[1])):
+            self.reply('Nutze /auftrag ID. Deine IDs findest du mit /auftraege.')
+            return
+        if command in ('/briefing', '/auftraege') and len(parts) != 1:
+            self.reply('Nutze ' + command + ' ohne weitere Angaben.')
+            return
+        try:
+            if command in ('/briefing', '/vorbereiten'):
+                payload = {'workflow': 'briefing' if command == '/briefing' else 'bookkeeping'}
+                if command == '/vorbereiten':
+                    payload['month'] = parts[1]
+                    if not self.app.bookkeeping_sync.enabled_for(self.ha_user_id):
+                        self.reply('Buchhaltung ist für dein ATLAS-Konto nicht freigegeben.')
+                        return
+                job = self.app.workflows.submit(self.ha_user_id, payload)
+                self.reply('Auftrag eingereiht: ' + job['id'] + '\nFortschritt und Ergebnis abrufen: /auftrag ' + job['id'])
+            elif command == '/auftraege':
+                jobs = self.app.jobs.list(self.ha_user_id)
+                lines = [str(job['title'])[:120] + ' · ' + self.job_status(job['status']) + '\n/auftrag ' + job['id'] for job in jobs[:10]]
+                self.reply('\n\n'.join(lines) if lines else 'Noch keine Aufträge vorhanden.')
+            else:
+                job = self.app.jobs.get(self.ha_user_id, parts[1])
+                if job is None:
+                    self.reply('Auftrag nicht gefunden oder nicht für dein Konto verfügbar.')
+                    return
+                result = job.get('result') or {}
+                if result.get('workflow') == 'bookkeeping' and not self.app.bookkeeping_sync.enabled_for(self.ha_user_id):
+                    self.reply('Buchhaltung ist für dein ATLAS-Konto nicht freigegeben.')
+                    return
+                lines = [str(job['title'])[:120], 'Status: ' + self.job_status(job['status'])]
+                for step in job.get('steps', [])[:10]:
+                    lines.append(str(step.get('label', 'Schritt'))[:120] + ': ' + self.job_status(step.get('status')))
+                if job['status'] == 'failed':
+                    lines.append('Auftrag fehlgeschlagen. Details in ATLAS prüfen. Keine automatische Wiederholung.')
+                elif isinstance(result.get('reply'), str):
+                    lines.append(result['reply'])
+                suffix = '\nBericht in ATLAS beim Auftrag herunterladen.' if result.get('artifact') else ''
+                answer = '\n'.join(lines)
+                if len(answer) + len(suffix) > 4000:
+                    suffix = '\n[Ergebnis gekürzt; vollständig in ATLAS.]' + suffix
+                    answer = answer[:4000 - len(suffix)]
+                self.reply(answer + suffix)
+        except Exception:
+            # Never forward provider, storage or transport errors (may contain secrets).
+            self.reply('Aufträge derzeit nicht verfügbar. Freigabe und laufende Aufträge in ATLAS prüfen.')
 
     def bookkeeping_reply(self, kind):
         # Exact owner authorization is checked by the helper, independently of chat binding.

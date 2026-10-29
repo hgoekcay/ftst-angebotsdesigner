@@ -1,5 +1,5 @@
 name: "FTST ATLAS"
-version: "0.6.1"
+version: "0.7.0"
 slug: "ftst_atlas"
 description: "Firmenassistent mit lokalem Wissen, optionaler Online-Beratung und Hintergrundaufträgen."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
@@ -22,6 +22,9 @@ timeout: 30
 options:
   ollama_url: "http://76b650ab-ftst-local-ai:11434"
   model: "qwen3:4b-instruct-2507-q4_K_M"
+  voice_enabled: false
+  voice_whisper_host: "core-whisper"
+  voice_piper_host: "core-piper"
   telegram_enabled: false
   mail_enabled: false
   mail_bridge_url: "http://76b650ab-ftst-strato-mail:8098"
@@ -42,6 +45,10 @@ options:
 schema:
   ollama_url: url
   model: str
+  voice_enabled: bool
+  voice_ha_user_id: "str?"
+  voice_whisper_host: str
+  voice_piper_host: str
   telegram_enabled: bool
   telegram_token: "password?"
   telegram_user_id: "str?"
