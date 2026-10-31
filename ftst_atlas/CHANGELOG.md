@@ -1,3 +1,10 @@
+## 0.8.2
+
+- Gespräch steht im Mittelpunkt: neue ATLAS-Kugel mit Zuständen für Start, Zuhören, Verarbeitung, Sprechen und Unterbrechung; reduzierte Animation auf Wunsch des Geräts.
+- Kurze Verbindungsfehler beim Abholen einer Antwort werden bis zu dreimal erneut versucht. Bereits übermittelte Aufträge werden dabei nicht erneut gestartet.
+- Zeitlimit auch beim Lesen einer hängen gebliebenen Antwort; Stoppen verhindert verspätete Wiedergabe.
+- Test auf dem eigenen Gerät erforderlich: diese Version garantiert keine Behebung gerätespezifischer Mikrofon- oder Audiofehler.
+
 ## 0.8.1
 
 - Gesprächsstart mit lokaler Begrüßung und erkennbaren Startphasen.
