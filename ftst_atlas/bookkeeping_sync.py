@@ -218,7 +218,7 @@ class BookkeepingSync:
         """
         key = 'billomat_op'
         state = self._get(key)
-        if not state.get('pending'):
+        if not state.get('pending') or state.get('cycle_attempted'):
             state = {'started_at': datetime.now(timezone.utc).isoformat(), 'pending': True}
         state.update(id=key, type='billomat', error='', last_run=_now(), refreshed=0)
         query = """FROM atlas_bookkeeping b
@@ -255,6 +255,11 @@ class BookkeepingSync:
                     state['error'] = 'Zahlungsstände bestehender Rechnungen konnten nicht vollständig aktualisiert werden.'
             with self.db() as db:
                 state['remaining'] = db.execute('SELECT COUNT(*) ' + query, (user, state['started_at'])).fetchone()[0]
+                # Completion of attempts advances the next cycle even if an ID keeps
+                # failing. Successful OPEN invoices must not remain frozen behind it.
+                unattempted = db.execute('SELECT COUNT(*) ' + query + " AND COALESCE(r.attempted_at,'') < ?",
+                                         (user, state['started_at'], state['started_at'])).fetchone()[0]
+                state['cycle_attempted'] = unattempted == 0
             state['pending'] = bool(state['remaining'])
             if not state['pending']:
                 state['last_finished'] = _now()

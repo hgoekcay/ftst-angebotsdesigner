@@ -354,19 +354,23 @@ live-session history guard address it before release.
 
 Known unresolved Billomat invoices now refresh by ID outside the rolling discovery
 window. A durable owner-scoped cycle processes at most 25 per sync; failed IDs
-remain pending without starving later IDs. Reports show incomplete refresh coverage.
+remain pending without starving later IDs. Review found that a permanent failure
+could freeze subsequent cycles; cycles now advance after all IDs were attempted,
+with a regression covering another invoice becoming paid while one ID keeps failing. Reports show incomplete refresh coverage.
 Already closed invoices and never-imported historical invoices are outside this
 repair. This is source-status reporting, not bank reconciliation.
 
 Live evidence on 0.8.2: normal browser authentication works; local text roundtrip
-returned successfully after a noticeable wait. Existing background jobs contain
+returned successfully; Ollama logs measured 22.8 seconds, including 19.6 seconds
+for 1,063 prompt tokens. The earlier 1–2 minute observation interval was not a
+measured model latency. Existing background jobs contain
 valid model replies. Automated bookkeeping sync is active but source coverage is
 incomplete, including a mailbox whose read-only preview explicitly reports rejected STRATO login.
 Its credentials must be corrected through secure configuration. Some imported attachments are not invoices;
 classification/review needs improvement. No company documents or identifiers are
 recorded here. No production configuration, credentials or document reviews changed.
 
-Validation/deployment: all 31 Node checks and 52 bookkeeping tests passed, along
+Validation/deployment: all 31 Node checks and 56 bookkeeping tests passed, along
 with Python compileall and whitespace checks. Broad local unittest discovery ran
 191 tests but four modules could not import because pytest is absent; full Python
 validation is delegated to CI. CI release checks and 0.8.3 installation are pending. Do not claim
@@ -378,3 +382,13 @@ invoices, add bank reconciliation and persistent mail drafts before claiming bro
 automation. Employee upload service requires verified separate HTTPS routing. The
 existing two workflows are briefing and monthly preparation, not a general autonomous
 company operator. Online API access remains an owner-supplied configuration step.
+
+The PDF intake follow-up is included in this same unmerged 0.8.3 release: generic
+incoming attachments are labeled unreviewed incoming documents, not confirmed
+invoices. Conservative explicit number/date pairs, currency prefixes and identical
+repeated invoice IDs are supported; contradictory values stay unknown. A valid
+synthetic PDF exercises the real isolated parser and original preservation. Existing
+stored PDFs are not re-extracted; no OCR, semantic classification or automatic review.
+Final independent review reports no remaining blocker in these changes. All 56
+bookkeeping tests and 31 Node checks passed locally. PR #78 is the release candidate;
+GitHub CI and installation must still be verified against its updated head.

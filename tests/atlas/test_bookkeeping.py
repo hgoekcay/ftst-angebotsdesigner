@@ -113,6 +113,57 @@ class BookkeepingTests(unittest.TestCase):
         self.assertNotIn('currency',result)
         self.assertEqual(result['invoice_date'],'2026-10-02')
 
+    def test_pdf_explicit_header_pair_and_currency_prefix(self):
+        text = ('Rechnungs-Nr.: RE-123    Rechnungsdatum: 31.10.2026\n'
+                'Nettobetrag: EUR 1.000,00\nGesamtbetrag: € 1.190,00\n')
+        result = module._extract_text(text)
+        self.assertEqual(result['invoice_number'], 'RE-123')
+        self.assertEqual(result['invoice_date'], '2026-10-31')
+        self.assertEqual(result['net'], '1000.00')
+        self.assertEqual(result['gross'], '1190.00')
+        self.assertNotIn('tax', result)
+        self.assertNotIn('currency', result)
+        reverse = module._extract_text('Invoice date: 2026-10-31    Invoice no: RE-123\n')
+        self.assertEqual(reverse['invoice_number'], 'RE-123')
+        self.assertEqual(reverse['invoice_date'], '2026-10-31')
+
+    def test_pdf_repeated_identifier_keeps_conflicts_unknown(self):
+        self.assertEqual(module._extract_text('Rechnungsnummer: RE-1\nRechnungsnummer: RE-1\n')['invoice_number'], 'RE-1')
+        self.assertNotIn('invoice_number', module._extract_text('Rechnungsnummer: RE-1\nRechnungsnummer: RE-2\n'))
+        ambiguous = module._extract_text('Gesamtbetrag: EUR 100,00\nGesamtbetrag: EUR 200,00\nMwSt. 19 % 19,00 EUR\n')
+        self.assertNotIn('gross', ambiguous)
+        self.assertNotIn('tax', ambiguous)
+        self.assertNotIn('invoice_number', module._extract_text('Anleitung: Rechnungsnummer: RE-1    Rechnungsdatum: 31.10.2026\n'))
+
+    @unittest.skipUnless(importlib.util.find_spec('pypdf'), 'pypdf is a production image dependency')
+    def test_real_text_pdf_preserved_and_fields_remain_unreviewed(self):
+        # Small valid PDF with a real text layer, no third-party fixture generator.
+        content = (b'BT /F1 10 Tf 40 780 Td '
+                   b'(Rechnungs-Nr.: RE-123    Rechnungsdatum: 31.10.2026) Tj '
+                   b'0 -20 Td (Nettobetrag: EUR 100,00) Tj '
+                   b'0 -20 Td (Gesamtbetrag: EUR 119,00) Tj ET')
+        objects = [b'<< /Type /Catalog /Pages 2 0 R >>',
+                   b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+                   b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+                   b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+                   b'<< /Length ' + str(len(content)).encode() + b' >>\nstream\n' + content + b'\nendstream']
+        data = b'%PDF-1.4\n'
+        offsets = []
+        for number, obj in enumerate(objects, 1):
+            offsets.append(len(data))
+            data += str(number).encode() + b' 0 obj\n' + obj + b'\nendobj\n'
+        xref = len(data)
+        data += b'xref\n0 6\n0000000000 65535 f \n'
+        data += b''.join(('%010d 00000 n \n' % offset).encode() for offset in offsets)
+        data += b'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + str(xref).encode() + b'\n%%EOF\n'
+        record = self.store.ingest_document('alice', data, 'synthetic.pdf', 'application/pdf', {'provider': 'upload'})
+        self.assertEqual(record['fields']['invoice_number'], 'RE-123')
+        self.assertEqual(record['fields']['invoice_date'], '2026-10-31')
+        self.assertEqual(record['fields']['gross'], '119.00')
+        self.assertEqual(record['fields']['tax'], '')
+        self.assertFalse(record['reviewed'])
+        self.assertEqual(self.store.get_document('alice', record['id'])[0], data)
+
     def test_billomat_snapshot_refresh_and_original_association(self):
         first=self.store.ingest_billomat('alice',self.invoice())
         self.assertFalse(first['duplicate'])

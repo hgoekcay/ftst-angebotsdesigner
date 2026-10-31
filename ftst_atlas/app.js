@@ -402,7 +402,7 @@ function renderBookkeeping(){
  if(!records.length)list.append(element('p','empty-state',bookkeepingEnabled?'Keine passenden Belege vorhanden. Ein Abgleich kann neue Belege übernehmen.':'Die Belegvorbereitung ist noch nicht freigegeben. Bestehende Belege erscheinen nach Einrichtung der Verbindung.'));
  for(const record of records){
   const fields=record.fields||{},card=element('article','card bookkeeping-card'),heading=element('div','bookkeeping-card-heading'),title=element('div');
-  title.append(element('span','section-kicker',fields.direction==='outgoing'?'AUSGANGSRECHNUNG':fields.direction==='incoming'?'EINGANGSRECHNUNG':'RICHTUNG UNGEKLÄRT'),element('h3','',fields.supplier||record.filename||'Beleg ohne Rechnungspartner'));
+  title.append(element('span','section-kicker',fields.direction==='outgoing'?'AUSGANGSRECHNUNG':fields.direction==='incoming'?(record.reviewed===true?'EINGANGSBELEG':'UNGEPRÜFTER EINGANGSBELEG'):'RICHTUNG UNGEKLÄRT'),element('h3','',fields.supplier||record.filename||'Beleg ohne Rechnungspartner'));
   heading.append(title,element('strong','bookkeeping-amount',bookkeepingAmount(fields)));card.append(heading);
   const badges=element('div','bookkeeping-badges');badges.append(element('span','tag'+(record.reviewed===true?'':' pending'),record.reviewed===true?'Geprüft':'Noch zu prüfen'),element('span','tag neutral','Zahlung: '+(paymentLabels[fields.payment_status]||'Unbekannt')));card.append(badges);
   card.append(element('p','quiet',(fields.invoice_number?'Nr. '+fields.invoice_number:'Rechnungsnummer fehlt')+' · '+(fields.invoice_date||'Datum fehlt')),element('p','field-hint',sourceLabel(record.source)));
