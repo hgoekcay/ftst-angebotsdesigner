@@ -306,3 +306,32 @@ the symptom toward the output path, but the device-specific cause remains unknow
 The prepared release reuses the gesture-enabled WebAudio context for all automatic
 replies. Next step: restore authenticated HA access, install with backup, verify
 Piper greeting/output through the actual UI, then verify on the owner's device.
+
+## Reply polling investigation (2026-10-31)
+
+Owner reports installing the update and hearing the startup greeting. Automatic
+spoken replies remain unverified. Completed results were reported in the jobs
+view while the corresponding chat reply was absent; this does not establish the
+exact device failure. TinyFish authenticated but repeatedly failed UI interaction;
+its earlier version claims are not installation evidence. No further live update
+has been verified.
+
+Source review confirms the job endpoint and browser agree on the flat status/result
+envelope. A transient GET failure currently abandons the browser wait while the
+durable server job continues. Preparing bounded retries of result reads only;
+submission must never be replayed. Backgrounding or leaving Chat intentionally
+stops the microphone and speech, and is a separate possible interruption.
+Graph engine unavailable: direct source tracing and an independent agent review.
+Next device check must distinguish capture, transcription, polling and playback;
+no claim that this resilience change alone fixes the reported microphone behavior.
+
+Implemented shared result reads with a30-second deadline covering headers/body,
+at most three retries on transient transport/408/429/5xx failures, and immediate
+failure for access/not-found errors. Chat and dialogue retain the original job ID;
+no POST is replayed. Cancellation prevents further reads or delayed playback.
+Regression tests cover recovered text/spoken replies, one submission, retry limits,
+authorization failures, canceled retries and a stalled/late response body.
+Dialogue, workflow/voice and knowledge Node suites and diff whitespace checks pass.
+Prepared as a review branch; version unchanged, not deployed, device symptom still
+requires live verification. Physical capture and automatic pause detection remain
+separate from the completed-job response path tested here.
