@@ -5,12 +5,16 @@ to perform unapproved external actions. Check live versions before deployment.
 
 ## Latest verified state
 
-ATLAS 0.8.3 is installed and running, verified through Home Assistant after update
-with the backup option enabled. PR #78 merged as 1565ff66b05a918c08406af038306a660978e085
-following all six CI jobs passing (run 41251902803, head 0824943da6ec38fc1a162a387d16e0b496f76559).
-Preparing 0.8.4 for explicit local re-extraction proposals on existing PDFs.
-Live local text response and briefing completed; physical iPhone conversation is
-still unverified. Online provider remains disabled; one mailbox rejects login.
+ATLAS 0.8.4 is installed and running, independently verified in Home Assistant.
+Both 0.8.3 and 0.8.4 updates used the enabled backup option. PR #79 merged as
+e072cdd87ef1f13af383ee98f6952ee84c01149e after all six CI jobs succeeded
+(run 41252302432; Python 3.13: 1333 passed, 4 skipped, 116 subtests).
+Text reply and briefing were verified live, as was the older-open-invoice sync.
+The PDF proposal action was tested on two existing documents without saving edits:
+one produced one proposal, the other none; form fields remained unchanged.
+Physical iPhone conversation remains unverified. Online provider remains disabled;
+one STRATO mailbox rejects login. Full bookkeeping and autonomous company workflows
+are not complete. See the final checkpoint and ATLAS-FIRMENABLAEUFE.md.
 
 ## Goal and decisions
 
@@ -416,3 +420,34 @@ workflows. It is a development/acceptance plan, not an installed autonomous comp
 0.8.4 validation and installation are pending the release checks. 0.8.3 is the
 last independently verified installed version. No live financial review decisions,
 mail sends or payments have been performed during this work.
+
+
+## Installed handoff: 0.8.4 (2026-10-31 UTC)
+
+PR #78 / 0.8.3 and PR #79 / 0.8.4 were merged after all six CI jobs passed for each
+exact release head. Home Assistant showed 0.8.4 current and running after updating
+with backup enabled. The normal browser session is authenticated; no credentials
+were read or copied. Do not assume that browser authentication lasts indefinitely.
+
+Live checks: 0.8.3 text submission produced the expected automatic chat reply;
+Tagesueberblick completed all four steps; automatic bookkeeping synchronization
+included the new older-open-invoice source. Incoming documents show the neutral
+unreviewed-document label. On 0.8.4, explicit PDF re-extraction returned one proposal
+for one existing PDF and no reliable proposals for another. Neither check changed
+form fields; no proposal was adopted and no financial review was saved. No private
+filenames, invoice values or document contents are included in this record.
+
+Remaining concrete blockers and work:
+- Physical iPhone input/output/rearm still requires actual device verification.
+  Browser greeting progressed to microphone acquisition, where this remote browser
+  reported no microphone. This is not evidence of an iPhone audio failure or success.
+- STRATO rejects login for one invoice mailbox; correct its credentials securely.
+- Online provider is disabled and needs the owner's API configuration.
+- Current parser handles only limited explicit text labels; no OCR or broad semantic
+  invoice recognition. Unknowns remain unresolved; there is no automatic review.
+- Employee upload HTTPS routing/access needs end-to-end verification. Bank matching,
+  ledger, durable mail drafts and fuller company workflows remain development work.
+
+Next resume: verify current installed version and available session, then work from
+ATLAS-FIRMENABLAEUFE.md acceptance milestones. The code and fixes are published;
+there is no promise of unattended continuous development after the chat turn ends.
