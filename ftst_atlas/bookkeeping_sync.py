@@ -40,6 +40,7 @@ class BookkeepingSync:
         self._stop, self._thread = threading.Event(), None
         with self.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS atlas_bookkeeping_sync (owner TEXT, source TEXT, state TEXT NOT NULL, PRIMARY KEY(owner,source))')
+            db.execute('CREATE TABLE IF NOT EXISTS atlas_bookkeeping_refresh (owner TEXT, invoice_id TEXT, checked_at TEXT NOT NULL DEFAULT \'\', attempted_at TEXT NOT NULL DEFAULT \'\', PRIMARY KEY(owner,invoice_id))')
             db.execute('CREATE TABLE IF NOT EXISTS atlas_bookkeeping_pdfs (owner TEXT, invoice_id TEXT, record_id TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(owner,invoice_id))')
 
     def enabled_for(self, user):
@@ -93,6 +94,7 @@ class BookkeepingSync:
             if self.billomat.enabled_for(user) and not self._stop.is_set():
                 summary['sources'].append(self._billomat(user, summary['counts']))
                 if not summary['sources'][-1].get('binding_changed'):
+                    summary['sources'].append(self._refresh_open_invoices(user, summary['counts']))
                     self._pdfs(user, summary)
             if not summary['sources'] and not summary['errors']:
                 summary['errors'].append('Keine freigegebene Importquelle eingerichtet.')
@@ -207,6 +209,64 @@ class BookkeepingSync:
             state.update(error='Billomat-Import unvollständig; Abruf oder geänderte Seitenfolge muss erneut geprüft werden.', pending=True)
         self._put(key, state)
         return {k: state.get(k) for k in ('id', 'type', 'pending', 'error', 'warnings', 'page', 'last_run')} | {'pending': bool(state['pending'] or state.get('warnings'))}
+
+    def _refresh_open_invoices(self, user, counts):
+        """Recheck unresolved IDs independently of the invoice discovery window.
+
+        A durable cycle and oldest-attempt ordering bound each run to 25 reads
+        without starving later IDs when an earlier invoice cannot be fetched.
+        """
+        key = 'billomat_op'
+        state = self._get(key)
+        if not state.get('pending') or state.get('cycle_attempted'):
+            state = {'started_at': datetime.now(timezone.utc).isoformat(), 'pending': True}
+        state.update(id=key, type='billomat', error='', last_run=_now(), refreshed=0)
+        query = """FROM atlas_bookkeeping b
+                   LEFT JOIN atlas_bookkeeping_refresh r
+                     ON r.owner=b.user_id AND r.invoice_id=json_extract(b.source_json,'$.invoice_id')
+                   WHERE b.user_id=? AND json_extract(b.source_json,'$.provider')='billomat'
+                     AND COALESCE(json_extract(b.fields_json,'$.source_status'),'') NOT IN ('PAID','CANCELED','DRAFT')
+                     AND COALESCE(r.checked_at,'') < ?"""
+        try:
+            with self.db() as db:
+                rows = db.execute("SELECT json_extract(b.source_json,'$.invoice_id') " + query +
+                                  " ORDER BY COALESCE(r.attempted_at,''),b.id LIMIT 25",
+                                  (user, state['started_at'])).fetchall()
+            for (invoice_id,) in rows:
+                if self._stop.is_set():
+                    break
+                attempted = datetime.now(timezone.utc).isoformat()
+                # Mark attempts before network access; failed IDs rotate but stay pending.
+                with self.db() as db:
+                    db.execute("INSERT INTO atlas_bookkeeping_refresh(owner,invoice_id,attempted_at) VALUES(?,?,?) "
+                               "ON CONFLICT(owner,invoice_id) DO UPDATE SET attempted_at=excluded.attempted_at",
+                               (user, invoice_id, attempted))
+                try:
+                    row = self.billomat.get_invoice(user, invoice_id)
+                    if row['id'] != invoice_id or row['status'] == 'DRAFT':
+                        raise SyncError('Rechnungskennung oder Status ungeklärt.')
+                    self.bookkeeping.ingest_billomat(user, self._normalize(row))
+                    with self.db() as db:
+                        db.execute('UPDATE atlas_bookkeeping_refresh SET checked_at=? WHERE owner=? AND invoice_id=?',
+                                   (attempted, user, invoice_id))
+                    state['refreshed'] += 1
+                    counts['billomat_invoices'] += 1
+                except Exception:
+                    state['error'] = 'Zahlungsstände bestehender Rechnungen konnten nicht vollständig aktualisiert werden.'
+            with self.db() as db:
+                state['remaining'] = db.execute('SELECT COUNT(*) ' + query, (user, state['started_at'])).fetchone()[0]
+                # Completion of attempts advances the next cycle even if an ID keeps
+                # failing. Successful OPEN invoices must not remain frozen behind it.
+                unattempted = db.execute('SELECT COUNT(*) ' + query + " AND COALESCE(r.attempted_at,'') < ?",
+                                         (user, state['started_at'], state['started_at'])).fetchone()[0]
+                state['cycle_attempted'] = unattempted == 0
+            state['pending'] = bool(state['remaining'])
+            if not state['pending']:
+                state['last_finished'] = _now()
+        except Exception:
+            state.update(pending=True, error='Abdeckung der bestehenden offenen Rechnungen konnte nicht geprüft werden.')
+        self._put(key, state)
+        return dict(state)
 
     def _pdfs(self, user, summary):
         with self.db() as db:

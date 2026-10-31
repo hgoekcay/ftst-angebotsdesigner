@@ -170,18 +170,27 @@ def _locale_amount(text):
 
 def _extract_text(text):
     """Conservative labeled fields only; missing supplier/currency stay unknown."""
+    # PDF text often puts the two explicit header labels on one row. Split only
+    # a complete, recognized number/date pair; do not split arbitrary prose.
+    number = r'(?:Rechnungs(?:nummer|[ -]?Nr\.?)|Invoice[ \t]*(?:number|no\.?))[ \t]*[:#]?[ \t]*[A-Za-z0-9][A-Za-z0-9_./-]{1,80}'
+    stamp = r'(?:Rechnungsdatum|Invoice[ \t]*date)[ \t]*:?[ \t]*(?:\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4})'
+    for first, second in ((number, stamp), (stamp, number)):
+        text = re.sub(r'(?im)^[ \t]*(' + first + r')[ \t]{2,}(' + second + r')[ \t]*$', r'\1\n\2', text)
     result = {}
     patterns = {
         'invoice_number': r'(?im)^\s*(?:Rechnungs(?:nummer|[ -]?Nr\.?)|Invoice\s*(?:number|no\.?))\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9_./-]{1,80})\s*$',
         'invoice_date': r'(?im)^\s*(?:Rechnungsdatum|Invoice\s*date)\s*:?\s*(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4})\s*$',
         'supplier': r'(?im)^\s*(?:Lieferant|Supplier|Rechnungssteller)\s*:\s*([^\n]{2,200})$',
         'currency': r'(?im)^\s*(?:Währung|Currency)\s*:\s*([A-Z]{3})\s*$',
-        'net': r'(?im)^\s*(?:Nettobetrag|Netto(?:summe)?|Net\s*total)\s*:?\s*(-?[\d., ]+)\s*(?:EUR|€)?\s*$',
-        'tax': r'(?im)^\s*(?:Steuerbetrag|Umsatzsteuer|MwSt\.?|VAT\s*total)\s*:?\s*(-?[\d., ]+)\s*(?:EUR|€)?\s*$',
-        'gross': r'(?im)^\s*(?:Bruttobetrag|Bruttosumme|Gesamtbetrag|Gross\s*total)\s*:?\s*(-?[\d., ]+)\s*(?:EUR|€)?\s*$'
+        'net': r'(?im)^\s*(?:Nettobetrag|Netto(?:summe)?|Net\s*total)\s*:?\s*(?:(?:EUR|€)[ \t]*)?(-?[\d., \u00a0]+)[ \t]*(?:EUR|€)?\s*$',
+        'tax': r'(?im)^\s*(?:Steuerbetrag|Umsatzsteuer|MwSt\.?|VAT\s*total)\s*:?\s*(?:(?:EUR|€)[ \t]*)?(-?[\d., \u00a0]+)[ \t]*(?:EUR|€)?\s*$',
+        'gross': r'(?im)^\s*(?:Bruttobetrag|Bruttosumme|Gesamtbetrag|Gross\s*total)\s*:?\s*(?:(?:EUR|€)[ \t]*)?(-?[\d., \u00a0]+)[ \t]*(?:EUR|€)?\s*$'
     }
     for key, pattern in patterns.items():
         matches = re.findall(pattern, text)
+        if key == 'invoice_number':
+            # Repeated page headers are one identifier; conflicting IDs stay unknown.
+            matches = list(dict.fromkeys(value.strip() for value in matches))
         if len(matches) != 1:
             continue
         try:

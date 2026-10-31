@@ -97,23 +97,24 @@ function renderResult(container,data){
  container.append(element('p','field-hint',(data.provider||'Lokal')+' · '+(data.model||'')+(data.online?(data.web_searched?' · Webquellen geprüft':' · Ohne Websuche'):'')+(data.routing_note?' · '+data.routing_note:'')));
 }
 // Only repeat status reads: a lost response must never resubmit a task.
-async function readJob(id,state=null){
- const live=()=>!state||dialogueLive(state);
+async function readJob(id,state=null,keepAfterStop=false){
+ const live=()=>keepAfterStop||!state||dialogueLive(state);
+ const feedback=message=>{if(state){if(dialogueLive(state))dialogueStatus(message);}else $('chat-progress').textContent=message;};
  for(let attempt=0;attempt<4;attempt++){
   if(!live())throw new Error('Gespräch beendet.');
-  const controller=new AbortController();if(state)state.controller=controller;let timer;
+  const controller=new AbortController();if(state&&!keepAfterStop)state.controller=controller;let timer;
   try{
    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('Auftragsstatus antwortet nicht rechtzeitig.'),{name:'AbortError',retryableRead:true}));},30000);});
    const job=await Promise.race([api('jobs/'+encodeURIComponent(id),{signal:controller.signal}),timeout]);
    if(!live())throw new Error('Gespräch beendet.');
-   if(attempt>0){if(state)dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.');else $('chat-progress').replaceChildren(element('span','thinking-dot'),document.createTextNode('ATLAS bearbeitet deinen Auftrag. Das Ergebnis bleibt unter Aufgaben abrufbar.'));}
+   if(attempt>0)feedback('ATLAS bearbeitet deine Anfrage. Das Ergebnis bleibt unter Aufgaben abrufbar.');
    return job;
   }catch(error){
    if(!live())throw error;
    const transient=error.retryableRead===true||error.status===408||error.status===429||(error.status>=500&&error.status<=599);
    if(!transient||attempt===3)throw error;
    const message='Verbindung kurz unterbrochen. Ich hole die Antwort erneut ab ('+(attempt+1)+'/3). Dein Auftrag wird nicht erneut gestartet.';
-   if(state)dialogueStatus(message);else $('chat-progress').textContent=message;
+   feedback(message);
   }finally{clearTimeout(timer);if(state&&state.controller===controller)state.controller=null;}
   await new Promise(resolve=>setTimeout(resolve,2000));
  }
@@ -245,7 +246,7 @@ function stopDialogue(reason='Gespräch beendet.'){
  if(state.recorder&&state.recorder.state!=='inactive')state.recorder.stop();
  if(state.controller)state.controller.abort();if(voiceController)voiceController.abort();
  stopVoicePlayback();if(state.context)state.context.close().catch(()=>{});
- finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. Ergebnis unter Aufgaben prüfen.':''),'idle');
+ finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. '+(state.acceptedJob?'Ich rufe ihre Antwort weiter als Text ab, solange die Seite geöffnet bleibt. Sie bleibt außerdem unter Aufgaben abrufbar.':'Ergebnis unter Aufgaben prüfen.'):''),'idle');
 }
 function dialogueFailure(state,error){
  if(!dialogueLive(state))return;
@@ -294,23 +295,32 @@ async function dialogueTurn(state,audio,mime){
   addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.','processing');
   state.submitted=true;
   const job=await dialogueApi(state,'voice/turn',{method:'POST',body:JSON.stringify({message,mode:state.mode,history:conversation.slice(-4).map(entry=>({role:entry.role,content:entry.content.slice(0,500)})),request_id:dialogueRequestId()})});
-  if(!dialogueLive(state))return;
+  if(typeof job.id!=='string'||!job.id)throw new Error('Auftragskennung fehlt. Bitte unter Aufgaben prüfen, bevor du erneut sendest.');
+  // An accepted job outlives microphone/playback. Keep one read-only waiter even
+  // after stop, navigation or backgrounding; never resubmit the original turn.
+  state.acceptedJob=job.id;
   let data;
-  for(let n=0;n<240&&dialogueLive(state);n++){
-   await new Promise(resolve=>setTimeout(resolve,1500));if(!dialogueLive(state))return;
-   const current=await readJob(job.id,state);if(!dialogueLive(state))return;
+  for(let n=0;n<240;n++){
+   await new Promise(resolve=>setTimeout(resolve,1500));
+   const current=await readJob(job.id,state,true);
    if(current.status==='failed')throw new Error(current.error||'Auftrag fehlgeschlagen.');
    if(current.status==='completed'){data=current.result;break;}
   }
-  if(!dialogueLive(state))return;if(!data)throw new Error('Der Auftrag läuft noch. Bitte unter Aufgaben prüfen.');
+  if(!data)throw new Error('Der Auftrag läuft noch. Bitte unter Aufgaben prüfen.');
   const reply=data.reply||data.response||data.message;if(typeof reply!=='string'||!reply.trim())throw new Error('Keine verwertbare Antwort erhalten.');
   state.submitted=false;const article=addMessage(reply,'assistant');renderResult(article,data);if(data.workflow)renderWorkflowArtifact(article,data);
-  conversation.push({role:'user',content:message},{role:'assistant',content:reply});if(conversation.length>4)conversation.splice(0,conversation.length-4);
+  // A recovered answer is visible, but must not become the newest context of a later conversation.
+  if(dialogueLive(state)){conversation.push({role:'user',content:message},{role:'assistant',content:reply});if(conversation.length>4)conversation.splice(0,conversation.length-4);}
   if(data.action==='task_created')loadTasks();
   // Long answers remain complete on screen; the spoken excerpt is explicitly labelled.
   const spoken=reply.length>1900?reply.slice(0,1800)+' … Die vollständige Antwort steht im Chat.':reply;
   await speakDialogue(state,spoken);
- }catch(error){dialogueFailure(state,error);}
+ }catch(error){
+  // This waiter has ended; do not promise further automatic result retrieval.
+  const acceptedJob=state.acceptedJob;state.acceptedJob=null;
+  if(dialogueLive(state))dialogueFailure(state,error);
+  else if(acceptedJob&&state.submitted){state.submitted=false;addMessage(error.message+' Das Ergebnis bleibt unter Aufgaben abrufbar. Bitte nicht erneut absenden.','assistant',true);}
+ }
 }
 async function listenDialogue(state){
  if(!dialogueLive(state))return;
@@ -392,7 +402,7 @@ function renderBookkeeping(){
  if(!records.length)list.append(element('p','empty-state',bookkeepingEnabled?'Keine passenden Belege vorhanden. Ein Abgleich kann neue Belege übernehmen.':'Die Belegvorbereitung ist noch nicht freigegeben. Bestehende Belege erscheinen nach Einrichtung der Verbindung.'));
  for(const record of records){
   const fields=record.fields||{},card=element('article','card bookkeeping-card'),heading=element('div','bookkeeping-card-heading'),title=element('div');
-  title.append(element('span','section-kicker',fields.direction==='outgoing'?'AUSGANGSRECHNUNG':fields.direction==='incoming'?'EINGANGSRECHNUNG':'RICHTUNG UNGEKLÄRT'),element('h3','',fields.supplier||record.filename||'Beleg ohne Rechnungspartner'));
+  title.append(element('span','section-kicker',fields.direction==='outgoing'?'AUSGANGSRECHNUNG':fields.direction==='incoming'?(record.reviewed===true?'EINGANGSBELEG':'UNGEPRÜFTER EINGANGSBELEG'):'RICHTUNG UNGEKLÄRT'),element('h3','',fields.supplier||record.filename||'Beleg ohne Rechnungspartner'));
   heading.append(title,element('strong','bookkeeping-amount',bookkeepingAmount(fields)));card.append(heading);
   const badges=element('div','bookkeeping-badges');badges.append(element('span','tag'+(record.reviewed===true?'':' pending'),record.reviewed===true?'Geprüft':'Noch zu prüfen'),element('span','tag neutral','Zahlung: '+(paymentLabels[fields.payment_status]||'Unbekannt')));card.append(badges);
   card.append(element('p','quiet',(fields.invoice_number?'Nr. '+fields.invoice_number:'Rechnungsnummer fehlt')+' · '+(fields.invoice_date||'Datum fehlt')),element('p','field-hint',sourceLabel(record.source)));

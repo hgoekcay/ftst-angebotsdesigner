@@ -1,15 +1,16 @@
 # ATLAS and FTST project state
 
-Updated: 2026-10-29. This file is the current continuity record, not an instruction
+Updated: 2026-10-31. This file is the current continuity record, not an instruction
 to perform unapproved external actions. Check live versions before deployment.
 
 ## Latest verified state
 
-ATLAS0.7.3 is installed and running. Briefing and monthly preparation workflows,
-Telegram start/status commands, and owner-only local Whisper/Piper voice are shipped.
-The live monthly ZIP download passed CRC and original SHA256 checks after fixing
-large-response truncation. See the final checkpoint below; earlier sections are
-historical. Cloud API access and invoice-mailbox credential repair remain pending.
+ATLAS 0.8.2 is installed and was verified through the authenticated Home Assistant
+browser. A live local text request completed and appeared in chat automatically.
+Piper playback/start advanced to microphone acquisition; this remote browser has
+no microphone, so physical iPhone conversation remains unverified. Preparing 0.8.3
+for accepted voice-job recovery and older Billomat open-item refresh. See the final
+checkpoint for validation/deployment status. Online provider remains disabled.
 
 ## Goal and decisions
 
@@ -340,3 +341,54 @@ replaying POST, timeout of stalled response bodies, cancellation and phase state
 Browser rendering and physical iPhone verification remain outstanding. Release CI
 must pass before merging; no installation on the user's Home Assistant is claimed.
 The earlier separate-branch checkpoint above is superseded by this combined update.
+
+
+## 0.8.3 reliability checkpoint (2026-10-31)
+
+Implemented: accepted voice jobs retain one read-only status waiter after explicit
+stop, navigation or backgrounding. Completed answers render once as text, without
+restarting audio/microphone or contaminating a newer conversation's model history.
+No POST is replayed. Full page reload still relies on the durable Tasks result.
+Independent review reproduced a stale-history race; a red/green regression and
+live-session history guard address it before release.
+
+Known unresolved Billomat invoices now refresh by ID outside the rolling discovery
+window. A durable owner-scoped cycle processes at most 25 per sync; failed IDs
+remain pending without starving later IDs. Review found that a permanent failure
+could freeze subsequent cycles; cycles now advance after all IDs were attempted,
+with a regression covering another invoice becoming paid while one ID keeps failing. Reports show incomplete refresh coverage.
+Already closed invoices and never-imported historical invoices are outside this
+repair. This is source-status reporting, not bank reconciliation.
+
+Live evidence on 0.8.2: normal browser authentication works; local text roundtrip
+returned successfully; Ollama logs measured 22.8 seconds, including 19.6 seconds
+for 1,063 prompt tokens. The earlier 1–2 minute observation interval was not a
+measured model latency. Existing background jobs contain
+valid model replies. Automated bookkeeping sync is active but source coverage is
+incomplete, including a mailbox whose read-only preview explicitly reports rejected STRATO login.
+Its credentials must be corrected through secure configuration. Some imported attachments are not invoices;
+classification/review needs improvement. No company documents or identifiers are
+recorded here. No production configuration, credentials or document reviews changed.
+
+Validation/deployment: all 31 Node checks and 56 bookkeeping tests passed, along
+with Python compileall and whitespace checks. Broad local unittest discovery ran
+191 tests but four modules could not import because pytest is absent; full Python
+validation is delegated to CI. CI release checks and 0.8.3 installation are pending. Do not claim
+that the original active-screen iPhone symptom has been reproduced or fully solved.
+
+Next: publish the tested patch, install with backup, verify version and text response;
+then repair source-specific import errors, distinguish attachment intake from confirmed
+invoices, add bank reconciliation and persistent mail drafts before claiming broader
+automation. Employee upload service requires verified separate HTTPS routing. The
+existing two workflows are briefing and monthly preparation, not a general autonomous
+company operator. Online API access remains an owner-supplied configuration step.
+
+The PDF intake follow-up is included in this same unmerged 0.8.3 release: generic
+incoming attachments are labeled unreviewed incoming documents, not confirmed
+invoices. Conservative explicit number/date pairs, currency prefixes and identical
+repeated invoice IDs are supported; contradictory values stay unknown. A valid
+synthetic PDF exercises the real isolated parser and original preservation. Existing
+stored PDFs are not re-extracted; no OCR, semantic classification or automatic review.
+Final independent review reports no remaining blocker in these changes. All 56
+bookkeeping tests and 31 Node checks passed locally. PR #78 is the release candidate;
+GitHub CI and installation must still be verified against its updated head.

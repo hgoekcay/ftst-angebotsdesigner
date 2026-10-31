@@ -1,3 +1,11 @@
+## 0.8.3
+
+- Eingehende Anhänge werden als ungeprüfte Eingangsbelege bezeichnet. PDF-Erkennung unterstützt eindeutige Nummer-/Datumszeilen, Währungszeichen vor Beträgen und identische wiederholte Rechnungsnummern; widersprüchliche Angaben bleiben offen. Bestehende Belege werden nicht automatisch neu ausgewertet.
+
+- Bereits angenommene Sprachaufträge liefern ihre Antwort auch nach dem Beenden des Gesprächs oder einem Ansichtswechsel als Text nach, solange die Seite geöffnet bleibt. Mikrofon und automatische Wiedergabe bleiben ausgeschaltet; ein neueres Gespräch wird nicht beeinflusst.
+- Ältere bekannte offene Billomat-Rechnungen werden unabhängig vom Entdeckungszeitraum erneut abgefragt, höchstens 25 pro Abgleich. Unvollständige Zahlungsstandsprüfungen bleiben sichtbar.
+- Ein vollständiges Neuladen verwirft weiterhin die Chatansicht; gespeicherte Ergebnisse bleiben unter Aufgaben abrufbar. Buchhaltung bleibt eine Vorbereitung ohne Bankabgleich.
+
 ## 0.8.2
 
 - Gespräch steht im Mittelpunkt: neue ATLAS-Kugel mit Zuständen für Start, Zuhören, Verarbeitung, Sprechen und Unterbrechung; reduzierte Animation auf Wunsch des Geräts.

@@ -199,7 +199,7 @@ class SyncTests(unittest.TestCase):
         self.assertFalse(self.sync._thread.is_alive())
         self.assertEqual(self.mail.invoice_batch.call_count, 1)
 
-    def test_real_bookkeeping_ingests_mail_and_refreshes_canceled_invoice(self):
+    def real_bookkeeping(self):
         spec = importlib.util.spec_from_file_location('atlas_bookkeeping_sync_integration', ROOT / 'bookkeeping.py')
         bookkeeping = importlib.util.module_from_spec(spec)
         sys.path.insert(0, str(ROOT))
@@ -208,6 +208,10 @@ class SyncTests(unittest.TestCase):
         finally:
             sys.path.pop(0)
         self.book = bookkeeping.Bookkeeping(self.db, self.tmp.name)
+
+    def test_real_bookkeeping_ingests_mail_and_refreshes_canceled_invoice(self):
+        self.real_bookkeeping()
+        self.bill.get_invoice.side_effect = lambda user, ident: self.bill.list_invoices.return_value['invoices'][0]
         batch = self.batch()
         attachment = batch['messages'][0]['attachments'][0]
         attachment.update(name='receipt.png', content_type='image/png', data=b'\x89PNG\r\n\x1a\nsynthetic')
@@ -236,6 +240,95 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(len(current['snapshots']), 2)
         self.assertEqual(self.book.get_document('owner', invoice['id'])[0], self.bill.get_pdf.return_value)
         self.assertTrue(result['pending'])
+
+    def test_old_invoice_paid_outside_discovery_window_leaves_op_report(self):
+        self.real_bookkeeping()
+        self.mail.enabled_for.return_value = False
+        self.bill.enabled_for.return_value = True
+        old = self.row()
+        old.update(date='2020-01-01', open_amount='11.90')
+        saved = self.book.ingest_billomat('owner', self.sync._normalize(old))
+        self.bill.list_invoices.return_value = self.page([])
+        paid = dict(old, status='PAID', paid_amount='11.90', open_amount='0')
+        self.bill.get_invoice.return_value = paid
+        self.sync = self.make()
+        result = self.sync.sync('owner')
+        self.bill.get_invoice.assert_called_once_with('owner', '1')
+        self.assertGreater(self.bill.list_invoices.call_args.args[1], old['date'])
+        self.assertFalse(result['pending'])
+        self.assertEqual(self.book.get('owner', saved['id'])['fields']['source_status'], 'PAID')
+        from types import SimpleNamespace
+        spec = importlib.util.spec_from_file_location('sync_reports', ROOT / 'bookkeeping_reports.py')
+        reports = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(reports)
+        report = reports.build_report(SimpleNamespace(db=self.db, bookkeeping=self.book, bookkeeping_sync=self.sync), 'owner')
+        self.assertEqual(report['summary']['open_items'], 0)
+        self.assertEqual(report['summary']['open_by_currency'], {})
+
+    def test_open_refresh_is_bounded_resumes_and_exposes_failed_coverage(self):
+        self.real_bookkeeping()
+        self.mail.enabled_for.return_value = False
+        self.bill.enabled_for.return_value = True
+        self.bill.list_invoices.return_value = self.page([])
+        for ident in range(1, 28):
+            self.book.ingest_billomat('owner', self.sync._normalize(dict(self.row(str(ident)), date='2020-01-01')))
+        # Another owner's records must never be sent to Billomat.
+        self.book.ingest_billomat('other', self.sync._normalize(self.row('99')))
+        def fetch(user, ident):
+            if ident == '1':
+                raise RuntimeError('private provider details')
+            return dict(self.row(ident), date='2020-01-01')
+        self.bill.get_invoice.side_effect = fetch
+        self.sync = self.make()
+        first = self.sync.sync('owner')
+        self.assertEqual(self.bill.get_invoice.call_count, 25)
+        self.assertTrue(first['pending'])
+        self.assertNotIn('private provider details', str(first))
+        started = self.sync._get('billomat_op')['started_at']
+        self.sync = self.make()
+        second = self.sync.sync('owner')
+        self.assertTrue(second['pending'])
+        self.assertEqual(self.sync._get('billomat_op')['started_at'], started)
+        self.assertEqual(self.sync._get('billomat_op')['remaining'], 1)
+        self.assertNotIn('99', [call.args[1] for call in self.bill.get_invoice.call_args_list])
+        self.bill.get_invoice.side_effect = lambda user, ident: self.row(ident)
+        self.assertTrue(self.sync._get('billomat_op')['cycle_attempted'])
+        final = self.sync.sync('owner')
+        self.assertTrue(final['pending'])  # New 27-ID cycle is bounded to 25 reads.
+        final = self.sync.sync('owner')
+        self.assertFalse(final['pending'])
+        self.assertEqual(self.sync._get('billomat_op')['remaining'], 0)
+
+    def test_permanent_failure_does_not_freeze_other_open_invoice_refresh(self):
+        self.real_bookkeeping()
+        self.mail.enabled_for.return_value = False
+        self.bill.enabled_for.return_value = True
+        self.bill.list_invoices.return_value = self.page([])
+        for ident in ('1', '2'):
+            self.book.ingest_billomat('owner', self.sync._normalize(dict(self.row(ident), date='2020-01-01', open_amount='11.90')))
+        paid = False
+        def fetch(user, ident):
+            if ident == '1':
+                raise RuntimeError('permanent remote failure')
+            return dict(self.row(ident), date='2020-01-01', status='PAID' if paid else 'OPEN',
+                        open_amount='0' if paid else '11.90', paid_amount='11.90' if paid else '0')
+        self.bill.get_invoice.side_effect = fetch
+        self.sync = self.make()
+        self.assertTrue(self.sync.sync('owner')['pending'])
+        first_cycle = self.sync._get('billomat_op')['started_at']
+        paid = True
+        self.sync = self.make()  # Durable attempt completion must survive restart.
+        result = self.sync.sync('owner')
+        self.assertTrue(result['pending'])  # The failed invoice remains explicitly unresolved.
+        self.assertGreater(self.sync._get('billomat_op')['started_at'], first_cycle)
+        self.assertEqual(self.bill.get_invoice.call_count, 4)
+        from types import SimpleNamespace
+        spec = importlib.util.spec_from_file_location('sync_failure_reports', ROOT / 'bookkeeping_reports.py')
+        reports = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(reports)
+        report = reports.build_report(SimpleNamespace(db=self.db, bookkeeping=self.book, bookkeeping_sync=self.sync), 'owner')
+        self.assertEqual([item['invoice_number'] for item in report['open_items']], ['R1'])
+        self.assertTrue(report['incomplete'])
 
     def test_missing_configured_account_is_visible(self):
         self.mail.accounts.return_value = []
