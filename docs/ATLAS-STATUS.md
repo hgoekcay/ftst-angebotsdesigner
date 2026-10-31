@@ -306,3 +306,37 @@ the symptom toward the output path, but the device-specific cause remains unknow
 The prepared release reuses the gesture-enabled WebAudio context for all automatic
 replies. Next step: restore authenticated HA access, install with backup, verify
 Piper greeting/output through the actual UI, then verify on the owner's device.
+
+
+## Voice-first web app — implementation checkpoint (2026-10-31)
+
+Prepared a JARVIS-inspired conversation surface in the existing ATLAS app:
+- Conversation appears first, above example prompts and routing controls.
+- Decorative teal orb follows explicit starting, listening, processing, speaking,
+  stopped and error states from the existing dialogue lifecycle. Text labels remain
+  available, motion respects prefers-reduced-motion, existing feature IDs retained.
+- Start/stop remains explicit; manual answer is a secondary fallback. This change
+  does not add full-duplex interruption, background microphone use or new tools.
+
+Validation: dialogue, workflow/voice, knowledge and public upload Node UI suites
+pass; JS syntax and whitespace checks pass. Browser screenshot validation was
+attempted but could not run: this resumed environment has no Chromium executable.
+Responsive layout therefore still needs rendered review and an actual iPhone test.
+No Home Assistant deployment or device-level voice fix is claimed.
+
+Separate draft PR #75 addresses transient result-polling failures. That patch is
+not included here; combine and test before a release. User reports updating the
+previous release, but current installed state has not been independently observed.
+
+
+## 0.8.2 test update preparation (2026-10-31)
+
+Owner explicitly requests a GitHub update for installation/testing. Combined the
+voice-first UI from PR #76 with bounded GET-only result recovery from PR #75.
+Version/config/container CI build argument are 0.8.2. No integration settings or
+stored data are migrated. Existing experimental add-on stage remains unchanged.
+Local dialogue regression suite verifies recovered text and spoken replies without
+replaying POST, timeout of stalled response bodies, cancellation and phase states.
+Browser rendering and physical iPhone verification remain outstanding. Release CI
+must pass before merging; no installation on the user's Home Assistant is claimed.
+The earlier separate-branch checkpoint above is superseded by this combined update.

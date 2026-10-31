@@ -12,13 +12,26 @@ let dialogue=null;
 let workflowCatalog=[],workflowStarting=false;
 const labels = {chat:'CHAT',knowledge:'WISSEN',tasks:'AUFGABEN',mail:'E-MAILS',bookkeeping:'BUCHHALTUNG',system:'SYSTEM'};
 function notify(message,error=false){const node=$('notice');node.textContent=message;node.className='notice'+(error?' error':'');node.hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{node.hidden=true;},9000);}
-async function api(path,options={}){if(options.method&&options.method!=='GET'&&!csrfToken){await loadStatus();if(!csrfToken)throw new Error('Die Sitzung ist noch nicht bereit. Bitte lade den Systemstatus neu.');}const response=await fetch('api/'+path,{...options,headers:{'Content-Type':'application/json',...(csrfToken?{'X-Atlas-CSRF':csrfToken}:{}),...(options.headers||{})},credentials:'same-origin',cache:'no-store'});let payload;try{payload=await response.json();}catch{throw new Error('Die Antwort des Servers konnte nicht gelesen werden. Bitte prüfe den Systemstatus.');}if(!response.ok){if(response.status===403){csrfToken='';throw new Error('Die Sitzungsfreigabe ist abgelaufen oder der Zugriff wurde abgelehnt. Bitte lade die Seite neu und prüfe vor einem erneuten Versuch, ob die Änderung bereits gespeichert wurde.');}throw new Error(payload.error||payload.message||'Die Anfrage konnte nicht abgeschlossen werden.');}return payload;}
+async function api(path,options={}){
+ if(options.method&&options.method!=='GET'&&!csrfToken){await loadStatus();if(!csrfToken)throw new Error('Die Sitzung ist noch nicht bereit. Bitte lade den Systemstatus neu.');}
+ let response;
+ try{response=await fetch('api/'+path,{...options,headers:{'Content-Type':'application/json',...(csrfToken?{'X-Atlas-CSRF':csrfToken}:{}),...(options.headers||{})},credentials:'same-origin',cache:'no-store'});}
+ catch(error){if(error.name==='TypeError'||error.name==='AbortError')error.retryableRead=true;throw error;}
+ let payload;
+ try{payload=await response.json();}
+ catch(error){if(error.name==='AbortError'||(response.ok&&error.name==='TypeError')){error.retryableRead=true;throw error;}throw Object.assign(new Error('Die Antwort des Servers konnte nicht gelesen werden. Bitte prüfe den Systemstatus.'),{status:response.status});}
+ if(!response.ok){
+  if(response.status===403){csrfToken='';throw Object.assign(new Error('Die Sitzungsfreigabe ist abgelaufen oder der Zugriff wurde abgelehnt. Bitte lade die Seite neu und prüfe vor einem erneuten Versuch, ob die Änderung bereits gespeichert wurde.'),{status:response.status});}
+  throw Object.assign(new Error(payload.error||payload.message||'Die Anfrage konnte nicht abgeschlossen werden.'),{status:response.status});
+ }
+ return payload;
+}
 function element(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
 function switchView(view){if(!labels[view])return;if(dialogue&&view!=='chat')stopDialogue('Gespräch beim Seitenwechsel beendet.');activeView=view;document.querySelectorAll('.view').forEach(n=>{const selected=n.id==='view-'+view;n.hidden=!selected;n.classList.toggle('active',selected);});document.querySelectorAll('.nav-item').forEach(n=>{const selected=n.dataset.view===view;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});$('view-label').textContent=labels[view];if(view==='knowledge'){loadMemories();loadProfile();}if(view==='tasks'){loadTasks();loadJobs();loadWorkflows();}if(view==='mail')loadMailAccounts();if(view==='bookkeeping'){loadBookkeeping();loadSubmissionAccess();}if(view==='system')loadStatus();}
 document.querySelectorAll('[data-view]').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 document.querySelector('.brand').addEventListener('click',e=>{e.preventDefault();switchView('chat');});
 function addMessage(text,role,error=false){$('chat-intro').hidden=true;const article=element('article','message '+role+(error?' error':''));article.append(element('div','message-author',role==='user'?'Du':error?'Verbindungshinweis':'ATLAS'),element('div','message-text',text));if(role==='assistant'&&!error){const actions=element('div','message-tools');const remember=element('button','tiny-button','Als Wissen übernehmen');remember.type='button';remember.addEventListener('click',()=>{switchView('knowledge');resetMemoryForm();$('memory-text').value=text.slice(0,2000);$('memory-source').value='ATLAS-Entwurf – vom Nutzer zu prüfen';$('memory-text').focus();notify(text.length>2000?'Der Entwurf wurde auf 2.000 Zeichen gekürzt. Bitte prüfe und korrigiere ihn vor dem Speichern.':'Bitte prüfe und korrigiere den Entwurf vor dem Speichern.');});actions.append(remember);addVoicePlayback(actions,text);article.append(actions);}$('messages').append(article);article.scrollIntoView({behavior:'auto',block:'nearest'});return article;}
-$('chat-form').addEventListener('submit',async e=>{e.preventDefault();if(sending||voiceBusy)return;const message=$('message').value.trim();if(!message)return;sending=true;addMessage(message,'user');$('message').value='';$('send-button').disabled=true;$('message').disabled=true;$('chat-progress').hidden=false;$('chat-form').setAttribute('aria-busy','true');try{const job=await api('jobs',{method:'POST',body:JSON.stringify({message,mode:$('chat-mode').value,history:conversation.slice(-4).map(entry=>({role:entry.role,content:entry.content.slice(0,500)}))})});const data=await waitJob(job.id);const reply=data.reply||data.response||data.message;if(typeof reply!=='string'||!reply.trim())throw new Error('ATLAS hat keine verwertbare Antwort geliefert.');const article=addMessage(reply,'assistant');renderResult(article,data);conversation.push({role:'user',content:message},{role:'assistant',content:reply});if(conversation.length>4)conversation.splice(0,conversation.length-4);}catch(err){addMessage(err.message+' Ein angenommener Auftrag kann weiterlaufen. Bitte zuerst unter Aufgaben prüfen, bevor du erneut sendest.','assistant',true);}finally{sending=false;$('send-button').disabled=false;$('message').disabled=false;$('chat-progress').hidden=true;$('chat-form').removeAttribute('aria-busy');$('message').focus();updateVoiceControls();}});
+$('chat-form').addEventListener('submit',async e=>{e.preventDefault();if(sending||voiceBusy)return;const message=$('message').value.trim();if(!message)return;sending=true;addMessage(message,'user');$('message').value='';$('send-button').disabled=true;$('message').disabled=true;$('chat-progress').replaceChildren(element('span','thinking-dot'),document.createTextNode('ATLAS bearbeitet deinen Auftrag. Das Ergebnis bleibt unter Aufgaben abrufbar.'));$('chat-progress').hidden=false;$('chat-form').setAttribute('aria-busy','true');try{const job=await api('jobs',{method:'POST',body:JSON.stringify({message,mode:$('chat-mode').value,history:conversation.slice(-4).map(entry=>({role:entry.role,content:entry.content.slice(0,500)}))})});const data=await waitJob(job.id);const reply=data.reply||data.response||data.message;if(typeof reply!=='string'||!reply.trim())throw new Error('ATLAS hat keine verwertbare Antwort geliefert.');const article=addMessage(reply,'assistant');renderResult(article,data);conversation.push({role:'user',content:message},{role:'assistant',content:reply});if(conversation.length>4)conversation.splice(0,conversation.length-4);}catch(err){addMessage(err.message+' Ein angenommener Auftrag kann weiterlaufen. Bitte zuerst unter Aufgaben prüfen, bevor du erneut sendest.','assistant',true);}finally{sending=false;$('send-button').disabled=false;$('message').disabled=false;$('chat-progress').hidden=true;$('chat-form').removeAttribute('aria-busy');$('message').focus();updateVoiceControls();}});
 $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('chat-form').requestSubmit();}});
 document.querySelectorAll('[data-prompt]').forEach(n=>n.addEventListener('click',()=>{$('message').value=n.dataset.prompt;$('message').focus();}));
 let memoryEditing=null, memoryRequest=0, taskKnowledgeIds=[];
@@ -83,10 +96,32 @@ function renderResult(container,data){
  }
  container.append(element('p','field-hint',(data.provider||'Lokal')+' · '+(data.model||'')+(data.online?(data.web_searched?' · Webquellen geprüft':' · Ohne Websuche'):'')+(data.routing_note?' · '+data.routing_note:'')));
 }
+// Only repeat status reads: a lost response must never resubmit a task.
+async function readJob(id,state=null){
+ const live=()=>!state||dialogueLive(state);
+ for(let attempt=0;attempt<4;attempt++){
+  if(!live())throw new Error('Gespräch beendet.');
+  const controller=new AbortController();if(state)state.controller=controller;let timer;
+  try{
+   const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('Auftragsstatus antwortet nicht rechtzeitig.'),{name:'AbortError',retryableRead:true}));},30000);});
+   const job=await Promise.race([api('jobs/'+encodeURIComponent(id),{signal:controller.signal}),timeout]);
+   if(!live())throw new Error('Gespräch beendet.');
+   if(attempt>0){if(state)dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.');else $('chat-progress').replaceChildren(element('span','thinking-dot'),document.createTextNode('ATLAS bearbeitet deinen Auftrag. Das Ergebnis bleibt unter Aufgaben abrufbar.'));}
+   return job;
+  }catch(error){
+   if(!live())throw error;
+   const transient=error.retryableRead===true||error.status===408||error.status===429||(error.status>=500&&error.status<=599);
+   if(!transient||attempt===3)throw error;
+   const message='Verbindung kurz unterbrochen. Ich hole die Antwort erneut ab ('+(attempt+1)+'/3). Dein Auftrag wird nicht erneut gestartet.';
+   if(state)dialogueStatus(message);else $('chat-progress').textContent=message;
+  }finally{clearTimeout(timer);if(state&&state.controller===controller)state.controller=null;}
+  await new Promise(resolve=>setTimeout(resolve,2000));
+ }
+}
 async function waitJob(id){
  for(let n=0;n<240;n++){
   await new Promise(resolve=>setTimeout(resolve,1500));
-  const job=await api('jobs/'+encodeURIComponent(id));
+  const job=await readJob(id);
   if(job.status==='completed')return job.result;
   if(job.status==='failed')throw new Error(job.error||'Auftrag fehlgeschlagen.');
  }
@@ -197,7 +232,7 @@ if(typeof window.addEventListener==='function')window.addEventListener('pagehide
 
 // An explicitly started, half-duplex conversation. No microphone or commands on load.
 function dialogueLive(state){return dialogue===state&&!state.stopped;}
-function dialogueStatus(text){$('dialogue-status').textContent=text;}
+function dialogueStatus(text,phase){$('dialogue-status').textContent=text;if(phase){$('dialogue-panel').dataset.phase=phase;$('dialogue-phase').textContent=({idle:'Bereit',starting:'Startet',listening:'Hört zu',processing:'Verarbeitet',speaking:'Spricht',error:'Unterbrochen'})[phase];}}
 function releaseDialogueCapture(state){
  clearTimeout(state.listenTimer);clearTimeout(state.limitTimer);state.finishCapture=null;$('dialogue-answer').hidden=true;
  if(state.source){state.source.disconnect();state.source=null;}
@@ -210,12 +245,12 @@ function stopDialogue(reason='Gespräch beendet.'){
  if(state.recorder&&state.recorder.state!=='inactive')state.recorder.stop();
  if(state.controller)state.controller.abort();if(voiceController)voiceController.abort();
  stopVoicePlayback();if(state.context)state.context.close().catch(()=>{});
- finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. Ergebnis unter Aufgaben prüfen.':''));
+ finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. Ergebnis unter Aufgaben prüfen.':''),'idle');
 }
 function dialogueFailure(state,error){
  if(!dialogueLive(state))return;
  const messages={NotAllowedError:'Mikrofon oder Audio nicht freigegeben. Bitte die Berechtigung für diese Seite prüfen und Gespräch erneut starten.',NotFoundError:'Kein Mikrofon gefunden. Bitte ein Mikrofon anschließen oder ATLAS auf deinem Handy öffnen.',NotReadableError:'Das Mikrofon wird bereits verwendet oder ist nicht erreichbar. Bitte andere Audio-Apps schließen.',AbortError:'Sprachverarbeitung abgebrochen oder Zeitlimit erreicht. Bitte Gespräch erneut starten.'};
- const message=messages[error.name]||error.message||'Gespräch unterbrochen.';stopDialogue(message);notify(message,true);
+ const message=messages[error.name]||error.message||'Gespräch unterbrochen.';stopDialogue(message);dialogueStatus($('dialogue-status').textContent,'error');notify(message,true);
 }
 async function dialogueBounded(state,promise,ms,message){
  let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);state.waitTimer=timer;})]);}
@@ -223,7 +258,7 @@ async function dialogueBounded(state,promise,ms,message){
 }
 async function speakDialogue(state,text,greeting=false){
  if(!dialogueLive(state))return;
- dialogueStatus(greeting?'ATLAS startet die Begrüßung. Bitte kurz warten …':'Die gesprochene Antwort wird lokal vorbereitet …');
+ dialogueStatus(greeting?'ATLAS startet die Begrüßung. Bitte kurz warten …':'Die gesprochene Antwort wird lokal vorbereitet …',greeting?'starting':'processing');
  const blob=await dialogueBounded(state,voiceRequest('synthesize',JSON.stringify({text}),'application/json',()=>dialogueLive(state)),45000,'Die lokale Sprachausgabe antwortet nicht rechtzeitig. Bitte Piper prüfen und Gespräch erneut starten.');
  if(!dialogueLive(state))return;if(blob.type.split(';')[0]!=='audio/wav')throw new Error('Ungültige Audioantwort.');
  const buffer=await dialogueBounded(state,state.context.decodeAudioData(await blob.arrayBuffer()),10000,'Audio konnte nicht geöffnet werden. Bitte Gespräch erneut starten.');
@@ -233,7 +268,7 @@ async function speakDialogue(state,text,greeting=false){
  const source=state.context.createBufferSource();source.buffer=buffer;source.connect(state.context.destination);state.playback=source;
  source.onended=()=>{if(!dialogueLive(state)||state.playback!==source)return;state.playback=null;clearTimeout(state.playbackTimer);source.disconnect();listenDialogue(state).catch(error=>dialogueFailure(state,error));};
  state.playbackTimer=setTimeout(()=>dialogueFailure(state,new Error('Die Wiedergabe wurde angehalten. Bitte Gespräch erneut starten.')),Math.ceil(buffer.duration*1000)+5000);
- dialogueStatus(greeting?'Hallo, ich bin ATLAS. Gleich kannst du sprechen.':'ATLAS spricht. Das Mikrofon ist aus.');source.start();
+ dialogueStatus(greeting?'Hallo, ich bin ATLAS. Gleich kannst du sprechen.':'ATLAS spricht. Das Mikrofon ist aus.','speaking');source.start();
 }
 
 function dialogueRequestId(){
@@ -250,20 +285,20 @@ async function dialogueApi(state,path,options={}){
 async function dialogueTurn(state,audio,mime){
  if(!dialogueLive(state))return;
  try{
-  dialogueStatus('Ich schreibe deine Aufnahme lokal mit …');
+  dialogueStatus('Ich schreibe deine Aufnahme lokal mit …','processing');
   const transcription=await voiceRequest('transcribe',audio,mime,()=>dialogueLive(state));if(!dialogueLive(state))return;
   const message=typeof transcription.text==='string'?transcription.text.trim():'';
   if(!message||message.length>2000)throw new Error('Keine passende Sprache erkannt. Bitte Gespräch neu starten.');
   // A spoken stop only closes the conversation; it is never dispatched as a job.
   if(/^(?:stopp?|gespräch beenden|atlas stopp?)[.!?]*$/i.test(message)){stopDialogue('Gespräch auf deinen Wunsch beendet.');return;}
-  addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.');
+  addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.','processing');
   state.submitted=true;
   const job=await dialogueApi(state,'voice/turn',{method:'POST',body:JSON.stringify({message,mode:state.mode,history:conversation.slice(-4).map(entry=>({role:entry.role,content:entry.content.slice(0,500)})),request_id:dialogueRequestId()})});
   if(!dialogueLive(state))return;
   let data;
   for(let n=0;n<240&&dialogueLive(state);n++){
    await new Promise(resolve=>setTimeout(resolve,1500));if(!dialogueLive(state))return;
-   const current=await dialogueApi(state,'jobs/'+encodeURIComponent(job.id));if(!dialogueLive(state))return;
+   const current=await readJob(job.id,state);if(!dialogueLive(state))return;
    if(current.status==='failed')throw new Error(current.error||'Auftrag fehlgeschlagen.');
    if(current.status==='completed'){data=current.result;break;}
   }
@@ -279,7 +314,7 @@ async function dialogueTurn(state,audio,mime){
 }
 async function listenDialogue(state){
  if(!dialogueLive(state))return;
- dialogueStatus('Mikrofon wird geöffnet …');
+ dialogueStatus('Mikrofon wird geöffnet …','starting');
  const pending=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}).then(stream=>{if(!dialogueLive(state))stream.getTracks().forEach(track=>track.stop());return stream;});
  const stream=await dialogueBounded(state,pending,30000,'Mikrofonfreigabe fehlt. Bitte die Mikrofonabfrage bestätigen oder die Berechtigung für diese Seite prüfen.');
  if(!dialogueLive(state)){stream.getTracks().forEach(t=>t.stop());return;}
@@ -306,7 +341,7 @@ async function listenDialogue(state){
   state.listenTimer=setTimeout(detect,100);
  }
  recorder.start(250);state.finishCapture=()=>finish(true);$('dialogue-answer').hidden=false;state.limitTimer=setTimeout(()=>finish(),60000);state.listenTimer=setTimeout(detect,100);
- dialogueStatus('Ich höre zu. Sprich jetzt. Nach einer Pause antworte ich; alternativ „Jetzt antworten“ drücken.');
+ dialogueStatus('Ich höre zu. Sprich jetzt. Nach einer Pause antworte ich; alternativ „Jetzt antworten“ drücken.','listening');
 }
 $('dialogue-start').addEventListener('click',async()=>{
  if(dialogue||voiceBusy||sending||!voiceStatus.enabled||!recordingSupported())return;
@@ -314,7 +349,7 @@ $('dialogue-start').addEventListener('click',async()=>{
  const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return;
  stopVoicePlayback();const state={mode:$('chat-mode').value,stopped:false,submitted:false};dialogue=state;voiceBusy=true;voiceEpoch++;updateVoiceControls();$('message').disabled=true;$('send-button').disabled=true;
  state.sessionTimer=setTimeout(()=>{if(dialogueLive(state))stopDialogue('Gespräch nach zehn Minuten beendet.');},600000);
- dialogueStatus('Audio wird aktiviert. Bitte kurz warten …');
+ dialogueStatus('Audio wird aktiviert. Bitte kurz warten …','starting');
  try{
   state.context=new Context();
   const resumed=state.context.resume(); // Must run directly in the user's click.
