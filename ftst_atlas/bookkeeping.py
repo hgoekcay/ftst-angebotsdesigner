@@ -14,6 +14,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import tempfile
 from functools import wraps
 import zipfile
 from datetime import date, datetime, timezone
@@ -551,6 +552,27 @@ class Bookkeeping:
             raise BookkeepingError('Originaldatei nicht verfügbar.') from None
         if hashlib.sha256(data).hexdigest() != row[3]: raise BookkeepingError('Originaldatei ist beschädigt.')
         return data, row[1], row[2]
+
+    @_locked
+    def extraction_suggestions(self, user, ident):
+        """Explicit local re-extraction; never modify saved fields or review state."""
+        document = self.get_document(user, ident)
+        if document is None:
+            raise BookkeepingError('Beleg nicht gefunden.')
+        data, filename, mime = document
+        if mime != 'application/pdf':
+            raise BookkeepingError('Erneute Texterkennung ist nur für PDF-Originale verfügbar.')
+        # get_document verifies owner, path, size and original hash first. Parse a
+        # private temporary copy so even a concurrent file change cannot alter input.
+        with tempfile.TemporaryDirectory(prefix='atlas-pdf-') as folder:
+            path = Path(folder) / 'original.pdf'
+            path.write_bytes(data)
+            fields, notes = _extract_pdf(path)
+        normalized = _fields(fields)
+        allowed = {'supplier', 'invoice_number', 'invoice_date', 'currency', 'net', 'tax', 'gross'}
+        return {'id': ident, 'suggestions': {key: normalized[key] for key in allowed if normalized[key]},
+                'notes': notes, 'saved': False,
+                'message': 'Vorschläge am Original prüfen. Gespeicherte Angaben und Prüfstatus bleiben unverändert.'}
 
     @_locked
     def export(self, user, month):

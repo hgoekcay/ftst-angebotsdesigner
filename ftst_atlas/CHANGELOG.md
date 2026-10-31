@@ -1,3 +1,8 @@
+## 0.8.4
+
+- Vorhandene PDF-Belege können in der Belegprüfung ausdrücklich erneut erkannt werden. Die lokale Auswertung liefert nur Vorschläge; Original, gespeicherte Angaben und Prüfstatus bleiben unverändert.
+- Einzelne Vorschläge lassen sich ins Prüfformular übernehmen und danach mit dem bestehenden Änderungsverlauf speichern. Keine automatische Massenänderung und keine OCR.
+
 ## 0.8.3
 
 - Eingehende Anhänge werden als ungeprüfte Eingangsbelege bezeichnet. PDF-Erkennung unterstützt eindeutige Nummer-/Datumszeilen, Währungszeichen vor Beträgen und identische wiederholte Rechnungsnummern; widersprüchliche Angaben bleiben offen. Bestehende Belege werden nicht automatisch neu ausgewertet.

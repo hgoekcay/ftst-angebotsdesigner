@@ -461,16 +461,35 @@ $('bookkeeping-export-form').addEventListener('submit',e=>e.preventDefault());
 $('bookkeeping-export').addEventListener('click',e=>{if(e.currentTarget.getAttribute('aria-disabled')==='true')e.preventDefault();});
 function showRecordIssues(record){const node=$('bookkeeping-issues');node.replaceChildren();if(record.issues?.length){const box=element('div','review-warning-box');box.append(element('strong','','Vor Freigabe klären'));const list=element('ul');for(const issue of record.issues)list.append(element('li','',String(issue)));box.append(list);node.append(box);}if(record.extraction_notes?.length){const details=element('details');details.append(element('summary','','Hinweise zur Erkennung'));for(const note of record.extraction_notes)details.append(element('p','field-hint',String(note)));node.append(details);}}
 async function openBookkeepingRecord(id){
- const dialog=$('bookkeeping-dialog');bookkeepingRecordId=null;$('bookkeeping-review-form').hidden=true;$('bookkeeping-document-meta').replaceChildren(element('p','','Beleg wird geladen …'));$('bookkeeping-issues').replaceChildren();$('bookkeeping-audit-list').replaceChildren();$('bookkeeping-review-message').textContent='';if(!dialog.open)dialog.showModal();
+ const dialog=$('bookkeeping-dialog');bookkeepingRecordId=null;$('bookkeeping-extraction-controls').hidden=true;$('bookkeeping-suggestions').replaceChildren();$('bookkeeping-reextract').disabled=false;$('bookkeeping-review-form').hidden=true;$('bookkeeping-document-meta').replaceChildren(element('p','','Beleg wird geladen …'));$('bookkeeping-issues').replaceChildren();$('bookkeeping-audit-list').replaceChildren();$('bookkeeping-review-message').textContent='';if(!dialog.open)dialog.showModal();
  try{const data=await api('bookkeeping/'+encodeURIComponent(id));const record=data.record||data;bookkeepingRecordId=record.id;const fields=record.fields||{};$('bookkeeping-dialog-title').textContent=record.filename||'Beleg prüfen';const meta=$('bookkeeping-document-meta');meta.replaceChildren(element('p','field-hint',sourceLabel(record.source)));if(record.source?.note)meta.append(element('p','field-hint','Kommentar: '+record.source.note));if(record.sources?.length>1){for(const source of record.sources.slice(1))meta.append(element('p','field-hint',sourceLabel(source)));}
   if(record.sha256)meta.append(element('p','document-hash','Datenstand-Prüfsumme (SHA-256): '+record.sha256));
   if(record.filename){const download=element('a','secondary download-link',record.mime==='application/json'&&!record.documents?.length?'Quelldaten herunterladen':'Belegdatei herunterladen');download.href='api/bookkeeping/'+encodeURIComponent(record.id)+'/document';download.setAttribute('download','');meta.append(download);}
   for(const [key,input] of [['supplier','supplier'],['invoice_number','number'],['invoice_date','date'],['currency','currency'],['net','net'],['tax','tax'],['gross','gross']])$('review-'+input).value=fields[key]??'';
+  $('bookkeeping-extraction-controls').hidden=!(record.mime==='application/pdf'||record.documents?.some(item=>item.mime==='application/pdf'));
   $('review-payment').value=Object.hasOwn(paymentLabels,fields.payment_status)?fields.payment_status:'unknown';$('review-reviewed').checked=record.reviewed===true;showRecordIssues(record);$('bookkeeping-review-form').hidden=false;
   for(const item of record.audit||[]){const row=element('details');row.append(element('summary','',localDate(item.created_at||item.timestamp)+' · '+({review:'Prüfung gespeichert',ingest:'Beleg übernommen',extract:'Angaben erkannt',attach_original:'Original ergänzt'}[item.action]||'Änderung')));const after=item.after?.fields||item.after||{};for(const [key,label] of [['supplier','Rechnungspartner'],['invoice_number','Rechnungsnummer'],['invoice_date','Datum'],['currency','Währung'],['net','Netto'],['tax','Steuer'],['gross','Brutto'],['payment_status','Zahlungsstatus']])if(after[key]!==undefined)row.append(element('p','field-hint',label+': '+String(after[key])));$('bookkeeping-audit-list').append(row);}
   if(!(record.audit||[]).length)$('bookkeeping-audit-list').append(element('p','field-hint','Noch kein Änderungsverlauf vorhanden.'));
  }catch(err){$('bookkeeping-document-meta').replaceChildren(element('p','review-warning',err.message));}
 }
+$('bookkeeping-reextract').addEventListener('click',async()=>{
+ const id=bookkeepingRecordId;if(!id)return;const button=$('bookkeeping-reextract'),box=$('bookkeeping-suggestions');button.disabled=true;box.replaceChildren(element('p','field-hint','PDF-Text wird erneut gelesen …'));
+ try{
+  const result=await api('bookkeeping/'+encodeURIComponent(id)+'/extract',{method:'POST',body:JSON.stringify({})});
+  if(bookkeepingRecordId!==id||!$('bookkeeping-dialog').open)return;
+  box.replaceChildren(element('p','field-hint',result.message||'Vorschläge am Original prüfen.'));
+  let found=0;
+  for(const [key,input,label] of [['supplier','supplier','Rechnungspartner'],['invoice_number','number','Rechnungsnummer'],['invoice_date','date','Datum'],['currency','currency','Währung'],['net','net','Netto'],['tax','tax','Steuer'],['gross','gross','Brutto']]){
+   const value=result.suggestions?.[key];if(typeof value!=='string'||!value)continue;found++;
+   const row=element('div','review-actions'),use=element('button','secondary','Ins Prüfformular übernehmen');use.type='button';
+   row.append(element('p','field-hint',label+': '+value),use);
+   use.addEventListener('click',()=>{if(bookkeepingRecordId!==id)return;$('review-'+input).value=value;$('review-reviewed').checked=false;use.disabled=true;$('bookkeeping-review-message').textContent='Vorschlag ins Formular übernommen, noch nicht gespeichert. Bitte am Original prüfen und Prüfung speichern.';});box.append(row);
+  }
+  if(!found)box.append(element('p','field-hint','Keine eindeutigen Angaben erkannt. Bei gescannten PDFs ist OCR oder manuelle Eingabe nötig.'));
+  for(const note of result.notes||[])box.append(element('p','field-hint',String(note)));
+ }catch(err){if(bookkeepingRecordId===id)box.replaceChildren(element('p','review-warning',err.message));}
+ finally{if(bookkeepingRecordId===id)button.disabled=false;}
+});
 $('bookkeeping-close').addEventListener('click',()=>$('bookkeeping-dialog').close());
 function exactDecimal(value){const cleaned=value.trim().replace(',','.');if(!cleaned)return '';if(!/^-?\d{1,12}(\.\d{1,2})?$/.test(cleaned))throw new Error('Beträge bitte mit höchstens zwei Nachkommastellen und ohne Tausendertrennzeichen eingeben.');return cleaned;}
 $('bookkeeping-review-form').addEventListener('submit',async e=>{

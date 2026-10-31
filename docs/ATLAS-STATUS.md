@@ -5,12 +5,12 @@ to perform unapproved external actions. Check live versions before deployment.
 
 ## Latest verified state
 
-ATLAS 0.8.2 is installed and was verified through the authenticated Home Assistant
-browser. A live local text request completed and appeared in chat automatically.
-Piper playback/start advanced to microphone acquisition; this remote browser has
-no microphone, so physical iPhone conversation remains unverified. Preparing 0.8.3
-for accepted voice-job recovery and older Billomat open-item refresh. See the final
-checkpoint for validation/deployment status. Online provider remains disabled.
+ATLAS 0.8.3 is installed and running, verified through Home Assistant after update
+with the backup option enabled. PR #78 merged as 1565ff66b05a918c08406af038306a660978e085
+following all six CI jobs passing (run 41251902803, head 0824943da6ec38fc1a162a387d16e0b496f76559).
+Preparing 0.8.4 for explicit local re-extraction proposals on existing PDFs.
+Live local text response and briefing completed; physical iPhone conversation is
+still unverified. Online provider remains disabled; one mailbox rejects login.
 
 ## Goal and decisions
 
@@ -392,3 +392,27 @@ stored PDFs are not re-extracted; no OCR, semantic classification or automatic r
 Final independent review reports no remaining blocker in these changes. All 56
 bookkeeping tests and 31 Node checks passed locally. PR #78 is the release candidate;
 GitHub CI and installation must still be verified against its updated head.
+
+
+## 0.8.4 existing-document proposals (2026-10-31)
+
+Implemented explicit POST bookkeeping/<id>/extract behind ingress, CSRF and owner
+checks. The verified original PDF is parsed locally with existing resource limits.
+Only seven candidate fields are returned; no stored fields, original bytes, review
+status or audit records are changed. UI adoption changes a single form field and
+clears the local reviewed checkbox; normal explicit save records the usual audit.
+Late responses for another document cannot populate its suggestions.
+
+Independent review found no release blocker. Unit coverage checks original/hash/
+owner boundaries, unchanged manual edits, explicit adoption and stale response
+isolation. New tests/atlas_bookkeeping_ui.cjs is included in CI. No OCR, automatic
+batch rewriting or new external service. Per-parse resources are bounded; requests
+serialize on the bookkeeping lock, without separate per-user rate limiting.
+
+The company workflow blueprint is in ATLAS-FIRMENABLAEUFE.md. It separates existing
+functions from future bank matching, ledger, persistent mail drafts and operational
+workflows. It is a development/acceptance plan, not an installed autonomous company.
+
+0.8.4 validation and installation are pending the release checks. 0.8.3 is the
+last independently verified installed version. No live financial review decisions,
+mail sends or payments have been performed during this work.
