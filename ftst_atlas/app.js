@@ -197,7 +197,7 @@ if(typeof window.addEventListener==='function')window.addEventListener('pagehide
 
 // An explicitly started, half-duplex conversation. No microphone or commands on load.
 function dialogueLive(state){return dialogue===state&&!state.stopped;}
-function dialogueStatus(text){$('dialogue-status').textContent=text;}
+function dialogueStatus(text,phase){$('dialogue-status').textContent=text;if(phase){$('dialogue-panel').dataset.phase=phase;$('dialogue-phase').textContent=({idle:'Bereit',starting:'Startet',listening:'Hört zu',processing:'Verarbeitet',speaking:'Spricht',error:'Unterbrochen'})[phase];}}
 function releaseDialogueCapture(state){
  clearTimeout(state.listenTimer);clearTimeout(state.limitTimer);state.finishCapture=null;$('dialogue-answer').hidden=true;
  if(state.source){state.source.disconnect();state.source=null;}
@@ -210,12 +210,12 @@ function stopDialogue(reason='Gespräch beendet.'){
  if(state.recorder&&state.recorder.state!=='inactive')state.recorder.stop();
  if(state.controller)state.controller.abort();if(voiceController)voiceController.abort();
  stopVoicePlayback();if(state.context)state.context.close().catch(()=>{});
- finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. Ergebnis unter Aufgaben prüfen.':''));
+ finishVoice();dialogueStatus(reason+(state.submitted?' Bereits übermittelte Aufträge können weiterlaufen. Ergebnis unter Aufgaben prüfen.':''),'idle');
 }
 function dialogueFailure(state,error){
  if(!dialogueLive(state))return;
  const messages={NotAllowedError:'Mikrofon oder Audio nicht freigegeben. Bitte die Berechtigung für diese Seite prüfen und Gespräch erneut starten.',NotFoundError:'Kein Mikrofon gefunden. Bitte ein Mikrofon anschließen oder ATLAS auf deinem Handy öffnen.',NotReadableError:'Das Mikrofon wird bereits verwendet oder ist nicht erreichbar. Bitte andere Audio-Apps schließen.',AbortError:'Sprachverarbeitung abgebrochen oder Zeitlimit erreicht. Bitte Gespräch erneut starten.'};
- const message=messages[error.name]||error.message||'Gespräch unterbrochen.';stopDialogue(message);notify(message,true);
+ const message=messages[error.name]||error.message||'Gespräch unterbrochen.';stopDialogue(message);dialogueStatus($('dialogue-status').textContent,'error');notify(message,true);
 }
 async function dialogueBounded(state,promise,ms,message){
  let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);state.waitTimer=timer;})]);}
@@ -223,7 +223,7 @@ async function dialogueBounded(state,promise,ms,message){
 }
 async function speakDialogue(state,text,greeting=false){
  if(!dialogueLive(state))return;
- dialogueStatus(greeting?'ATLAS startet die Begrüßung. Bitte kurz warten …':'Die gesprochene Antwort wird lokal vorbereitet …');
+ dialogueStatus(greeting?'ATLAS startet die Begrüßung. Bitte kurz warten …':'Die gesprochene Antwort wird lokal vorbereitet …',greeting?'starting':'processing');
  const blob=await dialogueBounded(state,voiceRequest('synthesize',JSON.stringify({text}),'application/json',()=>dialogueLive(state)),45000,'Die lokale Sprachausgabe antwortet nicht rechtzeitig. Bitte Piper prüfen und Gespräch erneut starten.');
  if(!dialogueLive(state))return;if(blob.type.split(';')[0]!=='audio/wav')throw new Error('Ungültige Audioantwort.');
  const buffer=await dialogueBounded(state,state.context.decodeAudioData(await blob.arrayBuffer()),10000,'Audio konnte nicht geöffnet werden. Bitte Gespräch erneut starten.');
@@ -233,7 +233,7 @@ async function speakDialogue(state,text,greeting=false){
  const source=state.context.createBufferSource();source.buffer=buffer;source.connect(state.context.destination);state.playback=source;
  source.onended=()=>{if(!dialogueLive(state)||state.playback!==source)return;state.playback=null;clearTimeout(state.playbackTimer);source.disconnect();listenDialogue(state).catch(error=>dialogueFailure(state,error));};
  state.playbackTimer=setTimeout(()=>dialogueFailure(state,new Error('Die Wiedergabe wurde angehalten. Bitte Gespräch erneut starten.')),Math.ceil(buffer.duration*1000)+5000);
- dialogueStatus(greeting?'Hallo, ich bin ATLAS. Gleich kannst du sprechen.':'ATLAS spricht. Das Mikrofon ist aus.');source.start();
+ dialogueStatus(greeting?'Hallo, ich bin ATLAS. Gleich kannst du sprechen.':'ATLAS spricht. Das Mikrofon ist aus.','speaking');source.start();
 }
 
 function dialogueRequestId(){
@@ -250,13 +250,13 @@ async function dialogueApi(state,path,options={}){
 async function dialogueTurn(state,audio,mime){
  if(!dialogueLive(state))return;
  try{
-  dialogueStatus('Ich schreibe deine Aufnahme lokal mit …');
+  dialogueStatus('Ich schreibe deine Aufnahme lokal mit …','processing');
   const transcription=await voiceRequest('transcribe',audio,mime,()=>dialogueLive(state));if(!dialogueLive(state))return;
   const message=typeof transcription.text==='string'?transcription.text.trim():'';
   if(!message||message.length>2000)throw new Error('Keine passende Sprache erkannt. Bitte Gespräch neu starten.');
   // A spoken stop only closes the conversation; it is never dispatched as a job.
   if(/^(?:stopp?|gespräch beenden|atlas stopp?)[.!?]*$/i.test(message)){stopDialogue('Gespräch auf deinen Wunsch beendet.');return;}
-  addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.');
+  addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.','processing');
   state.submitted=true;
   const job=await dialogueApi(state,'voice/turn',{method:'POST',body:JSON.stringify({message,mode:state.mode,history:conversation.slice(-4).map(entry=>({role:entry.role,content:entry.content.slice(0,500)})),request_id:dialogueRequestId()})});
   if(!dialogueLive(state))return;
@@ -279,7 +279,7 @@ async function dialogueTurn(state,audio,mime){
 }
 async function listenDialogue(state){
  if(!dialogueLive(state))return;
- dialogueStatus('Mikrofon wird geöffnet …');
+ dialogueStatus('Mikrofon wird geöffnet …','starting');
  const pending=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}).then(stream=>{if(!dialogueLive(state))stream.getTracks().forEach(track=>track.stop());return stream;});
  const stream=await dialogueBounded(state,pending,30000,'Mikrofonfreigabe fehlt. Bitte die Mikrofonabfrage bestätigen oder die Berechtigung für diese Seite prüfen.');
  if(!dialogueLive(state)){stream.getTracks().forEach(t=>t.stop());return;}
@@ -306,7 +306,7 @@ async function listenDialogue(state){
   state.listenTimer=setTimeout(detect,100);
  }
  recorder.start(250);state.finishCapture=()=>finish(true);$('dialogue-answer').hidden=false;state.limitTimer=setTimeout(()=>finish(),60000);state.listenTimer=setTimeout(detect,100);
- dialogueStatus('Ich höre zu. Sprich jetzt. Nach einer Pause antworte ich; alternativ „Jetzt antworten“ drücken.');
+ dialogueStatus('Ich höre zu. Sprich jetzt. Nach einer Pause antworte ich; alternativ „Jetzt antworten“ drücken.','listening');
 }
 $('dialogue-start').addEventListener('click',async()=>{
  if(dialogue||voiceBusy||sending||!voiceStatus.enabled||!recordingSupported())return;
@@ -314,7 +314,7 @@ $('dialogue-start').addEventListener('click',async()=>{
  const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return;
  stopVoicePlayback();const state={mode:$('chat-mode').value,stopped:false,submitted:false};dialogue=state;voiceBusy=true;voiceEpoch++;updateVoiceControls();$('message').disabled=true;$('send-button').disabled=true;
  state.sessionTimer=setTimeout(()=>{if(dialogueLive(state))stopDialogue('Gespräch nach zehn Minuten beendet.');},600000);
- dialogueStatus('Audio wird aktiviert. Bitte kurz warten …');
+ dialogueStatus('Audio wird aktiviert. Bitte kurz warten …','starting');
  try{
   state.context=new Context();
   const resumed=state.context.resume(); // Must run directly in the user's click.
