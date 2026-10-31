@@ -7,6 +7,7 @@ import tempfile
 import threading
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -87,6 +88,25 @@ class BookkeepingHTTPTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             self.assertIn('ai-bookkeeping.documents.json', archive.namelist())
             self.assertTrue(any(name.endswith('.png') for name in archive.namelist()))
+
+    def test_reextract_requires_csrf_owner_and_explicit_empty_post(self):
+        raw = b'%PDF-1.4\nsynthetic'
+        # Stub only parsing; HTTP auth, stored-original checks and service code are real.
+        with patch('bookkeeping._extract_pdf', return_value=({'invoice_number': 'SUGGESTED-1'}, ['Synthetic'])) as parser:
+            record = self.app.bookkeeping.ingest_document('alice', raw, 'test.pdf', 'application/pdf', {'provider': 'upload'})
+            parser.reset_mock()
+            path = '/api/bookkeeping/' + record['id'] + '/extract'
+            self.assertEqual(self.request(path, 'POST', {}, csrf=False)[0], 403)
+            self.assertEqual(self.request(path, 'POST', {}, user='bob')[0], 403)
+            self.assertEqual(self.request(path, 'POST', {'unexpected': True})[0], 400)
+            self.assertEqual(self.request(path)[0], 404)
+            parser.assert_not_called()
+            before = self.app.bookkeeping.get('alice', record['id'])
+            code, result, _ = self.request(path, 'POST', {})
+            self.assertEqual(code, 200)
+            self.assertEqual(result['suggestions']['invoice_number'], 'SUGGESTED-1')
+            self.assertFalse(result['saved'])
+            self.assertEqual(self.app.bookkeeping.get('alice', record['id']), before)
 
     def test_access_create_revoke_and_no_token_listing(self):
         path = '/api/submissions/access'

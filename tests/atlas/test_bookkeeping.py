@@ -163,6 +163,38 @@ class BookkeepingTests(unittest.TestCase):
         self.assertEqual(record['fields']['tax'], '')
         self.assertFalse(record['reviewed'])
         self.assertEqual(self.store.get_document('alice', record['id'])[0], data)
+        before = self.store.get('alice', record['id'])
+        retried = self.store.extraction_suggestions('alice', record['id'])
+        self.assertEqual(retried['suggestions']['invoice_number'], 'RE-123')
+        self.assertEqual(self.store.get('alice', record['id']), before)
+
+    def test_reextract_suggests_without_modifying_reviewed_record_or_original(self):
+        record = self.store.ingest_billomat('alice', self.invoice())
+        raw = b'%PDF-1.4\nsynthetic original'
+        self.store.attach_original('alice', record['id'], raw, 'original.pdf')
+        before = self.store.review('alice', record['id'], {'supplier': 'Manually verified', 'reviewed': True})
+        with patch.object(module, '_extract_pdf', return_value=({'supplier': 'New suggestion', 'gross': '999.00'}, ['Synthetic parser note'])) as parser:
+            result = self.store.extraction_suggestions('alice', record['id'])
+            temporary = parser.call_args.args[0]
+        self.assertFalse(temporary.exists())
+        self.assertEqual(result['suggestions'], {'supplier': 'New suggestion', 'gross': '999.00'})
+        self.assertFalse(result['saved'])
+        self.assertEqual(self.store.get('alice', record['id']), before)
+        self.assertEqual(self.store.get_document('alice', record['id'])[0], raw)
+        # Applying remains an explicit existing review write, with its normal audit.
+        applied = self.store.review('alice', record['id'], {'supplier': result['suggestions']['supplier'], 'reviewed': False})
+        self.assertEqual(len(applied['audit']), len(before['audit']) + 1)
+        self.assertEqual(applied['audit'][-1]['action'], 'review')
+        self.assertFalse(applied['reviewed'])
+
+    def test_reextract_denies_wrong_owner_and_non_pdf_before_parser(self):
+        record = self.xml()
+        with patch.object(module, '_extract_pdf') as parser:
+            with self.assertRaises(module.BookkeepingError):
+                self.store.extraction_suggestions('bob', record['id'])
+            with self.assertRaises(module.BookkeepingError):
+                self.store.extraction_suggestions('alice', record['id'])
+            parser.assert_not_called()
 
     def test_billomat_snapshot_refresh_and_original_association(self):
         first=self.store.ingest_billomat('alice',self.invoice())

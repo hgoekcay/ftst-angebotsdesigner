@@ -37,7 +37,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.8.3'
+VERSION = '0.8.4'
 MAX_BODY = 32768
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -572,6 +572,11 @@ def make_handler(app):
                     if method == 'POST' and path == '/api/bookkeeping/sync':
                         self.body()
                         return self.send(202, app.jobs.submit(self.user_id, {'kind': 'bookkeeping', 'message': 'Rechnungen und Belege einlesen'}))
+                    match_extract = re.fullmatch(r'/api/bookkeeping/([A-Za-z0-9_-]{1,100})/extract', path)
+                    if method == 'POST' and match_extract:
+                        if self.body():
+                            raise ValueError('Keine zusätzlichen Angaben erlaubt.')
+                        return self.send(200, app.bookkeeping.extraction_suggestions(self.user_id, match_extract[1]))
                     match_book = re.fullmatch(r'/api/bookkeeping/([A-Za-z0-9_-]{1,100})', path)
                     if method == 'PATCH' and match_book:
                         data = self.body()
