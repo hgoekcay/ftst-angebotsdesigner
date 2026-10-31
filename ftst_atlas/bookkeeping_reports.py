@@ -91,6 +91,8 @@ def format_report(report, kind='summary'):
              'Importstand: ' + _text(stamp, 70)]
     if report['incomplete']:
         lines.append('Import/Auswahl unvollständig – Angaben sind ein Teilbestand.')
+    if any(source.get('id') == 'billomat_op' and source.get('pending') for source in report['sync'].get('sources', [])):
+        lines.append('Zahlungsstände älterer offener Rechnungen sind noch nicht vollständig aktualisiert.')
     if kind in ('summary', 'op'):
         lines.append(str(summary['open_items']) + ' offene Ausgangsrechnungen im importierten Billomat-Bestand.')
         lines.extend(amount + ' ' + currency + ' offen' for currency, amount in list(summary['open_by_currency'].items())[:8])

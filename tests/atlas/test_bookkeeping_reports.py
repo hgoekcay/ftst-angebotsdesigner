@@ -40,6 +40,14 @@ class Tests(unittest.TestCase):
             db.executemany('INSERT INTO atlas_bookkeeping VALUES (?,?)', [(r['id'], 'owner') for r in records])
             db.executemany('INSERT INTO atlas_bookkeeping_documents VALUES (?,?)', [(ident, 'owner') for ident in originals])
 
+    def test_unfinished_old_invoice_refresh_is_visible_in_op_summary(self):
+        self.setup_records([record()])
+        self.app.bookkeeping_sync.status.return_value.update(
+            pending=True, sources=[{'id': 'billomat_op', 'pending': True, 'remaining': 1}])
+        report = reports.build_report(self.app, 'owner')
+        self.assertTrue(report['incomplete'])
+        self.assertIn('älterer offener Rechnungen', reports.format_report(report, 'op'))
+
     def test_owner_denial_before_data_read(self):
         with self.assertRaises(reports.ReportError):
             reports.build_report(self.app, 'other')
