@@ -105,20 +105,20 @@ def function(name, description, properties):
 
 
 TOOLS = [
-    function('check_availability', 'Freie Zeiten im lokalen Demo-Kalender prüfen. Datum YYYY-MM-DD oder leer für alle nächsten 14 Tage.',
+    function('check_availability', 'Freie Zeiten im konfigurierten Kalender prüfen. Datum YYYY-MM-DD oder leer für alle nächsten 14 Tage.',
              {'date': {'type': 'string'}}),
     function('propose_appointment', 'Einen unbestätigten Terminvorschlag anzeigen. Speichert KEINE Buchung; ersetzt einen alten Vorschlag.',
              {'slot_id': {'type': 'string'}, 'name': {'type': 'string'}}),
     function('cancel_proposal', 'Einen noch unbestätigten Vorschlag verwerfen.',
              {'proposal_id': {'type': 'string'}}),
     function('end_conversation', 'Auf ausdrücklichen Wunsch das Gespräch beenden (fertig, auf Wiedersehen, Gespräch beenden).', {}),
-    function('list_bookings', 'Bereits durch den Benutzer bestätigte Demo-Buchungen lesen.', {}),
+    function('list_bookings', 'Bereits durch den Benutzer bestätigte Buchungen lesen.', {}),
 ]
 
 
-def session_config():
+def session_config(demo=True):
     today = datetime.now(ZoneInfo('Europe/Berlin')).date().isoformat()
-    return {
+    config = {
         'model': 'gpt-live-1',
         'instructions': (
             'Du bist ATLAS, die freundliche deutschsprachige Terminassistenz von FT Sicherheitstechnik. '
@@ -157,10 +157,29 @@ def session_config():
     }
 
 
+    if not demo:
+        instructions = config['instructions']
+        instructions = instructions.replace(
+            'Dies ist ausdrücklich ein Demo-Kalender, keine echte Firmen-Terminbuchung.',
+            'Du arbeitest mit dem freigegebenen echten Firmenkalender über die konfigurierte Kalenderverbindung.')
+        config['instructions'] = instructions.replace('Demo-Buchung', 'Kalenderbuchung')
+        backend = config['delegation']['responses']['instructions']
+        backend = backend.replace('lokalen FT Sicherheitstechnik Demo-Kalender', 'freigegebenen Firmenkalender')
+        backend = backend.replace('Keine echten Kunden, Kalender, E-Mails oder Firmendaten sind verbunden.',
+            'Nur die freigegebene Kalenderanbindung ist verfügbar; E-Mails und Wissensspeicher sind hier nicht eingebunden.')
+        backend = backend.replace('Demo-Buchung', 'Kalenderbuchung')
+        config['delegation']['responses']['instructions'] = backend + (
+            ' Ein Status unknown oder saving ist KEINE bestätigte Buchung. '
+            'Fordere bei unklarem Status eine Prüfung an; erst confirmed belegt die Rückleseprüfung. '
+            'Externe Kalenderänderungen können nach einer Verfügbarkeitsprüfung erfolgen.')
+    return config
+
+
 class FrontDeskLive:
     def __init__(self, options, db_factory):
         self.db = db_factory
         self.enabled = options.get('live_enabled') is True
+        self.demo = options.get('calendar_enabled') is not True
         self.owner = options.get('online_ha_user_id') or ''
         self._key = options.get('openai_api_key') or ''
         self.limit = options.get('live_daily_limit', 10)
@@ -199,7 +218,7 @@ class FrontDeskLive:
         reason = ('Bereit' if self.enabled_for(user) else 'GPT-Live ist deaktiviert oder für diesen Benutzer nicht eingerichtet.')
         return {'enabled': self.enabled_for(user), 'reason': reason, 'used': used, 'limit': self.limit,
                 'model': 'gpt-live-1', 'backend_model': 'gpt-6-luna', 'max_seconds': self.max_seconds,
-                'duration_limit_enforcement': 'server_sideband_and_browser', 'demo': True}
+                'duration_limit_enforcement': 'server_sideband_and_browser', 'demo': self.demo}
 
     def create(self, user, sdp):
         if not self.enabled_for(user):
@@ -222,7 +241,7 @@ class FrontDeskLive:
         # Reserve before network call, including failed or ambiguous attempts.
         session_id = None
         try:
-            raw = _request(self._key, {'session': session_config(), 'transport': {'type': 'webrtc', 'sdp': sdp}})
+            raw = _request(self._key, {'session': session_config(self.demo), 'transport': {'type': 'webrtc', 'sdp': sdp}})
             session_id = raw['session']['id']
             answer = raw['transport']['sdp']
             if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,256}', session_id):

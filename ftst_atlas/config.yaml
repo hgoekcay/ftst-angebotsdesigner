@@ -1,5 +1,5 @@
 name: "FTST ATLAS"
-version: "0.9.0"
+version: "0.9.1"
 slug: "ftst_atlas"
 description: "Firmenassistent mit lokalem Wissen, optionaler Online-Beratung und Hintergrundaufträgen."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
@@ -9,6 +9,7 @@ startup: application
 boot: manual
 init: false
 stage: experimental
+homeassistant_api: true
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:brain
@@ -16,10 +17,14 @@ panel_title: ATLAS
 panel_admin: true
 ports:
   8100/tcp: null
+  8101/tcp: null
 ports_description:
+  8101/tcp: "Nur Google OAuth-Rückleitung; separater HTTPS-Reverse-Proxy erforderlich"
   8100/tcp: "Nur Belegupload; HTTPS-Reverse-Proxy erforderlich"
 timeout: 30
 options:
+  calendar_provider: home_assistant
+  calendar_enabled: false
   ollama_url: "http://76b650ab-ftst-local-ai:11434"
   model: "qwen3:4b-instruct-2507-q4_K_M"
   voice_enabled: false
@@ -46,6 +51,13 @@ options:
   online_daily_limit: 10
   online_share_profile: false
 schema:
+  calendar_provider: list(home_assistant|google)
+  google_client_id: "str?"
+  google_client_secret: "password?"
+  google_redirect_uri: "url?"
+  calendar_enabled: bool
+  calendar_entity_id: "str?"
+  calendar_ha_user_id: "str?"
   ollama_url: url
   model: str
   voice_enabled: bool

@@ -478,7 +478,6 @@ Actual OpenAI credentials/model access, iPhone full-duplex audio, and installati
 are NOT verified for this candidate. Last independently observed installed version
 remains 0.8.4. Next: CI, release, then API-enabled physical-device acceptance.
 
-
 ## Release checkpoint 0.9.0 (2026-11-01)
 
 PR #81 merged as d87420d1327c381774adebaaa056e268deaf89df after all six CI jobs
@@ -490,3 +489,54 @@ skipped the Developers plugin. Live remains disabled by default. Next step is
 installing 0.9.0, then securely configuring the API and verifying a real microphone
 conversation. The complete demo booking flow is tested with mocked provider calls;
 actual OpenAI full-duplex audio and physical iPhone playback remain unverified.
+
+
+## Calendar integration preparation (2026-11-01)
+
+User requests the connected Google business calendar in ATLAS and all necessary
+interfaces. ChatGPT's calendar connector can list a writable business calendar;
+that credential is not available to the deployed addon. No private calendar IDs
+or event details are recorded here. Prepared an HA Core calendar adapter using the
+existing HA Google OAuth integration, a separate real-booking store and status-aware
+Front Desk UI. Requires explicit entity/owner configuration plus homeassistant_api.
+No live activation or real appointment performed. Current browser authentication
+attempt returned to login; user explicitly prefers normal browser, not TinyFish.
+
+New modules: ha_calendar.py (bounded fixed-internal-origin REST),
+calendar_appointments.py (durable intents, conflict reread, read-only reconciliation).
+No model booking tool: final UI confirmation remains required. Unknown writes never
+replay. External calendar edits can race the read/create sequence. Confirmed records
+are booking history, not an external edit/delete mirror. Demo records stay separate.
+
+Local validation: 20 provider/calendar tests, Front Desk HTTP/Live tests and 12
+frontend checks pass; final wiring checks/release CI and live acceptance pending.
+Source tracing used; Code Review Graph engine unavailable in this runtime.
+Other blockers remain: OpenAI credential/model access, invoice-mailbox credentials,
+employee upload end-to-end verification; full bank matching/ledger are not implemented.
+Do not describe all interfaces as connected or this preparation as installed.
+
+
+### 2026-11-01: Direkter Google-Kalender, noch nicht ausgerollt
+
+Auf ausdrücklichen Wunsch direkte OAuth-/Calendar-API-Verbindung ergänzt.
+Optionaler HA-Adapter bleibt erhalten. Neue Module google_oauth.py →
+google_calendar.py → calendar_appointments.py; app.py schützt Besitzer/CSRF
+und serialisiert Kalenderwechsel mit Buchungen. google_callback.py bietet
+ausschließlich die öffentliche Rückleitung auf isoliertem Port 8101;
+google_calendar_ui.js führt in System durch Anmeldung, aktive Übernahme und
+bewusste Kalenderauswahl. Kein Code-Graph-Index behauptet, Beziehungen im
+Quelltext geprüft. Kein produktives Konto verbunden und keine Termine erzeugt.
+
+Noch erforderlich: konkreter dedizierter HTTPS-Callback samt geprüftem Proxy,
+Google-Webclient-ID/-Geheimnis und exakte Redirect-URI, anschließende Anmeldung
+durch Besitzer und Live-Abnahme. Kein Ingress-Callback erfunden, keine Ports
+öffentlich geschaltet. Details in ftst_atlas/DOCS.md.
+
+
+### Releasevorbereitung 0.9.1
+
+Benutzer fordert das installierbare Update ausdrücklich an. PR83 wird mit
+Versionsnummer 0.9.1 und identischem CI-Container-Build vorbereitet. Die
+Google-Systemoberfläche ist Teil des Updates; Zugangsdaten, HTTPS-Rückleitung
+und Besitzer-Anmeldung bleiben Einrichtungsschritte nach Installation.
+Kein produktiver Verbindungsstatus wird daraus abgeleitet.

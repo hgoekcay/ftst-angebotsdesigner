@@ -103,3 +103,33 @@ class FrontDeskHTTPTests(unittest.TestCase):
             code, headers, raw = request(server, '/' + name, body=None, method='GET')
             assert code == 200 and raw
             assert 'no-store' in headers['Cache-Control']
+
+    def test_real_calendar_failure_blocks_paid_session(self):
+        app, _ = self.server
+        app.calendar_enabled = True
+        with patch.object(app.appointments, 'state', return_value={'demo': False, 'provider_status': {'availability_verified': False}}), patch.object(app.frontdesk, 'create') as create:
+            assert call(self.server, 'session', {'sdp': 'v=0\r\n'})[0] == 503
+            create.assert_not_called()
+
+    def test_reconciliation_is_csrf_protected_and_has_no_model_tool(self):
+        app, _ = self.server
+        app.calendar_enabled = True
+        with patch.object(app.appointments, 'reconcile', create=True, return_value={'status': 'unknown'}) as reconcile:
+            assert call(self.server, 'reconcile', {'proposal_id': 'p'}, csrf=False)[0] == 403
+            reconcile.assert_not_called()
+            code, result = call(self.server, 'reconcile', {'proposal_id': 'p'})
+            assert code == 200 and result['result']['status'] == 'unknown'
+            reconcile.assert_called_once_with('owner', 'p')
+
+    def test_google_setup_is_owner_and_csrf_gated(self):
+        app, _ = self.server
+        code, _, raw = request(self.server, '/api/google/status', body=None, method='GET')
+        assert code == 200 and not json.loads(raw)['oauth']['connected']
+        assert request(self.server, '/api/google/begin', b'{}', csrf=False)[0] == 403
+        assert request(self.server, '/api/google/begin', b'{}', user='other')[0] == 503
+        assert request(self.server, '/api/google/finish', b'{}', user='other')[0] == 503
+        assert request(self.server, '/api/google/select', b'{"calendar_id":"private"}', user='other')[0] == 503
+
+    def test_google_setup_only_post_and_no_callback_in_ingress(self):
+        assert request(self.server, '/api/google/begin', b'{}', method='PUT')[0] == 405
+        assert request(self.server, '/oauth/google/callback?code=example&state=example', body=None, method='GET')[0] == 404

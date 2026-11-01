@@ -1,3 +1,11 @@
+## 0.9.1
+
+- Google Kalender direkt in ATLAS verbinden: neuer Einrichtungsbereich unter System, sichere OAuth-Anmeldung und bewusste Firmenkalender-Auswahl.
+- Freie Zeiten und bestätigte Buchungen im ausgewählten Firmenkalender; unklare Schreibantworten werden ausschließlich nachgelesen.
+- Separater OAuth-Rückleitungsdienst auf Port 8101. Vor Aktivierung sind eigene HTTPS-Rückleitung und Google-Webclient-Zugangsdaten erforderlich.
+- Optionaler Home-Assistant-Kalenderanbieter bleibt verfügbar; Demo-Modus bleibt ohne Einrichtung aktiv.
+- Keine automatische Live-Aktivierung. Bestehende OpenAI-Einrichtung und Google-Anmeldung sind nach Installation getrennt vorzunehmen.
+
 ## 0.9.0
 
 - Terminassistenz direkt im ATLAS-Chat: isolierter Demo-Kalender mit freien Zeiten, Vorschlägen und bestätigten Demo-Terminen (Europe/Berlin).
