@@ -1,5 +1,5 @@
 name: "FTST ATLAS"
-version: "0.9.0"
+version: "0.9.1"
 slug: "ftst_atlas"
 description: "Firmenassistent mit lokalem Wissen, optionaler Online-Beratung und Hintergrundaufträgen."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"

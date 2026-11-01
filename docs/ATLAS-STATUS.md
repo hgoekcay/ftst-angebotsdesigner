@@ -531,3 +531,12 @@ Noch erforderlich: konkreter dedizierter HTTPS-Callback samt geprüftem Proxy,
 Google-Webclient-ID/-Geheimnis und exakte Redirect-URI, anschließende Anmeldung
 durch Besitzer und Live-Abnahme. Kein Ingress-Callback erfunden, keine Ports
 öffentlich geschaltet. Details in ftst_atlas/DOCS.md.
+
+
+### Releasevorbereitung 0.9.1
+
+Benutzer fordert das installierbare Update ausdrücklich an. PR83 wird mit
+Versionsnummer 0.9.1 und identischem CI-Container-Build vorbereitet. Die
+Google-Systemoberfläche ist Teil des Updates; Zugangsdaten, HTTPS-Rückleitung
+und Besitzer-Anmeldung bleiben Einrichtungsschritte nach Installation.
+Kein produktiver Verbindungsstatus wird daraus abgeleitet.

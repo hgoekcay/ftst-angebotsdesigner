@@ -307,7 +307,7 @@ Stop während Aufbau; Rückkehr aus Hintergrund; API-Zugang fehlt; echte iPhone-
 Sprachausgabe und Wiederaufnahme prüfen. Automatisierte Tests verwenden Mock-Provider.
 
 
-## Echter Firmenkalender (Vorbereitung 0.9.1)
+## Echter Firmenkalender (ab 0.9.1)
 
 Die Google-Kalender-Verbindung in ChatGPT gilt nicht automatisch für ATLAS.
 Optionaler Anbieter `calendar_provider: home_assistant`: ATLAS verwendet die Google-Calendar-Integration **in Home Assistant**. Falls noch
@@ -353,7 +353,7 @@ Rücklesen, Doppelbestätigung, ungültige Freigabe, Kalenderausfall und iPhone-
 Noch keine Live-Abnahme allein aufgrund erfolgreicher Mock-Tests behaupten.
 
 
-## Google Kalender direkt in ATLAS (Entwurf, nicht live aktiviert)
+## Google Kalender direkt in ATLAS (ab 0.9.1; Einrichtung erforderlich)
 
 Mit `calendar_provider: google` spricht ATLAS direkt mit Google OAuth und der
 Calendar API; die Google-Integration in Home Assistant ist dafür nicht nötig.

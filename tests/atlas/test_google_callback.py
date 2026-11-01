@@ -1,12 +1,14 @@
 """Public callback cannot access application data or activate a grant."""
 import http.client
 from pathlib import Path
-import sys
+import importlib.util
 import threading
 import unittest
 from unittest.mock import Mock
-sys.path.insert(0, str(Path(__file__).parents[2] / 'ftst_atlas'))
-from google_callback import CallbackServer
+spec = importlib.util.spec_from_file_location('atlas_google_callback_test', Path(__file__).parents[2] / 'ftst_atlas/google_callback.py')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+CallbackServer = module.CallbackServer
 
 
 class CallbackTests(unittest.TestCase):
