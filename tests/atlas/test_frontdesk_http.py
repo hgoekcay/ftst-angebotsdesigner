@@ -103,3 +103,20 @@ class FrontDeskHTTPTests(unittest.TestCase):
             code, headers, raw = request(server, '/' + name, body=None, method='GET')
             assert code == 200 and raw
             assert 'no-store' in headers['Cache-Control']
+
+    def test_real_calendar_failure_blocks_paid_session(self):
+        app, _ = self.server
+        app.calendar_enabled = True
+        with patch.object(app.appointments, 'state', return_value={'demo': False, 'provider_status': {'availability_verified': False}}), patch.object(app.frontdesk, 'create') as create:
+            assert call(self.server, 'session', {'sdp': 'v=0\r\n'})[0] == 503
+            create.assert_not_called()
+
+    def test_reconciliation_is_csrf_protected_and_has_no_model_tool(self):
+        app, _ = self.server
+        app.calendar_enabled = True
+        with patch.object(app.appointments, 'reconcile', create=True, return_value={'status': 'unknown'}) as reconcile:
+            assert call(self.server, 'reconcile', {'proposal_id': 'p'}, csrf=False)[0] == 403
+            reconcile.assert_not_called()
+            code, result = call(self.server, 'reconcile', {'proposal_id': 'p'})
+            assert code == 200 and result['result']['status'] == 'unknown'
+            reconcile.assert_called_once_with('owner', 'p')
