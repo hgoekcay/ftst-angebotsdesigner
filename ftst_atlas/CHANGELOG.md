@@ -1,3 +1,8 @@
+## 0.9.2
+
+- Versionsanzeige unter System korrigiert: Laufzeit und Add-on melden denselben Stand.
+- Automatischer Konsistenztest verhindert künftig abweichende Versionsnummern in Konfiguration, Anwendung, Änderungsprotokoll und Container-Prüfung.
+
 ## 0.9.1
 
 - Google Kalender direkt in ATLAS verbinden: neuer Einrichtungsbereich unter System, sichere OAuth-Anmeldung und bewusste Firmenkalender-Auswahl.
