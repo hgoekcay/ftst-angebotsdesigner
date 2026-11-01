@@ -292,7 +292,8 @@ async function dialogueTurn(state,audio,mime){
   dialogueStatus('Ich schreibe deine Aufnahme lokal mit …','processing');
   const transcription=await voiceRequest('transcribe',audio,mime,()=>dialogueLive(state));if(!dialogueLive(state))return;
   const message=typeof transcription.text==='string'?transcription.text.trim():'';
-  if(!message||message.length>2000)throw new Error('Keine passende Sprache erkannt. Bitte Gespräch neu starten.');
+  if(!message){await listenDialogue(state);return;}
+  if(message.length>2000)throw new Error('Die erkannte Nachricht ist zu lang. Bitte kürzer sprechen.');
   // A spoken stop only closes the conversation; it is never dispatched as a job.
   if(/^(?:stopp?|gespräch beenden|atlas stopp?)[.!?]*$/i.test(message)){stopDialogue('Gespräch auf deinen Wunsch beendet.');return;}
   addMessage(message,'user');dialogueStatus('ATLAS bearbeitet deine Anfrage. Das Mikrofon ist aus.','processing');
@@ -343,14 +344,14 @@ async function listenDialogue(state){
  function finish(byButton=false){if(ended||!dialogueLive(state))return;if(byButton&&elapsedMs<500){dialogueStatus('Bitte erst kurz sprechen, dann „Jetzt antworten“ drücken.');return;}manual=byButton;ended=true;releaseDialogueCapture(state);if(recorder.state!=='inactive')recorder.stop();}
  recorder.addEventListener('dataavailable',event=>{if(!dialogueLive(state)||!event.data.size)return;bytes+=event.data.size;if(bytes>5*1024*1024){stopDialogue('Aufnahme zu groß. Bitte kürzer sprechen.');return;}chunks.push(event.data);});
  recorder.addEventListener('error',()=>dialogueFailure(state,new Error('Die Aufnahme ist fehlgeschlagen.')));
- recorder.addEventListener('stop',()=>{if(!dialogueLive(state)||state.recorder!==recorder)return;releaseDialogueCapture(state);state.recorder=null;if((!manual&&voicedMs<450)||!bytes){stopDialogue('Keine Sprache erkannt. Gespräch beendet.');return;}dialogueTurn(state,new Blob(chunks,{type:mime}),mime);});
+ recorder.addEventListener('stop',()=>{if(!dialogueLive(state)||state.recorder!==recorder)return;releaseDialogueCapture(state);state.recorder=null;if((!manual&&voicedMs<450)||!bytes){listenDialogue(state).catch(error=>dialogueFailure(state,error));return;}dialogueTurn(state,new Blob(chunks,{type:mime}),mime);});
  function detect(){
   if(!dialogueLive(state)||ended)return;
   if(state.context.state==='suspended'){stopDialogue('Audioerkennung wurde angehalten. Bitte Gespräch erneut starten.');return;}
   analyser.getFloatTimeDomainData(samples);let sum=0;for(const sample of samples)sum+=sample*sample;const rms=Math.sqrt(sum/samples.length);elapsedMs+=100;
   if(rms>=0.018){voicedMs+=100;silentMs=0;}else silentMs+=100;
   if(voicedMs>=450&&silentMs>=2000){finish();return;}
-  if(voicedMs<450&&elapsedMs>=15000){stopDialogue('15 Sekunden ohne Sprache. Gespräch beendet.');return;}
+  if(voicedMs<450&&elapsedMs>=15000){finish();return;}
   state.listenTimer=setTimeout(detect,100);
  }
  recorder.start(250);state.finishCapture=()=>finish(true);$('dialogue-answer').hidden=false;state.limitTimer=setTimeout(()=>finish(),60000);state.listenTimer=setTimeout(detect,100);

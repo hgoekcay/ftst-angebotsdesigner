@@ -540,3 +540,47 @@ Versionsnummer 0.9.1 und identischem CI-Container-Build vorbereitet. Die
 Google-Systemoberfläche ist Teil des Updates; Zugangsdaten, HTTPS-Rückleitung
 und Besitzer-Anmeldung bleiben Einrichtungsschritte nach Installation.
 Kein produktiver Verbindungsstatus wird daraus abgeleitet.
+
+
+## Voice-first completion checkpoint — 2026-11-01
+
+User priority: one started conversation must continue listening after every reply,
+accept tasks and report actual execution; broader company automation is deferred.
+Live version last verified: 0.9.2. Google OAuth and OpenAI activation remain incomplete.
+Cloudflared outage traced to an empty additional_hosts row; recovered by user.
+Do not restart the production tunnel without reading back persisted nonempty values.
+
+Working-tree fix (not published or installed): silent 15-second captures rearm
+locally instead of ending the conversation. Empty transcription also rearms without
+submitting a job. Explicit stop, permission failures and ten-minute session bound
+remain. tests/atlas_dialog_ui.cjs passes, including a second complete spoken turn
+without another start click and 30 seconds of silence without transcription.
+Physical iPhone audio remains unverified; this is not a proven fix for every reported
+first-answer failure. Existing OpenAI Front Desk is calendar-specific, not yet the
+general assistant.
+
+Acceptance order:
+1. Publish reviewed voice-loop fix; verify three successive iPhone turns and a pause.
+2. Configure server-side OpenAI credential and owner; test real provider connection.
+3. Extend general voice tools to persisted tasks and task queries, with readback,
+   authorization and duplicate protection; support interruption and follow-up context.
+4. Validate calendar and mail workflows separately before enabling them in voice.
+No claim of background development or full business autonomy.
+
+
+## Diagnose-Update 0.9.3 (2026-11-01)
+
+Live0.9.2: OpenAI-Zugang und Besitzer wurden eingerichtet; zwei echte Anfragen
+scheiterten bisher ohne unterscheidbare Ursache. Keine Ursache aus dem generischen
+Fehler ableiten. Implementiert: feste Diagnosecodes und HTTP-Status ohne rohe
+Providertexte, Schlüssel oder Eingaben;429 unterscheidet Guthaben/Limit und
+Anfragerate. Fehler bleiben durch answer und den vorhandenen JobError-Textpfad
+erhalten. Keine automatische Wiederholung, unveränderte Tageszählung.
+Offizielle Grundlage: https://developers.openai.com/api/docs/guides/error-codes
+
+Sprechpausen reaktivieren die lokale Aufnahme; leere Transkripte starten keinen
+Auftrag. Expliziter Stop und Zehn-Minuten-Limit bleiben. Vergleich gegen main
+beschränkt app.js auf diese drei Stellen; Dialogtests und elf Online-Tests
+bestanden. Quelltextsuche statt nicht verfügbarem Code-Graph.
+Nächster Schritt nach CI/Release:0.9.3 installieren und genau eine echte Anfrage
+ausführen, Diagnosecode auswerten. Keine weitere echte Anfrage bei Entwicklung.

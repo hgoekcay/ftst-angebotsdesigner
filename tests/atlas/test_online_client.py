@@ -161,6 +161,50 @@ class OnlineTests(unittest.TestCase):
                 self.assertEqual(connection.request.call_args.args, ('POST', '/v1/responses'))
                 connection.close.assert_called_once()
 
+    def test_safe_typed_http_diagnostics_and_propagation(self):
+        cases = [(401, {}, 'auth'), (403, {}, 'forbidden'), (404, {}, 'not_found'),
+                 (400, {}, 'bad_request'), (503, {}, 'provider'),
+                 (429, {'code': 'insufficient_quota'}, 'quota'),
+                 (429, {'code': 'credit_balance_exhausted'}, 'quota'),
+                 (429, {'type': 'rate_limit_error'}, 'rate_limit'),
+                 (429, {'code': KEY}, 'throttled')]
+        for status, error, expected in cases:
+            with self.subTest(status=status, expected=expected):
+                connection = MagicMock()
+                result = connection.getresponse.return_value
+                result.status = status
+                result.getheader.side_effect = lambda key, default=None: 'application/json' if key == 'Content-Type' else None
+                result.read1.side_effect = [json.dumps({'error': dict(error, message=KEY)}).encode(), b'']
+                with patch.object(m.http.client, 'HTTPSConnection', return_value=connection):
+                    with self.assertRaises(m.OnlineDiagnostic) as caught:
+                        m._request(KEY, {})
+                self.assertEqual(caught.exception.code, expected)
+                self.assertEqual(caught.exception.http_status, status)
+                self.assertNotIn(KEY, str(caught.exception))
+                self.assertEqual(connection.request.call_count, 1)
+        with patch.object(m, '_request', side_effect=m.OnlineDiagnostic('quota', 429)):
+            with self.assertRaises(m.OnlineDiagnostic) as caught:
+                self.client.answer('owner', 'private question')
+        self.assertEqual(caught.exception.code, 'quota')
+        self.assertIn('HTTP 429', str(caught.exception))
+        with self.db() as db:
+            self.assertNotIn('private', str(db.execute('SELECT * FROM online_usage').fetchall()))
+
+    def test_timeout_network_incomplete_and_sources_distinct(self):
+        for failure, code in [(TimeoutError(KEY), 'timeout'), (OSError(KEY), 'network')]:
+            connection = MagicMock()
+            connection.request.side_effect = failure
+            with patch.object(m.http.client, 'HTTPSConnection', return_value=connection):
+                with self.assertRaises(m.OnlineDiagnostic) as caught:
+                    m._request(KEY, {})
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn(KEY, str(caught.exception))
+        for value, web, code in [({'status': 'incomplete'}, False, 'incomplete'), (response(), True, 'sources')]:
+            with patch.object(m, '_request', return_value=value):
+                with self.assertRaises(m.OnlineDiagnostic) as caught:
+                    self.client.answer('owner', 'test', web=web)
+            self.assertEqual(caught.exception.code, code)
+
 
 if __name__ == '__main__':
     unittest.main()
