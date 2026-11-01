@@ -12,6 +12,8 @@ from jobs import JobQueue, JobError
 from workflows import Workflows
 from dialog import Dialog
 from appointments import Appointments, AppointmentError
+from ha_calendar import HACalendar
+from calendar_appointments import CalendarAppointments
 from frontdesk_live import FrontDeskLive, LiveError
 from voice import VoiceClient, VoiceError, VoiceAccessError, VoiceBusyError, MAX_UPLOAD
 from knowledge import Knowledge, KnowledgeConflict
@@ -87,7 +89,10 @@ class App:
         self.voice = VoiceClient(options, dev=self.dev)
         self.online_share_profile = options.get('online_share_profile') is True
         self.online = OnlineClient(options, self.db)
-        self.appointments = Appointments(self.db)
+        self.calendar_enabled = options.get('calendar_enabled') is True
+        self.calendar = HACalendar(options)
+        self.appointments = (CalendarAppointments(self.db, self.calendar)
+                             if self.calendar_enabled else Appointments(self.db))
         self.frontdesk = FrontDeskLive(options, self.db)
         self.mail_lock = threading.Lock()
         self.mail_cache = {}
@@ -112,6 +117,13 @@ class App:
         db = sqlite3.connect(self.db_path, timeout=10)
         db.row_factory = sqlite3.Row
         return db
+
+    def frontdesk_state(self, user):
+        state = self.appointments.state(user)
+        live = self.frontdesk.status(user)
+        if self.calendar_enabled and not state.get('provider_status', {}).get('availability_verified'):
+            live = {**live, 'enabled': False, 'reason': 'Firmenkalender konnte nicht geprüft werden.'}
+        return {**state, 'live': live}
 
     def collection(self, table, user_id):
         assert table in ('memories', 'tasks')
@@ -451,9 +463,9 @@ def make_handler(app):
             path = unquote(urlsplit(self.path).path)
             if path == '/api/frontdesk/state':
                 try:
-                    return self.send(200, {**app.appointments.state(self.user_id), 'live': app.frontdesk.status(self.user_id)})
+                    return self.send(200, app.frontdesk_state(self.user_id))
                 except (ValueError, sqlite3.Error):
-                    return self.error(503, 'Demo-Kalender momentan nicht verfügbar.')
+                    return self.error(503, 'Kalender nicht verfügbar oder für diesen Benutzer nicht freigegeben.')
             if path == '/api/submissions/access':
                 if not app.bookkeeping_sync.enabled_for(self.user_id):
                     return self.error(403, 'Belegverwaltung nicht freigegeben.')
@@ -562,6 +574,8 @@ def make_handler(app):
                     data = self.body()
                     action = path.removeprefix('/api/frontdesk/')
                     if action == 'session':
+                        if app.calendar_enabled and not app.frontdesk_state(self.user_id)['live']['enabled']:
+                            raise LiveError('Firmenkalender und Live-Zugang müssen für denselben Benutzer freigegeben und erreichbar sein.')
                         return self.send(201, app.frontdesk.create(self.user_id, data.get('sdp')))
                     if action == 'close':
                         return self.send(200, app.frontdesk.close(self.user_id, data.get('session_id'), client_closed=data.get('client_closed') is True))
@@ -591,11 +605,13 @@ def make_handler(app):
                         if data.get('confirmed') is not True:
                             return self.error(400, 'Bitte die angezeigten Termindetails ausdrücklich bestätigen.')
                         result = app.appointments.confirm(self.user_id, data.get('proposal_id'))
+                    elif action == 'reconcile' and app.calendar_enabled:
+                        result = app.appointments.reconcile(self.user_id, data.get('proposal_id'))
                     elif action == 'cancel':
                         result = app.appointments.cancel_proposal(self.user_id, data.get('proposal_id'))
                     else:
                         return self.error(404, 'Nicht gefunden.')
-                    return self.send(200, {'result': result, 'state': {**app.appointments.state(self.user_id), 'live': app.frontdesk.status(self.user_id)}})
+                    return self.send(200, {'result': result, 'state': app.frontdesk_state(self.user_id)})
                 if method == 'POST' and path in ('/api/voice/transcribe', '/api/voice/synthesize', '/api/voice/turn'):
                     return self.voice_request(path)
                 if method == 'POST' and path == '/api/workflows':

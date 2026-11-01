@@ -305,3 +305,49 @@ Abnahme: Mikrofon ablehnen; normale Buchung; während Prüfung Tag korrigieren;
 veraltete Karte bestätigen (muss scheitern); zweimal bestätigen (nur eine Buchung);
 Stop während Aufbau; Rückkehr aus Hintergrund; API-Zugang fehlt; echte iPhone-
 Sprachausgabe und Wiederaufnahme prüfen. Automatisierte Tests verwenden Mock-Provider.
+
+
+## Echter Firmenkalender (Vorbereitung 0.9.1)
+
+Die Google-Kalender-Verbindung in ChatGPT gilt nicht automatisch für ATLAS.
+ATLAS verwendet die Google-Calendar-Integration **in Home Assistant**. Falls noch
+nicht eingerichtet: Google Calendar API in Google Cloud aktivieren, OAuth-Client
+als Webanwendung mit Redirect `https://my.home-assistant.io/redirect/oauth`
+erstellen und Client-ID/Client-Secret direkt unter Home Assistant → Einstellungen
+→ Geräte & Dienste → Google Calendar hinterlegen. Google-Anmeldung und gewünschte
+Schreibfreigabe dort abschließen. Kein einfacher API-Key und kein Passwort im Chat.
+Offizielle Anleitung: https://www.home-assistant.io/integrations/google/
+
+Danach nur die bewusst ausgewählte Firmenkalender-Entität in ATLAS konfigurieren:
+- `calendar_enabled`: true (false erhält den separaten Demo-Kalender).
+- `calendar_entity_id`: tatsächliche `calendar.…`-Entität aus Home Assistant;
+  nicht die Google-Kalender-ID und nicht ungeprüft der private Hauptkalender.
+- `calendar_ha_user_id`: zugelassene Besitzer-ID aus ATLAS → System; für Sprache
+  muss sie mit `online_ha_user_id` übereinstimmen.
+
+Das Add-on benötigt `homeassistant_api: true`. Der interne Supervisor-Zugang ist
+technisch weitreichend; ATLAS begrenzt die implementierten Routen auf die gewählte
+Kalender-Entität und `calendar.create_event`. Kein Token geht in den Browser oder
+an OpenAI. Keine fremden Kalendertitel/-beschreibungen gehen an das Sprachmodell;
+es erhält freie Zeiten und die im ATLAS-Terminablauf eingegebenen Angaben.
+
+Freie Beratungen: nächste 14 Tage, Montag–Freitag 9–17 Uhr, 60 Minuten, Berlin.
+Ganztägige und überlappende Ereignisse werden berücksichtigt. HA liefert die
+expandierten Serienereignisse. Bei Lesefehlern gibt es keine vermeintlich freien
+Zeiten und keinen stillen Rückfall zur Demo. Dies ist noch keine Einsatzplanung
+für mehrere Techniker oder Reisezeiten.
+
+Nur die Bestätigungskarte erzeugt einen echten Kalendereintrag, ohne Gäste oder
+Einladungsversand. Vorher wird die Belegung erneut gelesen. Der Buchungsauftrag
+wird vor dem Schreibversuch lokal gespeichert. Erst ein passender zurückgelesener
+Eintrag gilt als bestätigt. Bei Zeitüberschreitung bleibt der Status unklar;
+„Buchungsstatus prüfen“ liest ausschließlich nach und sendet nie erneut.
+Home Assistant stellt keine atomare Reservierung gegen parallele Kalendernutzer
+bereit. Änderungen anderer Anwendungen können zwischen Prüfung und Speicherung
+liegen. Unklare Aufträge bleiben blockiert und erfordern gegebenenfalls manuelle
+Klärung; bestätigte ATLAS-Aufträge sind eine Historie, keine laufende Spiegelung
+späterer externer Änderungen oder Löschungen.
+
+Abnahme nach Einrichtung: freie/belegte/ganztägige Zeit, echte bestätigte Buchung,
+Rücklesen, Doppelbestätigung, ungültige Freigabe, Kalenderausfall und iPhone-Sprache.
+Noch keine Live-Abnahme allein aufgrund erfolgreicher Mock-Tests behaupten.
