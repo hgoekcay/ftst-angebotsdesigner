@@ -12,7 +12,9 @@ from jobs import JobQueue, JobError
 from workflows import Workflows
 from dialog import Dialog
 from appointments import Appointments, AppointmentError
-from ha_calendar import HACalendar
+from ha_calendar import HACalendar, CalendarError
+from google_oauth import GoogleOAuth, GoogleOAuthError
+from google_calendar import GoogleCalendar
 from calendar_appointments import CalendarAppointments
 from frontdesk_live import FrontDeskLive, LiveError
 from voice import VoiceClient, VoiceError, VoiceAccessError, VoiceBusyError, MAX_UPLOAD
@@ -43,7 +45,7 @@ def local_open(request, timeout):
 
 VERSION = '0.9.0'
 MAX_BODY = 32768
-STATIC = {'/frontdesk.js': ('frontdesk.js', 'text/javascript; charset=utf-8'), '/frontdesk.css': ('frontdesk.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
+STATIC = {'/google_calendar_ui.js': ('google_calendar_ui.js', 'text/javascript; charset=utf-8'), '/frontdesk.js': ('frontdesk.js', 'text/javascript; charset=utf-8'), '/frontdesk.css': ('frontdesk.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
 
 def qwen3_prompt(messages, thinking_prefill=True):
@@ -90,7 +92,10 @@ class App:
         self.online_share_profile = options.get('online_share_profile') is True
         self.online = OnlineClient(options, self.db)
         self.calendar_enabled = options.get('calendar_enabled') is True
-        self.calendar = HACalendar(options)
+        self.calendar_lock = threading.RLock()
+        self.google_oauth = GoogleOAuth(options, self.data_dir)
+        self.google_calendar = GoogleCalendar(options, self.google_oauth, self.data_dir)
+        self.calendar = (self.google_calendar if options.get('calendar_provider') == 'google' else HACalendar(options))
         self.appointments = (CalendarAppointments(self.db, self.calendar)
                              if self.calendar_enabled else Appointments(self.db))
         self.frontdesk = FrontDeskLive(options, self.db)
@@ -461,9 +466,20 @@ def make_handler(app):
             if not self.authorized():
                 return
             path = unquote(urlsplit(self.path).path)
+            if path.startswith('/api/google/'):
+                try:
+                    with app.calendar_lock:
+                        if path == '/api/google/status':
+                            return self.send(200, {'oauth': app.google_oauth.status(self.user_id), 'calendar': app.google_calendar.status(self.user_id)})
+                        if path == '/api/google/calendars':
+                            return self.send(200, {'calendars': app.google_calendar.list_calendars(self.user_id), 'selected_id': app.google_calendar.selected_id(self.user_id)})
+                    return self.error(404, 'Nicht gefunden.')
+                except (GoogleOAuthError, CalendarError):
+                    return self.error(503, 'Google-Kalender nicht verfügbar oder nicht freigegeben.')
             if path == '/api/frontdesk/state':
                 try:
-                    return self.send(200, app.frontdesk_state(self.user_id))
+                    with app.calendar_lock:
+                        return self.send(200, app.frontdesk_state(self.user_id))
                 except (ValueError, sqlite3.Error):
                     return self.error(503, 'Kalender nicht verfügbar oder für diesen Benutzer nicht freigegeben.')
             if path == '/api/submissions/access':
@@ -568,50 +584,68 @@ def make_handler(app):
                 return
             path = unquote(urlsplit(self.path).path)
             try:
-                if path.startswith('/api/frontdesk/'):
+                if path.startswith('/api/google/'):
                     if method != 'POST':
                         return self.error(405, 'POST erforderlich.')
                     data = self.body()
-                    action = path.removeprefix('/api/frontdesk/')
-                    if action == 'session':
-                        if app.calendar_enabled and not app.frontdesk_state(self.user_id)['live']['enabled']:
-                            raise LiveError('Firmenkalender und Live-Zugang müssen für denselben Benutzer freigegeben und erreichbar sein.')
-                        return self.send(201, app.frontdesk.create(self.user_id, data.get('sdp')))
-                    if action == 'close':
-                        return self.send(200, app.frontdesk.close(self.user_id, data.get('session_id'), client_closed=data.get('client_closed') is True))
-                    result = None
-                    if action == 'tool':
-                        if not app.frontdesk.active_for(self.user_id, data.get('session_id')):
-                            return self.error(403, 'Live-Sitzung nicht verfügbar.')
-                        args = data.get('arguments')
-                        if not isinstance(args, dict):
-                            raise ValueError('Tool-Argumente fehlen.')
-                        name = data.get('name')
-                        if name == 'check_availability':
-                            result = {'available': app.appointments.availability(self.user_id, args.get('date') or None)}
-                        elif name == 'propose_appointment':
-                            result = app.appointments.propose(self.user_id, args.get('slot_id'), args.get('name'))
-                        elif name == 'cancel_proposal':
-                            result = app.appointments.cancel_proposal(self.user_id, args.get('proposal_id'))
-                        elif name == 'end_conversation':
-                            result = {'finish': True}
-                        elif name == 'list_bookings':
-                            result = {'bookings': app.appointments.bookings(self.user_id)}
+                    with app.calendar_lock:
+                        action = path.removeprefix('/api/google/')
+                        if action == 'begin':
+                            result = app.google_oauth.begin(self.user_id)
+                        elif action == 'finish':
+                            result = app.google_oauth.finish(self.user_id)
+                        elif action == 'disconnect':
+                            result = app.google_oauth.disconnect(self.user_id)
+                        elif action == 'select':
+                            result = app.google_calendar.select_calendar(self.user_id, data.get('calendar_id'))
                         else:
-                            return self.error(400, 'Dieses Werkzeug ist nicht freigegeben. Bestätigung erfolgt in der Terminkarte.')
-                    elif action == 'propose':
-                        result = app.appointments.propose(self.user_id, data.get('slot_id'), data.get('name'))
-                    elif action == 'confirm':
-                        if data.get('confirmed') is not True:
-                            return self.error(400, 'Bitte die angezeigten Termindetails ausdrücklich bestätigen.')
-                        result = app.appointments.confirm(self.user_id, data.get('proposal_id'))
-                    elif action == 'reconcile' and app.calendar_enabled:
-                        result = app.appointments.reconcile(self.user_id, data.get('proposal_id'))
-                    elif action == 'cancel':
-                        result = app.appointments.cancel_proposal(self.user_id, data.get('proposal_id'))
-                    else:
-                        return self.error(404, 'Nicht gefunden.')
-                    return self.send(200, {'result': result, 'state': app.frontdesk_state(self.user_id)})
+                            return self.error(404, 'Nicht gefunden.')
+                    return self.send(200, result)
+                if path.startswith('/api/frontdesk/'):
+                    with app.calendar_lock:
+                        if method != 'POST':
+                            return self.error(405, 'POST erforderlich.')
+                        data = self.body()
+                        action = path.removeprefix('/api/frontdesk/')
+                        if action == 'session':
+                            if app.calendar_enabled and not app.frontdesk_state(self.user_id)['live']['enabled']:
+                                raise LiveError('Firmenkalender und Live-Zugang müssen für denselben Benutzer freigegeben und erreichbar sein.')
+                            return self.send(201, app.frontdesk.create(self.user_id, data.get('sdp')))
+                        if action == 'close':
+                            return self.send(200, app.frontdesk.close(self.user_id, data.get('session_id'), client_closed=data.get('client_closed') is True))
+                        result = None
+                        if action == 'tool':
+                            if not app.frontdesk.active_for(self.user_id, data.get('session_id')):
+                                return self.error(403, 'Live-Sitzung nicht verfügbar.')
+                            args = data.get('arguments')
+                            if not isinstance(args, dict):
+                                raise ValueError('Tool-Argumente fehlen.')
+                            name = data.get('name')
+                            if name == 'check_availability':
+                                result = {'available': app.appointments.availability(self.user_id, args.get('date') or None)}
+                            elif name == 'propose_appointment':
+                                result = app.appointments.propose(self.user_id, args.get('slot_id'), args.get('name'))
+                            elif name == 'cancel_proposal':
+                                result = app.appointments.cancel_proposal(self.user_id, args.get('proposal_id'))
+                            elif name == 'end_conversation':
+                                result = {'finish': True}
+                            elif name == 'list_bookings':
+                                result = {'bookings': app.appointments.bookings(self.user_id)}
+                            else:
+                                return self.error(400, 'Dieses Werkzeug ist nicht freigegeben. Bestätigung erfolgt in der Terminkarte.')
+                        elif action == 'propose':
+                            result = app.appointments.propose(self.user_id, data.get('slot_id'), data.get('name'))
+                        elif action == 'confirm':
+                            if data.get('confirmed') is not True:
+                                return self.error(400, 'Bitte die angezeigten Termindetails ausdrücklich bestätigen.')
+                            result = app.appointments.confirm(self.user_id, data.get('proposal_id'))
+                        elif action == 'reconcile' and app.calendar_enabled:
+                            result = app.appointments.reconcile(self.user_id, data.get('proposal_id'))
+                        elif action == 'cancel':
+                            result = app.appointments.cancel_proposal(self.user_id, data.get('proposal_id'))
+                        else:
+                            return self.error(404, 'Nicht gefunden.')
+                        return self.send(200, {'result': result, 'state': app.frontdesk_state(self.user_id)})
                 if method == 'POST' and path in ('/api/voice/transcribe', '/api/voice/synthesize', '/api/voice/turn'):
                     return self.voice_request(path)
                 if method == 'POST' and path == '/api/workflows':
@@ -719,6 +753,8 @@ def make_handler(app):
                     task['done'] = bool(task['done'])
                     return self.send(200, {'task': task})
                 self.error(404, 'Nicht gefunden.')
+            except (GoogleOAuthError, CalendarError):
+                self.error(503, 'Google-Kalenderanfrage fehlgeschlagen. Verbindung, Freigabe und Konfiguration prüfen.')
             except AppointmentError as exc:
                 self.error(409, str(exc))
             except LiveError as exc:
@@ -750,6 +786,11 @@ def main():
         options_path = app.data_dir / 'options.json'
         options = json.loads(options_path.read_text()) if options_path.exists() else {}
         start_bridge(app, options)
+        from google_callback import start_callback_server
+        try:
+            start_callback_server(app.google_oauth)
+        except (ValueError, OSError):
+            print('Google-Rückleitung deaktiviert: HTTPS-Konfiguration prüfen.', flush=True)
         from submissions_server import start_server, SubmissionsServerError
         try:
             start_server(app, options)

@@ -17,10 +17,13 @@ panel_title: ATLAS
 panel_admin: true
 ports:
   8100/tcp: null
+  8101/tcp: null
 ports_description:
+  8101/tcp: "Nur Google OAuth-Rückleitung; separater HTTPS-Reverse-Proxy erforderlich"
   8100/tcp: "Nur Belegupload; HTTPS-Reverse-Proxy erforderlich"
 timeout: 30
 options:
+  calendar_provider: home_assistant
   calendar_enabled: false
   ollama_url: "http://76b650ab-ftst-local-ai:11434"
   model: "qwen3:4b-instruct-2507-q4_K_M"
@@ -48,6 +51,10 @@ options:
   online_daily_limit: 10
   online_share_profile: false
 schema:
+  calendar_provider: list(home_assistant|google)
+  google_client_id: "str?"
+  google_client_secret: "password?"
+  google_redirect_uri: "url?"
   calendar_enabled: bool
   calendar_entity_id: "str?"
   calendar_ha_user_id: "str?"

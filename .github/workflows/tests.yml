@@ -40,7 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs tests/material_upload_browser.cjs tests/offer_delivery_browser.cjs tests/atlas_upload_browser.cjs tests/atlas_knowledge_ui.cjs tests/atlas_workflows_ui.cjs tests/atlas_dialog_ui.cjs tests/atlas_bookkeeping_ui.cjs tests/atlas_frontdesk_ui.cjs
+      - run: node --test tests/barcode_browser.cjs tests/pdf_browser.cjs tests/material_upload_browser.cjs tests/offer_delivery_browser.cjs tests/atlas_upload_browser.cjs tests/atlas_knowledge_ui.cjs tests/atlas_workflows_ui.cjs tests/atlas_dialog_ui.cjs tests/atlas_bookkeeping_ui.cjs tests/atlas_frontdesk_ui.cjs tests/atlas_google_calendar_ui.cjs
   local-ai-container:
     runs-on: ubuntu-latest
     steps:

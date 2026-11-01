@@ -514,3 +514,20 @@ Source tracing used; Code Review Graph engine unavailable in this runtime.
 Other blockers remain: OpenAI credential/model access, invoice-mailbox credentials,
 employee upload end-to-end verification; full bank matching/ledger are not implemented.
 Do not describe all interfaces as connected or this preparation as installed.
+
+
+### 2026-11-01: Direkter Google-Kalender, noch nicht ausgerollt
+
+Auf ausdrücklichen Wunsch direkte OAuth-/Calendar-API-Verbindung ergänzt.
+Optionaler HA-Adapter bleibt erhalten. Neue Module google_oauth.py →
+google_calendar.py → calendar_appointments.py; app.py schützt Besitzer/CSRF
+und serialisiert Kalenderwechsel mit Buchungen. google_callback.py bietet
+ausschließlich die öffentliche Rückleitung auf isoliertem Port 8101;
+google_calendar_ui.js führt in System durch Anmeldung, aktive Übernahme und
+bewusste Kalenderauswahl. Kein Code-Graph-Index behauptet, Beziehungen im
+Quelltext geprüft. Kein produktives Konto verbunden und keine Termine erzeugt.
+
+Noch erforderlich: konkreter dedizierter HTTPS-Callback samt geprüftem Proxy,
+Google-Webclient-ID/-Geheimnis und exakte Redirect-URI, anschließende Anmeldung
+durch Besitzer und Live-Abnahme. Kein Ingress-Callback erfunden, keine Ports
+öffentlich geschaltet. Details in ftst_atlas/DOCS.md.

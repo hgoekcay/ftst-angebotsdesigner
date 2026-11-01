@@ -161,7 +161,7 @@ def session_config(demo=True):
         instructions = config['instructions']
         instructions = instructions.replace(
             'Dies ist ausdrücklich ein Demo-Kalender, keine echte Firmen-Terminbuchung.',
-            'Du arbeitest mit dem freigegebenen echten Firmenkalender über Home Assistant.')
+            'Du arbeitest mit dem freigegebenen echten Firmenkalender über die konfigurierte Kalenderverbindung.')
         config['instructions'] = instructions.replace('Demo-Buchung', 'Kalenderbuchung')
         backend = config['delegation']['responses']['instructions']
         backend = backend.replace('lokalen FT Sicherheitstechnik Demo-Kalender', 'freigegebenen Firmenkalender')

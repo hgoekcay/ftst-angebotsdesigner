@@ -310,7 +310,7 @@ Sprachausgabe und Wiederaufnahme prüfen. Automatisierte Tests verwenden Mock-Pr
 ## Echter Firmenkalender (Vorbereitung 0.9.1)
 
 Die Google-Kalender-Verbindung in ChatGPT gilt nicht automatisch für ATLAS.
-ATLAS verwendet die Google-Calendar-Integration **in Home Assistant**. Falls noch
+Optionaler Anbieter `calendar_provider: home_assistant`: ATLAS verwendet die Google-Calendar-Integration **in Home Assistant**. Falls noch
 nicht eingerichtet: Google Calendar API in Google Cloud aktivieren, OAuth-Client
 als Webanwendung mit Redirect `https://my.home-assistant.io/redirect/oauth`
 erstellen und Client-ID/Client-Secret direkt unter Home Assistant → Einstellungen
@@ -351,3 +351,64 @@ späterer externer Änderungen oder Löschungen.
 Abnahme nach Einrichtung: freie/belegte/ganztägige Zeit, echte bestätigte Buchung,
 Rücklesen, Doppelbestätigung, ungültige Freigabe, Kalenderausfall und iPhone-Sprache.
 Noch keine Live-Abnahme allein aufgrund erfolgreicher Mock-Tests behaupten.
+
+
+## Google Kalender direkt in ATLAS (Entwurf, nicht live aktiviert)
+
+Mit `calendar_provider: google` spricht ATLAS direkt mit Google OAuth und der
+Calendar API; die Google-Integration in Home Assistant ist dafür nicht nötig.
+Die ChatGPT-Kalenderverbindung liefert ATLAS keine Zugangsdaten.
+
+1. Google Cloud: Calendar API aktivieren und einen OAuth-Client vom Typ
+   **Webanwendung** erstellen. Bei externer App im Testmodus den Benutzer als
+   Testnutzer zulassen; Google kann solche Freigaben nach sieben Tagen beenden.
+2. Eine eigene öffentliche HTTPS-Adresse mit gültigem Zertifikat bereitstellen.
+   Deren einziger freigegebener Pfad muss `/oauth/google/callback` sein und auf
+   den isolierten ATLAS-Listener **8101** führen. Andere Pfade ablehnen. Dieser
+   Listener hat keine ATLAS-, Beleg-, Kalender- oder Konfigurationsrouten.
+   Port 8101 ist standardmäßig nicht am Host veröffentlicht. Die konkrete
+   Tunnel-/Proxy-Zuordnung ist noch einzurichten und zu prüfen. Keinesfalls
+   ATLAS-Port 8099 oder Mitarbeiter-Port 8100 öffentlich dafür weiterleiten.
+   Proxy-Zugriffslogs müssen Query-Strings auslassen, weil sie OAuth-Codes enthalten.
+3. Die vollständige HTTPS-Adresse mit genau diesem Pfad als autorisierte
+   Weiterleitungs-URI beim Google-Webclient und identisch als
+   `google_redirect_uri` in ATLAS eintragen. Keine HA-Ingress-Adresse und nicht
+   `my.home-assistant.io/redirect/oauth` verwenden.
+4. In der Add-on-Konfiguration `calendar_enabled: true`,
+   `calendar_provider: google`, `calendar_ha_user_id` (ATLAS-Besitzer-ID),
+   `google_client_id` und `google_client_secret` setzen. Client-ID und Geheimnis
+   müssen zum selben Webclient gehören; die ID endet auf
+   `.apps.googleusercontent.com`. Geheimnis nur im Server-Konfigurationsfeld
+   hinterlegen. Für Sprache muss der Besitzer auch `online_ha_user_id` sein.
+5. Nach Neustart in **ATLAS → System → Google Kalender direkt verbinden** die
+   Anmeldung starten, Google-Freigabe abschließen, zu ATLAS zurückkehren,
+   **Status aktualisieren**, dann **Verbindung übernehmen**. Anschließend den
+   gewünschten schreibbaren Firmenkalender bewusst auswählen. Erst danach sind
+   echte Kalenderabfragen und bestätigte Buchungen möglich.
+
+Die öffentlichen Rückleitungen aktivieren selbst keine Verbindung. PKCE und
+zufälliger, einmaliger Zustand mit zehn Minuten Gültigkeit sichern den Ablauf;
+Übernahme und Kalenderauswahl erfordern die bestehende Besitzer-Sitzung und CSRF.
+Google-Zugang und Refresh-Token liegen serverseitig in `/data/google-oauth.json`
+mit Dateirechten 0600, nicht verschlüsselt; Backups entsprechend schützen.
+Ein Wechsel der Google-Verbindung macht die alte Kalenderauswahl ungültig.
+Die verlangten Google-Berechtigungen sind `calendar.events` und
+`calendar.calendarlist.readonly`; Google gewährt sie kontoweit, ATLAS begrenzt
+seine Implementierung auf den bewusst ausgewählten Kalender.
+
+**Google-Verbindung in ATLAS entfernen** löscht den lokalen Zugang. Eine bereits
+bei Google erteilte Freigabe kann zusätzlich im Google-Konto widerrufen werden.
+Eine gespeicherte Freigabe ist noch kein Nachweis einer erreichbaren Calendar API.
+Fehler liefern keine vermeintlich freien Zeiten und keinen Demo-Rückfall.
+Buchungen verwenden deterministische Google-Ereignis-IDs; nach unklaren Antworten
+wird nur nachgelesen, nicht erneut gebucht. Keine Gäste oder Einladungen werden
+versendet. Die Terminfenster, Bestätigungspflicht und Grenzen bezüglich externer
+Änderungen entsprechen dem Firmenkalender-Abschnitt oben.
+
+Vor Live-Freigabe noch zu prüfen: HTTPS-Rückleitung, echte Anmeldung, Auswahl,
+freie/belegte/ganztägige/Serientermine, bestätigte Buchung mit Rücklesen,
+Widerruf, Token-Erneuerung und Sprache auf dem iPhone. Automatisierte Tests
+verwenden ausschließlich simulierte Google-Antworten und buchen nichts real.
+
+Referenzen: https://developers.google.com/identity/protocols/oauth2/web-server
+und https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
