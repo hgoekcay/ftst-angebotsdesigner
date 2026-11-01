@@ -477,3 +477,16 @@ Code Review Graph engine was unavailable; source/call sites and tests were used.
 Actual OpenAI credentials/model access, iPhone full-duplex audio, and installation
 are NOT verified for this candidate. Last independently observed installed version
 remains 0.8.4. Next: CI, release, then API-enabled physical-device acceptance.
+
+
+## Release checkpoint 0.9.0 (2026-11-01)
+
+PR #81 merged as d87420d1327c381774adebaaa056e268deaf89df after all six CI jobs
+passed for head 84e84502703aae7b95ab44ad3c45c572fe4144db (run41308201045).
+ATLAS 0.9.0 is published in main. Installation was not performed: a fresh browser
+visit to the Home Assistant origin showed the login form, not an authenticated
+session. No credential was read or entered. No OpenAI key was created; the user
+skipped the Developers plugin. Live remains disabled by default. Next step is
+installing 0.9.0, then securely configuring the API and verifying a real microphone
+conversation. The complete demo booking flow is tested with mocked provider calls;
+actual OpenAI full-duplex audio and physical iPhone playback remain unverified.
