@@ -1,3 +1,8 @@
+## 0.9.3
+
+- Online-Fehler zeigen sichere Diagnosecodes für Anmeldung, Berechtigungen, Modellzugriff, Guthaben/Anfragelimits, Netzwerk und unvollständige Antworten. Keine geheimen Provider-Antworten werden angezeigt.
+- Gespräch bleibt nach Sprechpausen aktiv; leere Aufnahmen lösen keinen KI-Auftrag aus. Stop und Sitzungszeitlimit bleiben wirksam.
+
 ## 0.9.2
 
 - Versionsanzeige unter System korrigiert: Laufzeit und Add-on melden denselben Stand.

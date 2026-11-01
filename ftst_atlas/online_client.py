@@ -14,6 +14,51 @@ class OnlineError(Exception):
     pass
 
 
+DIAGNOSTICS = {
+    'auth': 'API-Anmeldung abgelehnt. Schlüssel und Projektzuordnung prüfen.',
+    'forbidden': 'API-Zugriff verweigert. Projekt-, Modell- und Regionsfreigabe prüfen.',
+    'not_found': 'Modell oder API-Ressource nicht verfügbar. Modellname und Projektzugriff prüfen.',
+    'quota': 'API-Guthaben oder Ausgaben-/Nutzungslimit erschöpft. Abrechnung und Limits prüfen.',
+    'rate_limit': 'API-Anfragelimit erreicht. Vor einem neuen Versuch warten.',
+    'throttled': 'API-Anfrage begrenzt; genaue Ursache unbekannt. Guthaben und Anfragelimits prüfen.',
+    'bad_request': 'API-Anfrage abgelehnt. Modell und unterstützte Anfrageparameter prüfen.',
+    'provider': 'OpenAI-Dienst vorübergehend nicht verfügbar.',
+    'http': 'Unerwarteter API-HTTP-Status.',
+    'timeout': 'Zeitlimit beim API-Aufruf überschritten.',
+    'network': 'Verbindung zur OpenAI-API fehlgeschlagen.',
+    'format': 'API-Antwort konnte nicht sicher gelesen werden.',
+    'incomplete': 'OpenAI hat keine vollständige Antwort geliefert.',
+    'sources': 'Webrecherche lieferte keine überprüfbaren Quellen.',
+    'unknown': 'Online-Anfrage konnte nicht abgeschlossen werden.',
+}
+
+
+class OnlineDiagnostic(OnlineError):
+    """Only locally defined messages/codes may cross the provider boundary."""
+    def __init__(self, code, status=None):
+        self.code = code if code in DIAGNOSTICS else 'unknown'
+        self.http_status = status if type(status) is int and 100 <= status <= 599 else None
+        marker = 'OPENAI_' + self.code.upper()
+        if self.http_status is not None:
+            marker += '; HTTP ' + str(self.http_status)
+        super().__init__('[' + marker + '] ' + DIAGNOSTICS[self.code] +
+                         ' Keine automatische Wiederholung; gesendete Versuche zählen zum Tageslimit.')
+
+
+def _http_error(status, body=None):
+    code = {400: 'bad_request', 401: 'auth', 403: 'forbidden', 404: 'not_found'}.get(status)
+    if status == 429:
+        error = body.get('error') if isinstance(body, dict) else None
+        error = error if isinstance(error, dict) else {}
+        fields = [error.get('code'), error.get('type')]
+        quota = {'insufficient_quota', 'credit_balance_exhausted', 'organization_spend_limit_exceeded',
+                 'project_spend_limit_exceeded', 'organization_usage_limit_exceeded'}
+        rate = {'rate_limit_exceeded', 'rate_limit_error', 'slow_down'}
+        code = ('quota' if any(isinstance(v, str) and v in quota for v in fields) else
+                'rate_limit' if any(isinstance(v, str) and v in rate for v in fields) else 'throttled')
+    return OnlineDiagnostic(code or ('provider' if 500 <= status <= 599 else 'http'), status)
+
+
 MAX_RESPONSE = 1024 * 1024
 TIMEOUT = 90
 HOST = 'api.openai.com'
@@ -54,8 +99,9 @@ def _request(key, payload):
                                     'Accept': 'application/json'})
         socket = connection.sock
         response = connection.getresponse()
-        if response.status != 200:
-            raise ValueError('HTTP failure')
+        status = response.status
+        if status != 200 and status != 429:
+            raise _http_error(status)
         if response.getheader('Content-Type', '').split(';')[0].strip().lower() != 'application/json':
             raise ValueError('Invalid content type')
         length = response.getheader('Content-Length')
@@ -65,7 +111,7 @@ def _request(key, payload):
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise ValueError('Deadline')
+                raise OnlineDiagnostic('timeout')
             socket.settimeout(min(15, remaining))
             block = response.read1(min(65536, MAX_RESPONSE + 1 - total))
             if not block:
@@ -76,34 +122,42 @@ def _request(key, payload):
             chunks.append(block)
         if length is not None and total != int(length):
             raise ValueError('Incomplete response')
-        return json.loads(b''.join(chunks))
+        value = json.loads(b''.join(chunks))
+        if status != 200:
+            raise _http_error(status, value)
+        return value
+    except OnlineDiagnostic:
+        raise
+    except TimeoutError:
+        raise OnlineDiagnostic('timeout') from None
+    except (OSError, http.client.HTTPException):
+        raise OnlineDiagnostic('network') from None
     except Exception:
-        # Never expose provider error bodies, request headers, key or original exception.
-        raise OnlineError('Online-Anfrage fehlgeschlagen. API-Zugang, Guthaben und Verbindung prüfen. Kein automatischer Wiederholungsversuch.') from None
+        raise (_http_error(status) if 'status' in locals() and status != 200 else OnlineDiagnostic('format')) from None
     finally:
         connection.close()
 
 
 def _parse(value):
     if not isinstance(value, dict) or value.get('status') != 'completed' or not isinstance(value.get('output'), list):
-        raise OnlineError('Online-Modell hat keine vollständige Antwort geliefert.')
+        raise OnlineDiagnostic('incomplete')
     parts, sources, offset = [], [], 0
     searched = False
     for item in value['output']:
         if not isinstance(item, dict):
-            raise OnlineError('Online-Antwortformat ungültig.')
+            raise OnlineDiagnostic('format')
         if item.get('type') == 'web_search_call':
             searched = searched or item.get('status') == 'completed'
         if item.get('type') != 'message' or item.get('role') != 'assistant':
             continue
         if item.get('status') != 'completed' or not isinstance(item.get('content'), list):
-            raise OnlineError('Online-Modell hat keine vollständige Antwort geliefert.')
+            raise OnlineDiagnostic('incomplete')
         for content in item['content']:
             if not isinstance(content, dict) or content.get('type') != 'output_text':
                 continue
             text = content.get('text')
             if not isinstance(text, str) or len(text) > 20000:
-                raise OnlineError('Online-Antwortformat ungültig.')
+                raise OnlineDiagnostic('format')
             if parts:
                 parts.append('\n\n')
                 offset += 2
@@ -119,7 +173,7 @@ def _parse(value):
             offset += len(text)
     reply = ''.join(parts)
     if not reply.strip() or len(reply) > 20000:
-        raise OnlineError('Online-Modell hat keine verwertbare Antwort geliefert.')
+        raise OnlineDiagnostic('incomplete')
     usage = value.get('usage') if isinstance(value.get('usage'), dict) else {}
     counts = {key: usage.get(key) if type(usage.get(key)) is int and 0 <= usage[key] < 10**9 else None
               for key in ('input_tokens', 'output_tokens')}
@@ -202,14 +256,16 @@ class OnlineClient:
         try:
             result = _parse(_request(self._key, payload))
             if web and (not result['web_searched'] or not result['sources']):
-                raise OnlineError('Webrecherche hat keine überprüfbaren Quellen geliefert.')
-        except Exception:
+                raise OnlineDiagnostic('sources')
+        except Exception as exc:
             try:
                 with self.db() as db:
                     db.execute("UPDATE online_usage SET outcome='failed' WHERE id=?", (ident,))
             except sqlite3.Error:
                 pass  # Reservation already counts toward the limit; never retry the remote operation.
-            raise OnlineError('Online-Anfrage nicht abgeschlossen. Zugang, Guthaben oder Antwort prüfen. Versuch zählt zum Tageslimit; keine automatische Wiederholung.') from None
+            if isinstance(exc, OnlineDiagnostic):
+                raise OnlineDiagnostic(exc.code, exc.http_status) from None
+            raise OnlineDiagnostic('unknown') from None
         try:
             with self.db() as db:
                 db.execute("UPDATE online_usage SET outcome='completed',input_tokens=?,output_tokens=? WHERE id=?",
