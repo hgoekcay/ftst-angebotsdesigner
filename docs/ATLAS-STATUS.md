@@ -451,3 +451,29 @@ Remaining concrete blockers and work:
 Next resume: verify current installed version and available session, then work from
 ATLAS-FIRMENABLAEUFE.md acceptance milestones. The code and fixes are published;
 there is no promise of unattended continuous development after the chat turn ends.
+
+
+## Front Desk integration candidate 0.9.0 (2026-11-01)
+
+Requested as an ATLAS feature, not a separate website. Added appointments.py
+(owner-isolated SQLite demo calendar), frontdesk_live.py (server-side GPT-Live
+WebRTC creation, Responses gpt-6-luna delegation, authenticated sideband watchdog),
+and frontdesk.js/css inside Chat. Existing local speech remains separate.
+
+All function tools are read/proposal-only. Only the explicit UI confirmation route
+saves a demo booking, with CSRF, user scope, expiry/conflict checks and idempotency.
+New proposals supersede older proposals. No real company calendar is connected.
+Provider key stays server-side. Live is disabled by default; uses openai_api_key and
+online_ha_user_id plus live_enabled/live_daily_limit/live_max_seconds.
+Server records daily starts before upstream calls, blocks duplicate active sessions,
+and attempts bounded sideband closure. Unknown provider finalization remains unknown;
+browser-reported graceful closure releases the local lease without falsely claiming
+server verification. No secrets, transcripts or customer data in this handoff.
+
+Validation: 24 new Python unittest cases (calendar8, Live12, HTTP4); 10 new frontend
+lifecycle/booking checks plus existing ATLAS regression scripts. Review identified
+and fixed local recorder lock and overlapping audio on local/cloud mode switches.
+Code Review Graph engine was unavailable; source/call sites and tests were used.
+Actual OpenAI credentials/model access, iPhone full-duplex audio, and installation
+are NOT verified for this candidate. Last independently observed installed version
+remains 0.8.4. Next: CI, release, then API-enabled physical-device acceptance.

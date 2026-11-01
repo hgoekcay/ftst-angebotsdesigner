@@ -1,3 +1,11 @@
+## 0.9.0
+
+- Terminassistenz direkt im ATLAS-Chat: isolierter Demo-Kalender mit freien Zeiten, Vorschlägen und bestätigten Demo-Terminen (Europe/Berlin).
+- Optionale GPT-Live-1-Gespräche mit Responses-Backend; Mikrofon und Audio über WebRTC. API-Schlüssel bleibt im Add-on.
+- Terminvorschläge werden erst durch ausdrückliche Bestätigung der angezeigten Karte gespeichert; geänderte und abgelaufene Vorschläge sind nicht mehr bestätigbar.
+- Mikrofonfehler, Abbruch, Seitenwechsel und Sitzungsende werden behandelt. Zusätzlicher serverseitiger Sitzungs-Watchdog und tägliches Startlimit.
+- Live-Modus standardmäßig aus. Keine Anbindung an echte Firmenkalender, keine Einladungen. Echte Audio-/Provider-Abnahme steht noch aus.
+
 ## 0.8.4
 
 - Vorhandene PDF-Belege können in der Belegprüfung ausdrücklich erneut erkannt werden. Die lokale Auswertung liefert nur Vorschläge; Original, gespeicherte Angaben und Prüfstatus bleiben unverändert.

@@ -263,3 +263,45 @@ Das beendet die aktuelle Aufnahme ausdrücklich. Der Knopf ist nur während eine
 Aufnahme aktiv; die Aufnahme muss mindestens eine halbe Sekunde lang sein.
 Wenn Mikrofonfreigabe oder Audioausgabe nicht starten, zeigt ATLAS eine konkrete
 Meldung. Ein fehlendes Mikrofon kann nicht durch einen Serverneustart ersetzt werden.
+
+
+## Terminassistenz / Front Desk (ab 0.9.0)
+
+Im Chat „Termine mit ATLAS · Demo“ öffnen. Ohne API lassen sich freie Zeiten
+wählen, Vorschläge prüfen und Demo-Termine bestätigen. Ein Name und ein freies
+Zeitfenster reichen. Erst die Bestätigungskarte speichert; eine erneute Bestätigung
+desselben Vorschlags erzeugt keine zweite Buchung. Vorschläge verfallen nach zehn
+Minuten. Jeder angemeldete Benutzer hat einen getrennten Demo-Kalender. Dies ist
+keine echte Ressourcenplanung für mehrere Mitarbeiter und keine Kundenbuchung.
+
+Für ein Online-Sprachgespräch in der Add-on-Konfiguration:
+- `openai_api_key`: ausschließlich im geschützten Passwortfeld eintragen.
+- `online_ha_user_id`: eigene Home-Assistant-ID aus ATLAS → System.
+- `live_enabled`: einschalten; unabhängig von lokaler Sprache und Online-Textmodus.
+- `live_daily_limit`: maximal 10 Starts pro UTC-Tag als Vorgabe. Auch fehlgeschlagene
+  oder unklare Startversuche zählen; es gibt keine automatische kostenpflichtige Wiederholung.
+- `live_max_seconds`: 60–600 Sekunden, Vorgabe 600.
+
+Speichern und Add-on neu starten. HTTPS und Mikrofonfreigabe sind erforderlich.
+GPT-Live (`gpt-live-1`) führt das Gespräch, `gpt-6-luna` übernimmt die delegierten
+Kalenderabfragen. Sprache und die im Gespräch genannten Termindetails gehen an
+OpenAI. Firmenprofil, E-Mails und Wissensspeicher werden hier nicht eingebunden.
+Live wird nach Dauer, das Responses-Backend zusätzlich nach Nutzung berechnet;
+das Startlimit ist kein Geldlimit. Der API-Zugang muss beide Modelle freigeben.
+
+Sprich etwa „Ich möchte nächsten Dienstag eine Beratung“. ATLAS prüft freie Zeiten,
+fragt fehlende Angaben nach und zeigt einen Vorschlag. Änderungen sind auch während
+der Antworten möglich. Die endgültige Bestätigung erfolgt bewusst auf der Karte;
+ein gesprochenes Ja löst noch keine Buchung aus. „Gespräch beenden“ oder der Stop-Knopf
+schließt die Sitzung. Die Seite beendet die Sprache auch beim Verlassen/Hintergrund.
+Wenn automatische Wiedergabe blockiert wird, erscheint ein Audioplayer.
+
+Der Server versucht die Sitzung zusätzlich nach der Frist über eine authentifizierte
+Sideband-Verbindung zu schließen. Bei Netzwerkausfall kann der Anbieterabschluss
+nicht garantiert werden; ein lokaler Abbruch ist kein Nachweis endgültiger Abrechnung.
+Erzeuge keinen API-Schlüssel im Quellcode und veröffentliche keine Sitzungsdaten.
+
+Abnahme: Mikrofon ablehnen; normale Buchung; während Prüfung Tag korrigieren;
+veraltete Karte bestätigen (muss scheitern); zweimal bestätigen (nur eine Buchung);
+Stop während Aufbau; Rückkehr aus Hintergrund; API-Zugang fehlt; echte iPhone-
+Sprachausgabe und Wiederaufnahme prüfen. Automatisierte Tests verwenden Mock-Provider.

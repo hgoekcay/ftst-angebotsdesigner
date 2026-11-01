@@ -27,7 +27,8 @@ async function api(path,options={}){
  return payload;
 }
 function element(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
-function switchView(view){if(!labels[view])return;if(dialogue&&view!=='chat')stopDialogue('Gespräch beim Seitenwechsel beendet.');activeView=view;document.querySelectorAll('.view').forEach(n=>{const selected=n.id==='view-'+view;n.hidden=!selected;n.classList.toggle('active',selected);});document.querySelectorAll('.nav-item').forEach(n=>{const selected=n.dataset.view===view;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});$('view-label').textContent=labels[view];if(view==='knowledge'){loadMemories();loadProfile();}if(view==='tasks'){loadTasks();loadJobs();loadWorkflows();}if(view==='mail')loadMailAccounts();if(view==='bookkeeping'){loadBookkeeping();loadSubmissionAccess();}if(view==='system')loadStatus();}
+function announceLocalVoice(){if(typeof window.dispatchEvent==='function'&&typeof Event==='function')window.dispatchEvent(new Event('atlas-local-voice-start'));}
+function switchView(view){if(!labels[view])return;if(view!=='chat')announceLocalVoice();if(dialogue&&view!=='chat')stopDialogue('Gespräch beim Seitenwechsel beendet.');activeView=view;document.querySelectorAll('.view').forEach(n=>{const selected=n.id==='view-'+view;n.hidden=!selected;n.classList.toggle('active',selected);});document.querySelectorAll('.nav-item').forEach(n=>{const selected=n.dataset.view===view;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});$('view-label').textContent=labels[view];if(view==='knowledge'){loadMemories();loadProfile();}if(view==='tasks'){loadTasks();loadJobs();loadWorkflows();}if(view==='mail')loadMailAccounts();if(view==='bookkeeping'){loadBookkeeping();loadSubmissionAccess();}if(view==='system')loadStatus();}
 document.querySelectorAll('[data-view]').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 document.querySelector('.brand').addEventListener('click',e=>{e.preventDefault();switchView('chat');});
 function addMessage(text,role,error=false){$('chat-intro').hidden=true;const article=element('article','message '+role+(error?' error':''));article.append(element('div','message-author',role==='user'?'Du':error?'Verbindungshinweis':'ATLAS'),element('div','message-text',text));if(role==='assistant'&&!error){const actions=element('div','message-tools');const remember=element('button','tiny-button','Als Wissen übernehmen');remember.type='button';remember.addEventListener('click',()=>{switchView('knowledge');resetMemoryForm();$('memory-text').value=text.slice(0,2000);$('memory-source').value='ATLAS-Entwurf – vom Nutzer zu prüfen';$('memory-text').focus();notify(text.length>2000?'Der Entwurf wurde auf 2.000 Zeichen gekürzt. Bitte prüfe und korrigiere ihn vor dem Speichern.':'Bitte prüfe und korrigiere den Entwurf vor dem Speichern.');});actions.append(remember);addVoicePlayback(actions,text);article.append(actions);}$('messages').append(article);article.scrollIntoView({behavior:'auto',block:'nearest'});return article;}
@@ -193,6 +194,7 @@ async function voiceRequest(path,body,contentType,stillActive=()=>true){
 function endRecording(discard=false){const state=voiceRecording;if(!state)return;state.discard=state.discard||discard;clearTimeout(state.timer);state.stream.getTracks().forEach(track=>track.stop());if(state.recorder.state!=='inactive')state.recorder.stop();}
 function finishVoice(){voiceBusy=false;voiceRecording=null;$('message').disabled=sending;$('send-button').disabled=sending;updateVoiceControls();}
 $('voice-record').addEventListener('click',async()=>{
+ announceLocalVoice();
  if(voiceRecording){endRecording();return;}if(voiceBusy||sending||!voiceStatus.enabled||!recordingSupported())return;
  stopVoicePlayback();const epoch=++voiceEpoch;voiceBusy=true;updateVoiceControls();$('message').disabled=true;$('send-button').disabled=true;$('voice-status').textContent='Mikrofonfreigabe wird angefragt …';let stream;
  try{
@@ -212,6 +214,7 @@ $('voice-record').addEventListener('click',async()=>{
 });
 $('voice-cancel').addEventListener('click',()=>{voiceEpoch++;endRecording(true);if(voiceController)voiceController.abort();stopVoicePlayback();finishVoice();notify('Aufnahme verworfen. Es wurde keine Chatnachricht gesendet.');});
 $('voice-file').addEventListener('change',async()=>{
+ announceLocalVoice();
  const file=$('voice-file').files?.[0];$('voice-file').value='';if(!file||voiceBusy||sending||!voiceStatus.enabled)return;
  const mime=file.type.split(';')[0];if(!['audio/wav','audio/x-wav','audio/mp4','audio/ogg','audio/webm'].includes(mime)){notify('Bitte WAV, MP4, OGG oder WebM auswählen.',true);return;}
  if(!file.size||file.size>5*1024*1024){notify('Audiodatei muss zwischen 1 Byte und 5 MiB groß sein.',true);return;}
@@ -353,7 +356,9 @@ async function listenDialogue(state){
  recorder.start(250);state.finishCapture=()=>finish(true);$('dialogue-answer').hidden=false;state.limitTimer=setTimeout(()=>finish(),60000);state.listenTimer=setTimeout(detect,100);
  dialogueStatus('Ich höre zu. Sprich jetzt. Nach einer Pause antworte ich; alternativ „Jetzt antworten“ drücken.','listening');
 }
+if(typeof window.addEventListener==='function')window.addEventListener('atlas-frontdesk-start',()=>{if(dialogue)stopDialogue('Termin-Gespräch gestartet.');voiceEpoch++;endRecording(true);if(voiceController)voiceController.abort();stopVoicePlayback();finishVoice();});
 $('dialogue-start').addEventListener('click',async()=>{
+ announceLocalVoice();
  if(dialogue||voiceBusy||sending||!voiceStatus.enabled||!recordingSupported())return;
  if($('message').value.trim()){notify('Bitte den vorhandenen Text zuerst senden oder entfernen.',true);return;}
  const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return;
