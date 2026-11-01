@@ -7,9 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 import sqlite3
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'ftst_atlas'))
-from appointments import AppointmentError
-from calendar_appointments import CalendarAppointments
+ROOT = str(Path(__file__).resolve().parents[2] / 'ftst_atlas')
+sys.path.insert(0, ROOT)
+try:
+    from appointments import AppointmentError
+    from calendar_appointments import CalendarAppointments
+finally:
+    sys.path.remove(ROOT)
 
 
 class Provider:
