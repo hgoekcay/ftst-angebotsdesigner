@@ -5,6 +5,6 @@ LABEL io.hass.version="${BUILD_VERSION}" io.hass.type="app" io.hass.arch="${BUIL
 USER root
 WORKDIR /opt/ftst
 COPY server.py atlas_tasks_mcp.py index.html client.js screen.css ./
-RUN /opt/hermes/.venv/bin/python -c "from mcp.server.fastmcp import FastMCP"
+RUN /opt/hermes/.venv/bin/python -c "from mcp.server.mcpserver import MCPServer"
 ENTRYPOINT ["/opt/hermes/.venv/bin/python", "/opt/ftst/server.py"]
 CMD []

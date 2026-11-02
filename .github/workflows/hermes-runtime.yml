@@ -18,6 +18,8 @@ jobs:
         run: docker build --pull -t ftst-hermes:test ftst_hermes
       - name: Verify installed Hermes CLI
         run: docker run --rm --entrypoint /opt/hermes/.venv/bin/hermes ftst-hermes:test --version
+      - name: Verify ATLAS MCP protocol
+        run: docker run --rm -v "$PWD/tests/hermes_runtime/mcp_probe.py:/tmp/mcp_probe.py:ro" --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /tmp/mcp_probe.py
       - name: Verify startup and isolation
         shell: bash
         run: |
@@ -40,3 +42,4 @@ jobs:
           docker run --rm --network hermes-smoke --ip 172.30.32.2 \
             -v "$PWD/tests/hermes_runtime/turn.py:/turn.py:ro" \
             --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /turn.py
+

@@ -49,9 +49,9 @@ def atlas_task_create(title: str) -> dict:
 
 
 if __name__ == '__main__':
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
-    service = FastMCP('atlas_tasks')
+    service = MCPServer('atlas_tasks')
     for tool in (atlas_task_create, atlas_tasks_list, atlas_task_get):
         service.tool()(tool)
     service.run(transport='stdio')

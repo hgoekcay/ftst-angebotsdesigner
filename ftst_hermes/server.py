@@ -50,6 +50,8 @@ class Pilot:
             if not re.fullmatch(r'(?:local|[a-z0-9]{8})-ftst-atlas', task_host) or not re.fullmatch(r'[A-Za-z0-9_-]{43,128}', token):
                 raise ValueError('Aufgabenverbindung ungültig.')
             tools['atlas_tasks'] = {'command': PYTHON, 'args': [str(ROOT / 'atlas_tasks_mcp.py')],
+                                    'tools': {'include': ['atlas_task_create', 'atlas_tasks_list', 'atlas_task_get'],
+                                              'resources': False, 'prompts': False},
                                     'env': {'FTST_ATLAS_TASK_TOKEN': token, 'FTST_ATLAS_TASK_HOST': task_host}}
         # JSON is a YAML subset. No raw tokens in URLs, command lines or browser responses.
         self.write('config.yaml', json.dumps({'mcp_servers': tools, 'model': {'default': self.model, 'provider': 'custom', 'base_url': self.base}, 'agent': {'max_turns': 6}}))
