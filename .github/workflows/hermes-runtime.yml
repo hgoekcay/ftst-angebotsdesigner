@@ -33,7 +33,7 @@ jobs:
             -v "$PWD/tests/hermes_runtime/model.py:/fixture.py:ro" --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /fixture.py
           docker run -d --name hermes-smoke-app --network hermes-smoke --ip 172.30.32.3 \
             -p 127.0.0.1:18099:8099 -v "$RUNNER_TEMP/hermes-data:/data" ftst-hermes:test
-          trap 'docker logs --tail 40 hermes-smoke-app; docker logs hermes-model; docker rm -f hermes-smoke-app hermes-model hermes-atlas-adapter; docker network rm hermes-smoke' EXIT
+          trap 'docker logs --tail 40 hermes-smoke-app; docker logs hermes-model; docker exec hermes-smoke-app sh -c "cat /data/hermes/*/logs/errors.log | tail -n 10" || true; docker rm -f hermes-smoke-app hermes-model hermes-atlas-adapter; docker network rm hermes-smoke' EXIT
           for attempt in $(seq 1 45); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
               -H 'X-Remote-User-Id: mock-owner' http://127.0.0.1:18099/ || true)
@@ -61,7 +61,7 @@ jobs:
           set -e
 
           # Exercise optional task mode with the actual upstream MCP client/server and actual ATLAS adapter.
-          docker run -d --name hermes-atlas-adapter --network hermes-smoke --network-alias local-ftst-atlas \
+          docker run -d --name hermes-atlas-adapter --network hermes-smoke --ip 172.30.32.5 --network-alias local-ftst-atlas \
             -v "$PWD/ftst_atlas/hermes_tasks.py:/opt/test/hermes_tasks.py:ro" \
             -v "$PWD/tests/hermes_runtime/task_service.py:/opt/test/task_service.py:ro" \
             --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /opt/test/task_service.py

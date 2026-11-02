@@ -68,7 +68,8 @@ class Pilot:
         command = [CLI, 'chat', '--provider', 'custom', '--base-url', self.base, '--model', self.model,
                    '--toolsets', 'mcp-atlas_tasks' if self.tasks else 'bot_room', '--max-turns', '6', '--format', 'stream-json',
                    '--query-file', '-']
-        session = self.home / 'ftst-session'
+        # Hermes pins tools per session. Keep paired and chat-only sessions separate.
+        session = self.home / ('ftst-session-tasks' if self.tasks else 'ftst-session')
         if session.exists():
             previous = session.read_text().strip()
             if not re.fullmatch(r'[\w.-]{1,128}', previous):
@@ -93,7 +94,7 @@ class Pilot:
         reply, ident = last.get('text'), last.get('session_id')
         if not isinstance(reply, str) or not reply.strip() or not isinstance(ident, str) or not re.fullmatch(r'[\w.-]{1,128}', ident):
             raise ValueError('Hermes lieferte keine gültige Gesprächsantwort.')
-        self.write('ftst-session', ident)
+        self.write(session.name, ident)
         return reply[:20000]
 
 
