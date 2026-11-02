@@ -30,7 +30,7 @@ class Model(BaseHTTPRequestHandler):
         if task_mode:
             expected = {"atlas_task_create", "atlas_task_get", "atlas_tasks_list"}
             if len(names) != 3 or not all(any(n.endswith(want) for n in names) for want in expected):
-                return self.send_error(403, "Task tools missing or broader tools granted")
+                return self.send_error(403, "Task tool contract violated: " + ",".join(names))
         want_call = task_mode and messages[-1]["role"] != "tool"
         result = "ATLAS-Testaufgabe gespeichert." if task_mode else REPLY
         name = next((n for n in names if n.endswith("atlas_task_create")), "")
