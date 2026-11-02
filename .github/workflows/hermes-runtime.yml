@@ -1,0 +1,42 @@
+name: Hermes runtime
+on:
+  pull_request:
+    paths:
+      - 'ftst_hermes/**'
+      - '.github/workflows/hermes-runtime.yml'
+      - 'tests/hermes_runtime/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Hermes for Home Assistant
+        run: docker build --pull -t ftst-hermes:test ftst_hermes
+      - name: Verify installed Hermes CLI
+        run: docker run --rm --entrypoint /opt/hermes/.venv/bin/hermes ftst-hermes:test --version
+      - name: Verify startup and isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hermes-data"
+          echo '{"owner_ha_user_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","model":"qwen3:4b-instruct-2507-q4_K_M","ollama_host":"local-ftst-local-ai","atlas_tasks_host":"local-ftst-atlas"}' > "$RUNNER_TEMP/hermes-data/options.json"
+          docker network create --subnet 172.30.32.0/26 hermes-smoke
+          docker run -d --name hermes-model --network hermes-smoke --ip 172.30.32.4 --network-alias local-ftst-local-ai \
+            -v "$PWD/tests/hermes_runtime/model.py:/fixture.py:ro" --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /fixture.py
+          docker run -d --name hermes-smoke-app --network hermes-smoke --ip 172.30.32.3 \
+            -p 127.0.0.1:18099:8099 -v "$RUNNER_TEMP/hermes-data:/data" ftst-hermes:test
+          trap 'docker logs --tail 40 hermes-smoke-app; docker logs hermes-model; docker rm -f hermes-smoke-app hermes-model; docker network rm hermes-smoke' EXIT
+          for attempt in $(seq 1 45); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
+              -H 'X-Remote-User-Id: mock-owner' http://127.0.0.1:18099/ || true)
+            if [[ "$code" == 403 ]]; then break; fi
+            sleep 1
+          done
+          test "$code" = 403
+          docker run --rm --network hermes-smoke --ip 172.30.32.2 \
+            -v "$PWD/tests/hermes_runtime/turn.py:/turn.py:ro" \
+            --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /turn.py
