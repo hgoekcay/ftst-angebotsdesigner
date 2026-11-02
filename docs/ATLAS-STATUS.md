@@ -584,3 +584,7 @@ beschränkt app.js auf diese drei Stellen; Dialogtests und elf Online-Tests
 bestanden. Quelltextsuche statt nicht verfügbarem Code-Graph.
 Nächster Schritt nach CI/Release:0.9.3 installieren und genau eine echte Anfrage
 ausführen, Diagnosecode auswerten. Keine weitere echte Anfrage bei Entwicklung.
+
+## Hermes-Aufgabenadapter – Entwicklung 2026-11-02
+
+0.9.4 erweitert ATLAS um einen optionalen Intranet-Dienst ohne Host-Portfreigabe. Der eigene Bearer ist auf Aufgaben eines fest konfigurierten Besitzers beschränkt. Endpunkte lesen nur ID, Titel und Status, erstellen offene Aufgaben und deduplizieren offene Titel unter Schreibsperre. Frontend-Zuordnung im getrennten Hermes-Add-on zwingend. Quellen direkt geprüft, kein frischer Graph-Index behauptet. Store, HTTP-Grenzen und Isolation mit separater SQLite-Datenbank getestet. Release und physische HA-/Sprachprüfung separat erforderlich.

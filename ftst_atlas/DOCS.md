@@ -412,3 +412,9 @@ verwenden ausschließlich simulierte Google-Antworten und buchen nichts real.
 
 Referenzen: https://developers.google.com/identity/protocols/oauth2/web-server
 und https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
+
+### Optionaler interner Aufgabenzugang für FTST Hermes
+
+Benötigt ATLAS 0.9.4 und den Hermes-Client. Setze `hermes_tasks_ha_user_id` auf die 32-stellige Besitzer-ID aus ATLAS → System. In der Hermes-App muss derselbe Besitzer für den Ingress-Chat konfiguriert sein. Erzeuge mit einem Passwortmanager einen zufälligen gemeinsamen Schlüssel aus mindestens 43 und maximal 128 Buchstaben, Ziffern, Unterstrich oder Bindestrich (32 zufällige Bytes als base64url sind geeignet). Trage ihn nur in die Passwortfelder beider Apps ein, bei ATLAS in `hermes_tasks_token`. Nach `hermes_tasks_enabled: true` und Neustart läuft der Dienst im internen Add-on-Netz auf Port 8102. Es gibt keine Host-Portfreigabe. Kein Tunnel, Proxy oder Router-Port hierfür. Zwischen den beiden HA-Containern wird HTTP verwendet.
+
+Wer das gemeinsame Token hat, kann ohne zusätzliche Nutzeranmeldung die letzten 50 Aufgaben dieses Besitzers lesen, einzelne Aufgaben anhand der ID abfragen und Aufgaben erstellen. Keine weiteren ATLAS- oder Home-Assistant-Rechte. Bei erneutem Anlegen desselben offenen Titels wird die vorhandene Aufgabe zurückgegeben. Nach unklarer Antwort zuerst nachlesen. Schlüsselrotation erfordert Aktualisierung und Neustart beider Apps. Zum Abschalten in ATLAS den Schalter deaktivieren und ATLAS neu starten.

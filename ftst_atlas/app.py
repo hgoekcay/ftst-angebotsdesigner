@@ -43,7 +43,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.9.3'
+VERSION = '0.9.4'
 MAX_BODY = 32768
 STATIC = {'/google_calendar_ui.js': ('google_calendar_ui.js', 'text/javascript; charset=utf-8'), '/frontdesk.js': ('frontdesk.js', 'text/javascript; charset=utf-8'), '/frontdesk.css': ('frontdesk.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -786,6 +786,11 @@ def main():
         options_path = app.data_dir / 'options.json'
         options = json.loads(options_path.read_text()) if options_path.exists() else {}
         start_bridge(app, options)
+        from hermes_tasks import start_server as start_hermes_tasks
+        try:
+            start_hermes_tasks(app, options)
+        except (ValueError, OSError):
+            print('Interner Hermes-Aufgabenzugang deaktiviert: Konfiguration prüfen.', flush=True)
         from google_callback import start_callback_server
         try:
             start_callback_server(app.google_oauth)

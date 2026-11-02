@@ -1,3 +1,7 @@
+## 0.9.4
+
+- Optionaler interner Aufgabenzugang für FTST Hermes. Ein Besitzer, getrenntes Token, standardmäßig ausgeschaltet.
+
 ## 0.9.3
 
 - Online-Fehler zeigen sichere Diagnosecodes für Anmeldung, Berechtigungen, Modellzugriff, Guthaben/Anfragelimits, Netzwerk und unvollständige Antworten. Keine geheimen Provider-Antworten werden angezeigt.
