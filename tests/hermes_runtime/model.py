@@ -22,9 +22,19 @@ class Model(BaseHTTPRequestHandler):
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if self.path != "/v1/chat/completions" or data.get("model") != MODEL:
             return self.send_error(400)
-        # This fixture runs without a task token. No general computer tools allowed.
-        if data.get("tools"):
+        messages = data.get("messages", [])
+        task_mode = any(m.get("role") == "user" and "ATLAS-Testaufgabe speichern." in str(m.get("content")) for m in messages)
+        names = [tool.get("function", {}).get("name", "") for tool in data.get("tools", [])]
+        if not task_mode and names:
             return self.send_error(403, "Unexpected tools in restricted chat")
+        if task_mode:
+            expected = {"atlas_task_create", "atlas_task_get", "atlas_tasks_list"}
+            if len(names) != 3 or not all(any(n.endswith(want) for n in names) for want in expected):
+                return self.send_error(403, "Task tools missing or broader tools granted")
+        want_call = task_mode and messages[-1]["role"] != "tool"
+        result = "ATLAS-Testaufgabe gespeichert." if task_mode else REPLY
+        name = next((n for n in names if n.endswith("atlas_task_create")), "")
+        call = {"id": "call_smoke", "type":"function", "function":{"name":name, "arguments":json.dumps({"title":"ATLAS Integrationstest"})}}
         history = data.get("messages", [])
         if any(m.get("role") == "user" and "Wiederhole die Antwort." in str(m.get("content")) for m in history):
             first_turn = any(m.get("role") == "user" and "Antworte mit dem Testtext." in str(m.get("content")) for m in history)
@@ -32,11 +42,14 @@ class Model(BaseHTTPRequestHandler):
             if not first_turn or not first_reply:
                 return self.send_error(400, "Previous turn missing from the model context")
         base = {"id": "smoke", "model": MODEL, "created": 1}
+        if want_call and not data.get("stream"):
+            return self.respond(dict(base, object="chat.completion", choices=[{"index":0,"message":{"role":"assistant","content":None,"tool_calls":[call]},"finish_reason":"tool_calls"}]))
         if not data.get("stream"):
             return self.respond(dict(base, object="chat.completion", choices=[{
-                "index": 0, "message": {"role": "assistant", "content": REPLY}, "finish_reason": "stop"}]))
+                "index": 0, "message": {"role": "assistant", "content": result}, "finish_reason": "stop"}]))
         events = []
-        for delta, reason in [({"role": "assistant", "content": REPLY}, None), ({}, "stop")]:
+        delta = {"role":"assistant", "tool_calls":[dict(call,index=0)]} if want_call else {"role":"assistant","content":result}
+        for delta, reason in [(delta, None), ({}, "tool_calls" if want_call else "stop")]:
             chunk = dict(base, object="chat.completion.chunk", choices=[{
                 "index": 0, "delta": delta, "finish_reason": reason}])
             events.append("data: " + json.dumps(chunk))
