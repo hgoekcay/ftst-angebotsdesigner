@@ -44,6 +44,10 @@ class BookkeepingError(ValueError):
     """Safe error for user display; never includes raw document content."""
 
 
+class ExportTooLarge(BookkeepingError):
+    """A complete archive cannot fit this volume; other validation errors must propagate."""
+
+
 def _now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -575,7 +579,7 @@ class Bookkeeping:
                 'message': 'Vorschläge am Original prüfen. Gespeicherte Angaben und Prüfstatus bleiben unverändert.'}
 
     @_locked
-    def export(self, user, month):
+    def export(self, user, month, *, part_sink=None):
         _user(user)
         if not isinstance(month, str) or not re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month):
             raise BookkeepingError('Monat benötigt YYYY-MM.')
@@ -588,6 +592,29 @@ class Bookkeeping:
                 ORDER BY created_at DESC,rowid DESC LIMIT ?''', (user, month + '-%', MAX_EXPORT_FILES + 1)).fetchall()
         if len(rows) > MAX_EXPORT_FILES: raise BookkeepingError('Export enthält mehr als 2000 Belege; Auswahl eingrenzen.')
         records = [self._record(row) for row in rows]
+        if part_sink is None:
+            return self._export_volume(user, month, records)
+
+        # Cap memory at one volume. Split spans only on size errors, preserving
+        # order and keeping each record, original, audit and snapshots together.
+        # The caller stages volumes privately and publishes only the complete set.
+        ranges = [(0, len(records))]
+        while ranges:
+            first, end = ranges.pop()
+            batch = records[first:end]
+            try:
+                archive = self._export_volume(user, month, batch)
+            except ExportTooLarge:
+                if end - first < 2:
+                    raise BookkeepingError('Ein einzelner Beleg mit Prüfdaten überschreitet das Teilpaket-Limit.') from None
+                middle = (first + end) // 2
+                ranges.extend([(middle, end), (first, middle)])
+                continue
+            part_sink(archive, tuple(record['id'] for record in batch))
+            del archive
+        return None
+
+    def _export_volume(self, user, month, records):
         output, csv_out = io.BytesIO(), io.StringIO(newline='')
         writer = csv.writer(csv_out, delimiter=';')
         columns = ['id','status','direction','supplier','invoice_number','invoice_date','currency','net','tax','gross','payment_status','sha256','original']
@@ -598,7 +625,7 @@ class Bookkeeping:
             for record in records:
                 data, name, mime = self.get_document(user, record['id'])
                 total += len(data)
-                if total > MAX_EXPORT_BYTES: raise BookkeepingError('Export überschreitet 100 MiB.')
+                if total > MAX_EXPORT_BYTES: raise ExportTooLarge('Export überschreitet 100 MiB.')
                 original = 'originale/' + record['id'] + '-' + name
                 archive.writestr(original, data)
                 values = {**record['fields'], 'id':record['id'], 'status':record['status'], 'sha256':hashlib.sha256(data).hexdigest(), 'original':original}
@@ -616,7 +643,7 @@ class Bookkeeping:
                     if hashlib.sha256(snapshot).hexdigest() != snapshot_sha:
                         raise BookkeepingError('Billomat-Datenstand ist beschädigt.')
                     total += len(snapshot)
-                    if total > MAX_EXPORT_BYTES: raise BookkeepingError('Export überschreitet 100 MiB.')
+                    if total > MAX_EXPORT_BYTES: raise ExportTooLarge('Export überschreitet 100 MiB.')
                     snapshot_name = 'datenstaende/' + record['id'] + '-' + snapshot_sha[:16] + '.json'
                     archive.writestr(snapshot_name, snapshot)
                     full['snapshot_files'].append({'file':snapshot_name,'sha256':snapshot_sha})
@@ -626,17 +653,21 @@ class Bookkeeping:
                 # also includes bridge, CSV, unresolved items and wrapper bytes.
                 manifest_bytes += len(_json(manifest_record).encode('utf-8'))
                 if total + manifest_bytes > MAX_EXPORT_BYTES:
-                    raise BookkeepingError('Export einschließlich Prüfdaten überschreitet 100 MiB.')
+                    raise ExportTooLarge('Export einschließlich Prüfdaten überschreitet 100 MiB.')
                 manifest['records'].append(manifest_record)
                 if record['status'] != 'reviewed' or record['fields']['payment_status'] == 'unknown':
                     unresolved.append({'id':record['id'], 'filename':name, 'issues':record['issues'], 'manual_review_required':record['status'] != 'reviewed', 'payment_unknown':record['fields']['payment_status'] == 'unknown'})
             bridge = documents_v1(manifest['records'])
             metadata_size = len(_json(manifest).encode()) + len(_json(bridge).encode()) + len(csv_out.getvalue().encode()) + len(_json(unresolved).encode())
             if total + metadata_size > MAX_EXPORT_BYTES:
-                raise BookkeepingError('Export einschließlich Prüfdaten überschreitet 100 MiB.')
+                raise ExportTooLarge('Export einschließlich Prüfdaten überschreitet 100 MiB.')
             archive.writestr('ai-bookkeeping.documents.json', _json(bridge))
             archive.writestr('belege.csv', '\ufeff' + csv_out.getvalue())
             archive.writestr('manifest.json', _json(manifest))
             archive.writestr('ungeklaert.json', _json(unresolved))
             archive.writestr('HINWEIS.txt', manifest['notice'])
+            if sum(entry.file_size for entry in archive.infolist()) > MAX_EXPORT_BYTES:
+                raise ExportTooLarge('Export einschließlich Prüfdaten überschreitet 100 MiB.')
+        if output.tell() > MAX_EXPORT_BYTES:
+            raise ExportTooLarge('Export einschließlich Prüfdaten überschreitet 100 MiB.')
         return output.getvalue()

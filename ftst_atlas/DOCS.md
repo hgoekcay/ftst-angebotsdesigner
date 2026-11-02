@@ -167,7 +167,7 @@ Technische Grundlagen: https://developers.openai.com/api/docs/guides/tools-web-s
 
 `bookkeeping_auto_sync` aktiviert wiederholten Import, standardmäßig alle 3600 Sekunden. `bookkeeping_lookback_days` ist standardmäßig 30; eine vollständige historische Übernahme wird nicht behauptet. Bis zu drei Mailbatches pro Konto und drei Billomat-Seiten sowie fünf PDFs pro Lauf begrenzen die Arbeit. Noch offene Arbeit und Quellenfehler bleiben sichtbar. Billomat-Seiten sind keine unveränderliche Momentaufnahme. Änderungen werden bei weiteren Durchläufen erneut abgefragt. Ab STRATO 0.3.1 und ATLAS 0.6.0 sind bis zu 32 MiB Rohmail und 40 MiB je Abruf möglich; Anhänge bleiben auf jeweils 8 MiB begrenzt. STRATO lehnt Rohmails über 32 MiB ab; solche Fehler können den jeweiligen Importcursor blockieren und benötigen eine gezielte Nachreichung.
 
-Originale werden unter `/data/bookkeeping` dauerhaft und anhand von SHA-256 geprüft gespeichert. Der Monats-ZIP enthält CSV, Originale, Manifest, offene Prüfpunkte, Billomat-Datenstände und `ai-bookkeeping.documents.json`. Undatierte Belege sind sichtbar enthalten und können deshalb in mehreren Monatsausgaben erscheinen. Exporte sind auf 2.000 Belege/100 MiB begrenzt. CSV-Eingaben werden gegen Formelinterpretation abgesichert. XML wird ohne externe Entitäten gelesen, PDF-Text in einem begrenzten Unterprozess; Fotos und Scans benötigen weiterhin OCR beziehungsweise manuelle Prüfung. Diese Fassung enthält keine automatische Foto-OCR.
+Originale werden unter `/data/bookkeeping` dauerhaft und anhand von SHA-256 geprüft gespeichert. Der Monats-ZIP enthält CSV, Originale, Manifest, offene Prüfpunkte, Billomat-Datenstände und `ai-bookkeeping.documents.json`. Undatierte Belege sind sichtbar enthalten und können deshalb in mehreren Monatsausgaben erscheinen. Ein Export umfasst höchstens 2.000 Belege. Der direkte ZIP-Download ist auf 100 MiB begrenzt. Für größere Monate „Monatsvorbereitung“ unter „Aufgaben“ starten. CSV-Eingaben werden gegen Formelinterpretation abgesichert. XML wird ohne externe Entitäten gelesen, PDF-Text in einem begrenzten Unterprozess; Fotos und Scans benötigen weiterhin OCR beziehungsweise manuelle Prüfung. Diese Fassung enthält keine automatische Foto-OCR.
 
 Die Brücke verwendet das documents/1-Format des originalen MIT-lizenzierten AI-Bookkeeping-Projekts (https://github.com/leebale/billpal-skills, Revision 8ccff9c7cbd1b568e3bd469a4d457b50ab381781). Der vollständige Originalskill wurde separat als Entwicklungs-/Arbeitswerkzeug installiert; sein Ledger wird nicht als Mehrbenutzerdienst im Addon ausgeführt. Das Austauschformat bleibt bei fehlenden Steuerangaben ausdrücklich prüfpflichtig. Kein automatischer DATEV-Kontenrahmen, keine erfundenen Steuerfälle, kein Bankabgleich und keine Steuerübermittlung. Unternehmensform, Gewinnermittlung, Umsatzsteuerverfahren, Konten und Bankdaten müssen vor einer belastbaren laufenden Buchführung geklärt werden.
 
@@ -196,13 +196,24 @@ Unter Wissen können bestätigte Notizen mit Quelle und bis zu acht Schlagwörte
 Unter **Aufgaben** stehen zwei feste Abläufe bereit. **Tagesüberblick** liest eigenes
 Profil, gespeichertes Wissen, offene Aufgaben und den bereits importierten Belegstand.
 Er ruft keine neuen E-Mails ab. **Monatsvorbereitung** gleicht freigegebene Quellen
-in einem begrenzten Durchlauf ab, erstellt einen Prüfbericht und ein ZIP für den
-gewählten Monat. Der Bericht beschreibt den Gesamtbestand; das ZIP den gewählten
+in einem begrenzten Durchlauf ab, erstellt einen Prüfbericht und das Belegpaket für den
+gewählten Monat. Der Bericht beschreibt den Gesamtbestand; das Paket den gewählten
 Monat. Warnungen und ausstehende Importe bleiben sichtbar. Dies ist keine vollständige
 Buchhaltung und kein Zahlungsabgleich.
 
-Schritte und Ergebnisse bleiben sieben Tage abrufbar. Monatspakete sind auf 100 MiB,
-drei je Benutzer und zehn insgesamt begrenzt; ältere Pakete können früher entfallen.
+Kleine Monate liefern weiterhin einen ZIP-Download. Bei größeren Monaten enthält
+das Ergebnis ein Paketverzeichnis (JSON) und nummerierte ZIP-Dateien. Für den
+vollständigen Export alle Teile herunterladen. Jede ZIP-Datei lässt sich einzeln
+entpacken; benutze getrennte Ordner für die Teile, weil ihre CSVs und Manifeste
+gleich heißen. Das Verzeichnis nennt je Teil Beleg-IDs, Größe und SHA-256.
+Ein Beleg bleibt mit seinem Original, Prüfhistorie und Datenständen in einem Teil.
+Pro Teil gelten 100 MiB für unkomprimierten Inhalt und ZIP-Größe. Passt ein einzelner
+Beleg samt Verlauf nicht in diesen Rahmen, schlägt der gesamte Workflow sichtbar fehl.
+
+Schritte und Ergebnisse bleiben maximal sieben Tage abrufbar. Je Paket sind
+höchstens 100 Teile und 1.000 MiB gespeichert erlaubt. Die Aufbewahrung ist
+auf drei Pakete je Benutzer, zehn Pakete insgesamt und insgesamt 1.000 MiB begrenzt.
+Bei Platzbedarf entfallen ältere Pakete vollständig.
 Ein beim Neustart laufender Auftrag wird als unterbrochen markiert und nicht automatisch
 wiederholt. Telegram kann mit `/briefing` und `/vorbereiten YYYY-MM` starten;
 `/auftraege` und `/auftrag ID` zeigen den Stand. Der Paketdownload erfolgt in ATLAS.

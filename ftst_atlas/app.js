@@ -172,7 +172,18 @@ function renderJobSteps(card,job){
 function renderWorkflowArtifact(container,result){
  if(result.incomplete)container.append(element('p','workflow-warning','Unvollständige Daten: Hinweise im Ergebnis prüfen. Dieser Export ist keine abgeschlossene Buchhaltung.'));
  const artifact=result.artifact;if(!artifact||typeof artifact.url!=='string'||!/^api\/workflows\/[A-Za-z0-9_-]+\/download$/.test(artifact.url))return;
- const link=element('a','workflow-artifact','Export herunterladen');link.href=artifact.url;link.download=artifact.filename||'atlas-export.zip';container.append(link,element('p','field-hint','Nur für dein Benutzerkonto. Exporte werden zeitlich und mengenmäßig begrenzt aufbewahrt.'));
+ const multipart=Array.isArray(artifact.parts)&&artifact.parts.length>1;
+ const link=element('a','workflow-artifact',multipart?'Paketverzeichnis herunterladen':'Export herunterladen');
+ link.href=artifact.url;link.download=artifact.filename||'atlas-export.zip';container.append(link);
+ if(multipart){
+  container.append(element('p','field-hint','Für den vollständigen Monat alle '+artifact.parts.length+' ZIP-Teile herunterladen.'));
+  artifact.parts.forEach((part,index)=>{
+   if(part?.url!==artifact.url+'/'+(index+1))return;
+   const partLink=element('a','workflow-artifact','ZIP-Teil '+(index+1)+' von '+artifact.parts.length+' · '+part.record_count+' Belege');
+   partLink.href=part.url;partLink.download=part.filename;container.append(partLink);
+  });
+ }
+ container.append(element('p','field-hint','Nur für dein Benutzerkonto. Exporte werden zeitlich und mengenmäßig begrenzt aufbewahrt.'));
 }
 function recordingSupported(){return typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia&&typeof MediaRecorder!=='undefined';}
 function updateVoiceControls(){

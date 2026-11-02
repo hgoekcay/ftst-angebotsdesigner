@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import unittest
@@ -63,6 +64,70 @@ class WorkflowTests(unittest.TestCase):
         self.assertIsNone(self.app.workflows.download('other',job['id']))
         self.app.bookkeeping_sync.enabled = False
         self.assertEqual(self.request(url)[0],404)
+
+    def test_multipart_manifest_links_and_archive_readback(self):
+        self.enable()
+        expected = {}
+        for n in range(4):
+            image = b'\x89PNG\r\n\x1a\n' + bytes([n]) * 7000
+            record = self.app.bookkeeping.ingest_document('dev', image, 'papier.png', 'image/png', {'provider': 'upload'})
+            expected[record['id']] = image
+        job = self.submit('bookkeeping', month='2026-10')
+        with patch('bookkeeping.MAX_EXPORT_BYTES', 14000):
+            self.app.jobs._process_one()
+        current = self.app.jobs.get('dev', job['id'])
+        self.assertEqual(current['status'], 'completed', current)
+        artifact = current['result']['artifact']
+        url = '/' + artifact['url']
+        index = json.loads(self.request(url)[1])
+        self.assertEqual(index['record_count'], 4)
+        self.assertEqual(index['part_count'], len(artifact['parts']))
+        self.assertGreater(index['part_count'], 1)
+        found = {}
+        for number, (part, descriptor) in enumerate(zip(index['parts'], artifact['parts']), 1):
+            self.assertEqual(part['number'], number)
+            self.assertEqual(part['filename'], descriptor['filename'])
+            self.assertEqual(descriptor['url'], artifact['url'] + '/' + str(number))
+            code, blob = self.request('/' + descriptor['url'])
+            self.assertEqual(code, 200)
+            self.assertEqual((len(blob), hashlib.sha256(blob).hexdigest()), (part['bytes'], part['sha256']))
+            with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+                records = json.loads(archive.read('manifest.json'))['records']
+                self.assertEqual(part['record_ids'], [row['id'] for row in records])
+                for row in records:
+                    self.assertNotIn(row['id'], found)
+                    found[row['id']] = archive.read(row['original'])
+        self.assertEqual(found, expected)
+        self.assertEqual(self.request(url + '/100')[0], 404)
+        self.assertIsNone(self.app.workflows.download('other', job['id'], 1))
+        self.app.bookkeeping_sync.enabled = False
+        self.assertEqual(self.request(url + '/1')[0], 404)
+        self.assertEqual(self.request(url)[0], 404)
+        self.app.bookkeeping_sync.enabled = True
+        with self.app.db() as db:
+            db.execute("UPDATE atlas_workflow_artifacts SET created_at='2000-01-01'")
+        self.assertEqual(self.request(url + '/1')[0], 404)
+        with self.app.db() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM atlas_workflow_parts').fetchone()[0], 0)
+
+    def test_staging_failure_preserves_previous_package(self):
+        self.enable()
+        earlier = self.submit('bookkeeping', month='2026-10')
+        self.app.jobs._process_one()
+        previous = self.app.workflows.download('dev', earlier['id'])
+        later = self.submit('bookkeeping', month='2026-10')
+
+        def oversized(user, month, *, part_sink):
+            for i in range(2):
+                part_sink(b'x' * 20, (str(i),))
+
+        with patch.object(self.app.bookkeeping, 'export', side_effect=oversized), patch('workflows.MAX_STORED_BYTES', 30):
+            self.app.jobs._process_one()
+        self.assertEqual(self.app.jobs.get('dev', later['id'])['status'], 'failed')
+        self.assertEqual(self.app.workflows.download('dev', earlier['id']), previous)
+        with self.app.db() as db:
+            for table in ('atlas_workflow_artifacts', 'atlas_workflow_parts'):
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM ' + table + ' WHERE job_id=?', (later['id'],)).fetchone()[0], 0)
 
     def test_step_failure_redacted_and_not_replayed(self):
         self.enable()
