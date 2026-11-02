@@ -39,7 +39,20 @@ jobs:
             sleep 1
           done
           test "$code" = 403
+          set +e
           docker run --rm --network hermes-smoke --ip 172.30.32.2 \
             -v "$PWD/tests/hermes_runtime/turn.py:/turn.py:ro" \
             --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /turn.py
-
+          # CI contains only a synthetic model and fixture user. Expose startup diagnostics on CI failure only.
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            profile=/data/hermes/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            docker exec -u 10000:10000 -w "$profile" hermes-smoke-app env -i \
+              HOME="$profile" HERMES_HOME="$profile" OPENAI_API_KEY=local-ollama \
+              PATH=/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 \
+              /opt/hermes/.venv/bin/hermes chat --provider custom --base-url http://local-ftst-local-ai:11434/v1 \
+              --model qwen3:4b-instruct-2507-q4_K_M --toolsets mcp-atlas_tasks --max-turns 6 \
+              --format stream-json -q synthetic-diagnostic
+            docker exec hermes-smoke-app sh -c 'find /data/hermes -name "*.log" -print -exec tail -n 30 {} \;'
+          fi
+          exit "$result"
