@@ -1,0 +1,74 @@
+name: Hermes runtime
+on:
+  pull_request:
+    paths:
+      - 'ftst_hermes/**'
+      - '.github/workflows/hermes-runtime.yml'
+      - 'tests/hermes_runtime/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify voice preferences and hands-free turn transitions
+        run: node --test tests/hermes_voice_ui.cjs
+      - name: Build Hermes for Home Assistant
+        run: docker build --pull -t ftst-hermes:test ftst_hermes
+      - name: Verify installed Hermes CLI
+        run: docker run --rm --entrypoint /opt/hermes/.venv/bin/hermes ftst-hermes:test --version
+      - name: Verify ATLAS MCP protocol
+        run: docker run --rm -v "$PWD/tests/hermes_runtime/mcp_probe.py:/tmp/mcp_probe.py:ro" --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /tmp/mcp_probe.py
+      - name: Verify startup and isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hermes-data"
+          echo '{"owner_ha_user_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","model":"qwen3:4b-instruct-2507-q4_K_M","ollama_host":"local-ftst-local-ai","atlas_tasks_host":"local-ftst-atlas"}' > "$RUNNER_TEMP/hermes-data/options.json"
+          docker network create --subnet 172.30.32.0/26 hermes-smoke
+          docker run -d --name hermes-model --network hermes-smoke --ip 172.30.32.4 --network-alias local-ftst-local-ai \
+            -v "$PWD/tests/hermes_runtime/model.py:/fixture.py:ro" --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /fixture.py
+          docker run -d --name hermes-smoke-app --network hermes-smoke --ip 172.30.32.3 \
+            -p 127.0.0.1:18099:8099 -v "$RUNNER_TEMP/hermes-data:/data" ftst-hermes:test
+          trap 'docker logs --tail 40 hermes-smoke-app; docker logs hermes-model; docker exec hermes-smoke-app sh -c "grep -hiE \"mcp|invalid_params|error\" /data/hermes/*/logs/*.log | tail -n 55" || true; docker rm -f hermes-smoke-app hermes-model hermes-atlas-adapter; docker network rm hermes-smoke' EXIT
+          for attempt in $(seq 1 45); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
+              -H 'X-Remote-User-Id: mock-owner' http://127.0.0.1:18099/ || true)
+            if [[ "$code" == 403 ]]; then break; fi
+            sleep 1
+          done
+          test "$code" = 403
+          set +e
+          docker run --rm --network hermes-smoke --ip 172.30.32.2 \
+            -v "$PWD/tests/hermes_runtime/turn.py:/turn.py:ro" \
+            --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /turn.py
+          # CI contains only a synthetic model and fixture user. Expose startup diagnostics on CI failure only.
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            profile=/data/hermes/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            docker exec -u 10000:10000 -w "$profile" hermes-smoke-app env -i \
+              HOME="$profile" HERMES_HOME="$profile" OPENAI_API_KEY=local-ollama \
+              PATH=/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 \
+              /opt/hermes/.venv/bin/hermes chat --provider custom --base-url http://local-ftst-local-ai:11434/v1 \
+              --model qwen3:4b-instruct-2507-q4_K_M --toolsets bot_room --max-turns 6 \
+              --format stream-json -q synthetic-diagnostic
+            docker exec hermes-smoke-app sh -c 'find /data/hermes -name "*.log" -print -exec tail -n 30 {} \;'
+          fi
+          if [ "$result" -ne 0 ]; then exit "$result"; fi
+          set -e
+
+          # Exercise optional task mode with the actual upstream MCP client/server and actual ATLAS adapter.
+          docker run -d --name hermes-atlas-adapter --network hermes-smoke --ip 172.30.32.5 --network-alias local-ftst-atlas \
+            -v "$PWD/ftst_atlas/hermes_tasks.py:/opt/test/hermes_tasks.py:ro" \
+            -v "$PWD/tests/hermes_runtime/task_service.py:/opt/test/task_service.py:ro" \
+            --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /opt/test/task_service.py
+          docker rm -f hermes-smoke-app
+          sudo python3 -c 'import json,sys; p=sys.argv[1]; data=json.load(open(p)); data["atlas_tasks_token"]="x"*43; json.dump(data,open(p,"w"))' "$RUNNER_TEMP/hermes-data/options.json"
+          docker run -d --name hermes-smoke-app --network hermes-smoke --ip 172.30.32.3 \
+            -v "$RUNNER_TEMP/hermes-data:/data" ftst-hermes:test
+          docker run --rm --network hermes-smoke --ip 172.30.32.2 \
+            -v "$PWD/tests/hermes_runtime/task_turn.py:/turn.py:ro" \
+            --entrypoint /opt/hermes/.venv/bin/python ftst-hermes:test /turn.py
