@@ -588,3 +588,18 @@ ausführen, Diagnosecode auswerten. Keine weitere echte Anfrage bei Entwicklung.
 ## Hermes-Aufgabenadapter – Entwicklung 2026-11-02
 
 0.9.4 erweitert ATLAS um einen optionalen Intranet-Dienst ohne Host-Portfreigabe. Der eigene Bearer ist auf Aufgaben eines fest konfigurierten Besitzers beschränkt. Endpunkte lesen nur ID, Titel und Status, erstellen offene Aufgaben und deduplizieren offene Titel unter Schreibsperre. Frontend-Zuordnung im getrennten Hermes-Add-on zwingend. Quellen direkt geprüft, kein frischer Graph-Index behauptet. Store, HTTP-Grenzen und Isolation mit separater SQLite-Datenbank getestet. Release und physische HA-/Sprachprüfung separat erforderlich.
+
+## Monatsvorbereitung – 0.9.5, 2026-11-02
+
+Der produktiv gemeldete Fehler im vierten Schritt entstand beim 100-MiB-Limit.
+Große Monate werden innerhalb eines konsistenten Exports anhand der Belege in
+separat prüfbare ZIPs aufgeteilt. Alle Teile und das Gesamtverzeichnis werden erst
+nach vollständiger Vorbereitung gemeinsam veröffentlicht. Download bleibt an
+Eigentümer, aktiven Buchhaltungszugang und fertiggestellten Auftrag gebunden.
+Ältere einteilige Pakete behalten ihren Downloadpfad.
+
+Testbestand: 11 verschiedenartige Prüfsummen, 110 MiB inkompressible
+synthetische Originale. Zwei ZIPs erzeugt und alle IDs und Originalhashes nach
+dem Entpacken verglichen. Kein echter Beleg in der Testumgebung. Source-Prüfung
+und gezielte Tests, kein frisch geprüfter Code-Graph-Index. Der produktive
+Oktoberlauf ist erst nach Installation und tatsächlicher Abnahme bestätigt.

@@ -26,6 +26,11 @@ vm.runInContext(source.replace('loadStatus();loadTasks();','window.testLoadWorkf
  await context.window.testLoadWorkflows();
  get('workflow-kind').value='bookkeeping';get('workflow-kind').listeners.change();assert.equal(get('workflow-month-wrap').hidden,false);get('workflow-month').value='2026-10';
  await get('workflow-form').listeners.submit({preventDefault(){}});assert.match(text(get('job-list')),/Quellen lesen · Erledigt/);assert.match(text(get('job-list')),/Unvollständige Daten/);assert.equal(find(get('job-list'),'Export herunterladen').href,'api/workflows/wf1/download');
+ jobs[0].result.artifact.parts=[{url:'api/workflows/wf1/download/1',filename:'p1.zip',record_count:5},{url:'api/workflows/wf1/download/2',filename:'p2.zip',record_count:7}];await context.window.testLoadJobs();
+ assert.equal(find(get('job-list'),'Paketverzeichnis herunterladen').href,'api/workflows/wf1/download');
+ assert.equal(find(get('job-list'),'ZIP-Teil 2 von 2 · 7 Belege').download,'p2.zip');
+ jobs[0].result.artifact.parts[0].url='https://example.com/leak';await context.window.testLoadJobs();assert.equal(find(get('job-list'),'ZIP-Teil 1 von 2 · 5 Belege'),undefined);
+ delete jobs[0].result.artifact.parts;
  jobs[0].result.artifact.url='https://example.com/leak';await context.window.testLoadJobs();assert.equal(find(get('job-list'),'Export herunterladen'),undefined);
  const workflowCall=calls.find(c=>c.path==='api/workflows');assert.deepEqual(JSON.parse(workflowCall.body),{workflow:'bookkeeping',month:'2026-10'});
  get('message').value='Entwurf';await get('voice-record').listeners.click();assert.equal(recordRequests,1);assert(timers.includes(60000),'Recording has a 60-second timer');assert.equal(get('send-button').disabled,true);await get('voice-record').listeners.click();await tick();assert(trackStops>0);assert.equal(get('message').value,'Entwurf\nGeprüfter Testtext');assert.equal(calls.filter(c=>c.path==='api/jobs'&&c.method==='POST').length,0,'Transcript never auto-submitted');

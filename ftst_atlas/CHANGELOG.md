@@ -1,3 +1,7 @@
+## 0.9.5
+
+- Große Monatsausgaben werden im Workflow auf mehrere eigenständige ZIP-Dateien mit einer gemeinsamen Paketübersicht verteilt.
+
 ## 0.9.4
 
 - Optionaler interner Aufgabenzugang für FTST Hermes. Ein Besitzer, getrenntes Token, standardmäßig ausgeschaltet.

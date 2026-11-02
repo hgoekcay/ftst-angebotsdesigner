@@ -319,6 +319,41 @@ class BookkeepingTests(unittest.TestCase):
                 self.store.export('alice', '2026-10')
             reads.assert_called_once_with('alice', newest['id'])
 
+    def test_multipart_archives_cover_every_record_and_match_original_bytes(self):
+        originals = {}
+        for index in range(7):
+            # Distinct source bytes. Raw size triggers splitting even if ZIP compresses well.
+            raw = PNG + bytes([index]) * 4096
+            rec = self.store.ingest_document('alice', raw, f'scan-{index}.png', 'image/png', {'provider':'upload'})
+            originals[rec['id']] = raw
+        self.xml('bob')
+        volumes = []
+        limit = 18000
+        with patch.object(module, 'MAX_EXPORT_BYTES', limit):
+            with self.assertRaises(module.ExportTooLarge):
+                self.store.export('alice','2026-10')
+            self.store.export('alice','2026-10',part_sink=lambda archive, ids: volumes.append((archive, ids)))
+        self.assertGreater(len(volumes), 1)
+        seen = []
+        for raw_zip, ids in volumes:
+            self.assertLessEqual(len(raw_zip), limit)
+            with zipfile.ZipFile(io.BytesIO(raw_zip)) as z:
+                self.assertLessEqual(sum(f.file_size for f in z.infolist()), limit)
+                records = json.loads(z.read('manifest.json'))['records']
+                self.assertEqual(list(ids), [r['id'] for r in records])
+                self.assertIn('belege.csv', z.namelist())
+                self.assertIn('ai-bookkeeping.documents.json', z.namelist())
+                for r in records:
+                    self.assertEqual(z.read(r['original']), originals[r['id']])
+                seen.extend(ids)
+        self.assertCountEqual(seen, originals.keys())
+
+    def test_multipart_rejects_oversized_record_without_omitting_it(self):
+        self.xml()
+        with patch.object(module, 'MAX_EXPORT_BYTES', 300):
+            with self.assertRaisesRegex(module.BookkeepingError, 'einzelner Beleg'):
+                self.store.export('alice','2026-10',part_sink=lambda archive, ids: self.fail('unexpected partial volume'))
+
     def test_tampered_original_detected(self):
         record=self.xml()
         with self.db() as db: path=db.execute('SELECT original_path FROM atlas_bookkeeping WHERE id=?',(record['id'],)).fetchone()[0]

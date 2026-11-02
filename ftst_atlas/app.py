@@ -43,7 +43,7 @@ def local_open(request, timeout):
     return LOCAL_OPENER.open(request, timeout=timeout)
 
 
-VERSION = '0.9.4'
+VERSION = '0.9.5'
 MAX_BODY = 32768
 STATIC = {'/google_calendar_ui.js': ('google_calendar_ui.js', 'text/javascript; charset=utf-8'), '/frontdesk.js': ('frontdesk.js', 'text/javascript; charset=utf-8'), '/frontdesk.css': ('frontdesk.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8')}
 
@@ -500,12 +500,14 @@ def make_handler(app):
                 return self.send(200, {**app.status(), 'ha_user_id': self.user_id, 'mail_enabled': app.mail.enabled_for(self.user_id), 'online': app.online.status(self.user_id), 'online_share_profile': app.online_share_profile, 'voice': app.voice.status(self.user_id)})
             if path == '/api/workflows/catalog':
                 return self.send(200, app.workflows.catalog(self.user_id))
-            workflow_download = re.fullmatch(r'/api/workflows/([A-Za-z0-9_-]{1,100})/download', path)
+            workflow_download = re.fullmatch(r'/api/workflows/([A-Za-z0-9_-]{1,100})/download(?:/([1-9][0-9]{0,2}))?', path)
             if workflow_download:
-                artifact = app.workflows.download(self.user_id, workflow_download[1])
+                number = int(workflow_download[2]) if workflow_download[2] else None
+                artifact = app.workflows.download(self.user_id, workflow_download[1], number)
                 if artifact is None:
                     return self.error(404, 'Paket nicht verfügbar oder abgelaufen.')
-                return self.send(200, artifact[1], 'application/zip', download=artifact[0])
+                mime = 'application/json' if artifact[0].endswith('.json') else 'application/zip'
+                return self.send(200, artifact[1], mime, download=artifact[0])
             if path == '/api/jobs':
                 return self.send(200, {'jobs': app.jobs.list(self.user_id)})
             match = re.fullmatch(r'/api/jobs/([A-Za-z0-9_-]{1,100})', path)
