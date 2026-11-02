@@ -66,7 +66,7 @@ class Pilot:
 
     def turn(self, message):
         command = [CLI, 'chat', '--provider', 'custom', '--base-url', self.base, '--model', self.model,
-                   '--toolsets', 'mcp-atlas_tasks', '--max-turns', '6', '--format', 'stream-json',
+                   '--toolsets', 'mcp-atlas_tasks' if self.tasks else 'bot_room', '--max-turns', '6', '--format', 'stream-json',
                    '--query-file', '-']
         session = self.home / 'ftst-session'
         if session.exists():

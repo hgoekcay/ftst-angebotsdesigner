@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Verify voice preferences and hands-free turn transitions
+        run: node --test tests/hermes_voice_ui.cjs
       - name: Build Hermes for Home Assistant
         run: docker build --pull -t ftst-hermes:test ftst_hermes
       - name: Verify installed Hermes CLI
@@ -51,7 +53,7 @@ jobs:
               HOME="$profile" HERMES_HOME="$profile" OPENAI_API_KEY=local-ollama \
               PATH=/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 \
               /opt/hermes/.venv/bin/hermes chat --provider custom --base-url http://local-ftst-local-ai:11434/v1 \
-              --model qwen3:4b-instruct-2507-q4_K_M --toolsets mcp-atlas_tasks --max-turns 6 \
+              --model qwen3:4b-instruct-2507-q4_K_M --toolsets bot_room --max-turns 6 \
               --format stream-json -q synthetic-diagnostic
             docker exec hermes-smoke-app sh -c 'find /data/hermes -name "*.log" -print -exec tail -n 30 {} \;'
           fi

@@ -3,4 +3,7 @@
 <body><main><header><small>FT SICHERHEITSTECHNIK</small><h1>Hermes</h1><p>Dein Gespräch mit der lokalen KI.</p><p id="tasks"></p></header>
 <section id="log" role="log" aria-label="Gespräch"></section>
 <form><label for="text">Deine Nachricht</label><textarea id="text" maxlength="2000" required></textarea><button id="send">Senden</button><button type="button" id="voice" hidden>Sprachgespräch starten</button></form>
+<fieldset id="voiceSettings" hidden><legend>Stimme</legend><label for="voiceSelect">Deutsche Stimme auswählen</label>
+<select id="voiceSelect" aria-describedby="voiceInfo"></select>
+<button type="button" id="previewVoice">Stimme anhören</button><p id="voiceInfo"></p></fieldset>
 <p id="notice" role="status"></p><p id="voiceHint" hidden>Sprachein- und -ausgabe übernimmt dein Browser. Je nach Browser verarbeitet sein Sprachanbieter die Aufnahme.</p></main></body></html>

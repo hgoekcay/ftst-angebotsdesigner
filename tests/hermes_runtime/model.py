@@ -25,6 +25,12 @@ class Model(BaseHTTPRequestHandler):
         # This fixture runs without a task token. No general computer tools allowed.
         if data.get("tools"):
             return self.send_error(403, "Unexpected tools in restricted chat")
+        history = data.get("messages", [])
+        if any(m.get("role") == "user" and "Wiederhole die Antwort." in str(m.get("content")) for m in history):
+            first_turn = any(m.get("role") == "user" and "Antworte mit dem Testtext." in str(m.get("content")) for m in history)
+            first_reply = any(m.get("role") == "assistant" and REPLY in str(m.get("content")) for m in history)
+            if not first_turn or not first_reply:
+                return self.send_error(400, "Previous turn missing from the model context")
         base = {"id": "smoke", "model": MODEL, "created": 1}
         if not data.get("stream"):
             return self.respond(dict(base, object="chat.completion", choices=[{
@@ -38,3 +44,4 @@ class Model(BaseHTTPRequestHandler):
 
 
 HTTPServer(("0.0.0.0", 11434), Model).serve_forever()
+

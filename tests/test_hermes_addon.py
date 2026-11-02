@@ -63,7 +63,7 @@ class HermesIngress(unittest.TestCase):
         cli.write_text("""#!/usr/bin/env python3
 import json, sys
 assert '--format' in sys.argv and 'stream-json' in sys.argv
-assert sys.argv[sys.argv.index('--toolsets') + 1] == 'mcp-atlas_tasks'
+assert sys.argv[sys.argv.index('--toolsets') + 1] == 'bot_room'
 query = sys.stdin.read()
 if query == 'Folgefrage':
     assert sys.argv[sys.argv.index('--resume') + 1] == 'session_01'
