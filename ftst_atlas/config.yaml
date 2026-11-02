@@ -1,5 +1,5 @@
 name: "FTST ATLAS"
-version: "0.9.3"
+version: "0.9.4"
 slug: "ftst_atlas"
 description: "Firmenassistent mit lokalem Wissen, optionaler Online-Beratung und Hintergrundaufträgen."
 url: "https://github.com/hgoekcay/ftst-angebotsdesigner"
@@ -23,6 +23,7 @@ ports_description:
   8100/tcp: "Nur Belegupload; HTTPS-Reverse-Proxy erforderlich"
 timeout: 30
 options:
+  hermes_tasks_enabled: false
   calendar_provider: home_assistant
   calendar_enabled: false
   ollama_url: "http://76b650ab-ftst-local-ai:11434"
@@ -51,6 +52,9 @@ options:
   online_daily_limit: 10
   online_share_profile: false
 schema:
+  hermes_tasks_enabled: bool
+  hermes_tasks_ha_user_id: "str?"
+  hermes_tasks_token: "password?"
   calendar_provider: list(home_assistant|google)
   google_client_id: "str?"
   google_client_secret: "password?"
