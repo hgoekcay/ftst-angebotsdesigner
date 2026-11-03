@@ -1,74 +1,79 @@
 # ATLAS als Firmenassistenz
 
-Stand: 31.10.2026. Ziel ist eine gemeinsame Assistenz für FT Sicherheitstechnik:
-sprechen, nachfragen, Wissen wiederfinden und nachvollziehbare Arbeitsaufträge
-bearbeiten. Dieses Dokument beschreibt den Ausbau. Es bestätigt weder eine
-vollständige Automatisierung noch die Installation eines Updates. Maßgeblich für
-Release- und Testnachweise ist [ATLAS-STATUS.md](ATLAS-STATUS.md).
+Stand 03.11.2026. ATLAS bleibt die zentrale Oberfläche für Gespräch, Wissen,
+Aufgaben, E-Mails, Termine und Buchhaltung. Hermes ist auf Wunsch des Inhabers
+kein aktueller Ausbaupfad. Dieses Dokument ist der verbindliche Arbeitsplan,
+keine Bestätigung neuer installierter Funktionen.
 
-## Sechs Bausteine
+## Nachweisstand und Priorität
 
-Die gezeigte JARVIS-Vorlage verbindet Steuerung, Wissensablage, Sprache und
-Oberfläche. Für den Firmenbetrieb ergänzen wir Quellenanbindungen und eine
-überprüfbare Auftragsausführung:
+Priorität ist die Vorbereitung der Oktober-Buchhaltung. Der letzte dokumentierte
+Produktionsstand ist ATLAS 0.9.5 vom 02.11.2026 mit erfolgreich durchgelaufener
+Monatsvorbereitung und mehrteiligen Exporten. Eine erneute Live-Prüfung fand bei
+dieser Konzeptaktualisierung nicht statt. OpenAI-Text und Webrecherche wurden im
+vorherigen Arbeitsabschnitt erfolgreich getestet. Die direkte Google-Verbindung
+und ein vollständiges Gespräch auf dem tatsächlichen iPhone bleiben unbestätigt.
 
-| Baustein | ATLAS-Ziel | Aktueller Stand |
+Ein Kontoauszug wurde außerhalb von ATLAS ausgewertet und gegen Rechnungsdaten
+geprüft. Diese Auswertung ist noch kein eingebauter Bankimport, kein persistenter
+Zahlungsabgleich und kein fertiges Buchungsjournal. Private Beträge, Dokumente und
+Kontoverbindungen gehören nicht in dieses öffentliche Projektprotokoll.
+
+## Gemeinsames Bedienkonzept
+
+Der Nutzer formuliert einen Auftrag im Gespräch oder per Text. ATLAS zeigt,
+welchen Ablauf es startet, welche Quellen verfügbar sind und welche Angaben fehlen.
+Ein angenommener Auftrag bleibt nach Navigation oder Neustart nachvollziehbar.
+Die Antwort unterscheidet erledigte Arbeit, Vorschläge und noch offene Klärungen.
+Eine gespeicherte Aufgabe allein ist keine ausgeführte Aktion.
+
+Die Ansichten bleiben Gespräch, Wissen, Aufgaben, E-Mails, Belege und System.
+Für die Buchhaltung erhält Belege einen Monatsarbeitsplatz mit Quellenstatus,
+Kontoauszügen, Zuordnungsvorschlägen, Klärungen und Export. Derselbe Monatsstand
+soll später über Sprache und Telegram abrufbar sein.
+
+## Nächster Lieferumfang – Bankabgleich in ATLAS
+
+| Schritt | Verhalten | Abnahme |
 | --- | --- | --- |
-| Steuerung | Frage beantworten oder passenden Ablauf starten | Lokales Modell, optionale Online-Beratung und fest definierte Abläufe vorhanden; kein beliebiger autonomer Werkzeugplaner. Online-Zugang benötigt Konfiguration. |
-| Firmenwissen | Herkunft, Änderungen und Verbindungen zwischen Kundenprojekten, Verfahren und Entscheidungen nachvollziehen | Profil, gespeicherte Notizen, Suche, Fassungen und Aufgabenverknüpfungen vorhanden. Obsidian ist keine nachgewiesene installierte Voraussetzung. Ein Markdown-Export wäre ein zusätzlicher Zugang. |
-| Sprache | Einmal starten, zuhören, antworten, erneut zuhören | Dialog implementiert. Erkennung und gespeicherte Antworten beobachtet; durchgängiger Betrieb auf dem tatsächlichen iPhone bleibt zu prüfen. |
-| Oberfläche | Gespräch plus Wissen, Aufgaben, E-Mails und Belege an einem Ort | Gemeinsame Weboberfläche vorhanden. Anzeigen müssen echte Ausführungszustände zeigen; eine Animation beweist keine erledigte Arbeit. |
-| Quellen | Freigegebene Postfächer, Billomat und Mitarbeiterbelege zusammenführen | Anbindungen und Import vorhanden, aber Quellenabdeckung unvollständig. Ein Postfach meldet abgewiesene Anmeldung; Mitarbeiterzugang benötigt geprüfte separate HTTPS-Erreichbarkeit. |
-| Ausführung | Aufträge dauerhaft annehmen, Ergebnisse nachvollziehbar ablegen, Fehler erkennen | Hintergrundaufträge, Tagesüberblick und Monatsvorbereitung vorhanden. Eine gespeicherte Aufgabe ist ein offener Listeneintrag, keine bereits ausgeführte Firmenaktion. |
+| Original übernehmen | Besitzer lädt Auszug hoch, Original und SHA-256 bleiben erhalten. Quelle, Konto, Währung und Zeitraum werden separat geführt. | Erneuter Upload derselben Datei erzeugt keine zusätzlichen Transaktionen. Ein anderer Besitzer kann weder Original noch Buchungen abrufen. |
+| Auszug prüfen | Zunächst ausdrücklich unterstütztes Revolut-EUR-PDF und ein dokumentiertes CSV-Format. Giro und Unterkonten bleiben getrennt. Unlesbare oder widersprüchliche Daten bleiben im Prüfstatus. | Anfangssaldo plus Eingänge minus Ausgänge entspricht Endsaldo je Konto. Transaktionssaldo und Summen werden geprüft. Keine stille Teilübernahme. |
+| Zahlungen vorschlagen | Rechnungsreferenz, Betrag, Währung und Richtung begründen den Vorschlag. Vollständiger Verwendungszweck einschließlich Folgezeilen wird berücksichtigt. | Gleicher Betrag allein bestätigt keine Zuordnung. Testfälle umfassen Teilzahlung, Sammelzahlung, Gutschrift, Bankgebühr und Umbuchung. |
+| Entscheidung speichern | Nutzer bestätigt oder verwirft Vorschlag. Zuordnung speichert Betrag, Transaktion, Rechnung, Entscheider und Zeitpunkt. Korrekturen bleiben nachvollziehbar. | Eine Zahlung kann nur bis zu ihrem verfügbaren Betrag zugeordnet werden. Wiederholte Bestätigung erzeugt keine Doppelzuordnung. Billomat-Status bleibt unverändert. |
+| Klärungen anzeigen | Nicht zugeordnete Zahlungen, fehlende Belege, Widersprüche und unvollständige Quellen stehen in einer gemeinsamen Liste. | „Kein Treffer“ wird nicht als „unbezahlt“ ausgegeben. Aktueller Quellstatus wird vom historischen Monatsstichtag unterschieden. |
+| Monat exportieren | Originale, geprüfte Transaktionsliste, bestätigte Zuordnungen, Vorschläge und Klärungen werden getrennt exportiert. | Jeder Datensatz ist zur Quelle rückverfolgbar. Alle Exportteile sind vollständig herunterladbar und anhand des Verzeichnisses prüfbar. |
 
-## Abteilungen und konkrete Ergebnisse
+Implementierungsreihenfolge im bestehenden Projekt
+1. Besitzergebundene Datenhaltung, Originalspeicher und Importvalidierung.
+2. Deterministischer Abgleich mit synthetischen Sonderfällen.
+3. HTTP-Routen mit bestehendem Besitzer-/CSRF-Schutz und Monatsoberfläche.
+4. Ergänzung des bestehenden Monatsablaufs und Exports.
+5. Gezielte Tests, unabhängige Prüfung, Release-CI und Installation mit Backup.
+6. Abnahme mit einem realen Monat ohne automatische finanzielle Entscheidungen.
 
-„Vorhanden“ bezeichnet implementierte Funktionen, nicht automatisch einen
-vollständig eingerichteten oder im Alltag abgenommenen Ablauf.
+Keine Modellantwort schreibt direkt Buchungen. Ein zukünftiges Beancount-Journal
+benötigt bestätigte Stammdaten, Kontenrahmen, Steuerlogik und Anfangsbestände.
+Diese Voraussetzungen sind ein separates Arbeitspaket nach dem Zahlungsabgleich.
 
-| Bereich | Eingaben | Konkrete Ergebnisse | Umsetzungsstand |
-| --- | --- | --- | --- |
-| Leitung | Firmenprofil, freigegebenes Wissen, Aufgaben, verfügbarer Belegstand | Tagesüberblick mit offenen Punkten und erkennbaren Datenlücken | Fester Briefing-Ablauf vorhanden. Automatische Zustellung und verlässliche Terminüberwachung sind separat zu ergänzen und abzunehmen. |
-| Büro | Freigegebene E-Mail-Postfächer, Gesprächsaufträge, Rückfragen | Mailzusammenfassungen, Antwortentwürfe, offene Aufgaben | Lesen und Entwürfe vorhanden. Dauerhaft verwaltete Mailentwürfe, Zuordnung zu Vorgängen und Versandablauf sind nächste Ausbauschritte. |
-| Vertrieb | Kundenanfrage, geprüfte Artikel und Preise, Projektwissen | Angebotsentwurf, fehlende Angaben, nächste Vertriebsaufgabe | AngebotsDesigner ist ein bestehendes separates Modul. Ein durchgängiger ATLAS-Vertriebsablauf mit geprüften Übergaben ist noch abzunehmen; automatischer Angebotsversand ist kein vorhandener Standardablauf. |
-| Technik | Freigegebenes Angebot, Projektunterlagen, Fotos, Wartungshinweise | Montagevorbereitung, Materialentwurf, Prüf- und Wartungslisten | Als Ziel beschrieben. Eine verlässliche vollständige Projektkette mit Nachweisen und Rückmeldungen ist noch aufzubauen. |
-| Buchhaltung | Eingangsbelege, Billomat-Ausgangsrechnungen, später Bankdaten | Geprüftes Monatspaket, fehlende Belegangaben, nachvollziehbare offene Posten | Import, Belegprüfung, Export und Monatsvorbereitung vorhanden. Bankabgleich, vollständiges Buchungsjournal und belastbare OP-Liste fehlen. Der Billomat-Zahlungsstatus ersetzt keinen Bankabgleich. |
-| Marketing | Freigegebene Referenzen, Leistungsbeschreibung, Bildmaterial | Beitragsentwürfe und Redaktionsvorschläge | Geplanter Ablauf. Ein anderer verfügbarer Connector bedeutet noch keine in ATLAS eingerichtete oder getestete Veröffentlichung. |
+## Folgepakete in Reihenfolge
 
-## Buchhaltung: vom Dokument zum geprüften Monat
-
-Der Zielweg lautet: Original übernehmen, Dokumentart bestimmen, Angaben mit
-Quelle auslesen, Dubletten oder Korrekturen zuordnen, Rechnung prüfen, Zahlung
-abgleichen und einen überprüfbaren Export vorbereiten.
-
-Der heutige Import erledigt davon nur Teile. Ein E-Mail-Anhang ist nicht automatisch
-eine Rechnung; ein unbekannter Zahlungsstatus ist kein Nachweis einer offenen
-Forderung. Unvollständige Quellen dürfen keinen scheinbar vollständigen Bericht
-ergeben. Ein zukünftiges Buchungsjournal, etwa mit Beancount, benötigt ausdrücklich
-festgelegte Konten, Perioden, Korrekturregeln und Abnahmetests. Der vorhandene
-Buchhaltungs-Skill allein stellt diese Integration nicht her.
-
-Die gewünschte Telegram-Liste soll konkrete Rückfragen enthalten: welcher Beleg
-fehlt, zu welchem Vorgang er gehört und wie er nachgereicht werden kann. Dafür
-müssen zunächst Rechnungsart und Zahlungsabgleich verlässlich sein. Mitarbeiter
-sollen Belege über einen begrenzten Uploadzugang einreichen können; dieser Zugang
-soll keine Firmenpostfächer oder fremden Unterlagen offenlegen.
-
-## Nächste Meilensteine und Abnahme
-
-| Reihenfolge | Arbeitspaket | Nachprüfbare Abnahme |
+| Paket | Ergebnis | Abschlussnachweis |
 | --- | --- | --- |
-| 1 | Dialog stabilisieren und Update verifizieren | Installierte Version festhalten. Drei gesprochene Fragen nacheinander liefern Text und Ton; nach jeder Antwort hört ATLAS wieder zu. Stop beendet Audio und Mikrofon. Bereits angenommene Aufträge erscheinen höchstens einmal und starten keine zweite Aktion. Test auf dem tatsächlichen iPhone. |
-| 2 | Quellen vollständig anbinden | Jedes vorgesehene Postfach besteht einen Lese-Test. Billomat-Abdeckung und Importfehler sind sichtbar. Zugangsdaten werden sicher konfiguriert; ein fehlender API-Schlüssel wird als offen ausgewiesen. |
-| 3 | Dokumenteingang und Mitarbeiterupload abnehmen | Testfälle für Rechnung, sonstiges Dokument, Dublette und Korrektur bleiben unterscheidbar. Originale bleiben erhalten. Upload von außerhalb funktioniert über HTTPS; gesperrter Zugang wird abgewiesen. |
-| 4 | Mailassistenz als Arbeitsablauf | Ein Testvorgang enthält Quelle, Zusammenfassung und gespeicherten bearbeitbaren Entwurf. Der Status unterscheidet „Entwurf“ und „gesendet“. Eine ausdrückliche Versandaktion erzeugt höchstens einen Versand. |
-| 5 | Bankabgleich und Buchungsentwürfe | Testmonat mit Teilzahlung, Gutschrift, fehlendem Beleg und Dublette wird korrekt zugeordnet. Unklare Fälle bleiben offen. Summen und Herkunft sind prüfbar; Wiederholung erzeugt keine doppelten Buchungen. |
-| 6 | Firmenabläufe und Telegram-Berichte | Tagesüberblick und Monatsvorbereitung enthalten nachvollziehbare Quellen und Lücken. Eine freigegebene Telegram-Rückfrage lässt sich durch Upload beantworten. Jede automatisierte Aktion hat Ergebnis, Fehlerstatus und Schutz vor Wiederholung. |
+| Belege nachfordern | Konkrete Klärung mit zugehörigem Uploadzugang über Telegram an den eingerichteten Inhaber. Mitarbeiterzugänge bleiben auf Einreichen begrenzt. | Upload beantwortet genau eine Klärung. Widerruf sperrt Zugang. Versand und Fehler sind nachvollziehbar und werden nicht doppelt ausgelöst. |
+| Natürliches Gespräch | Allgemeine ATLAS-Fragen, Aufgaben erstellen und abfragen, danach automatisch weiter zuhören. | Drei aufeinanderfolgende Runden am echten iPhone, Unterbrechung, Sprechpause, Stop und Verbindungsverlust geprüft. Keine doppelten Aktionen. |
+| Mailassistenz | Quelle, Zusammenfassung und dauerhaft bearbeitbarer Antwortentwurf pro Vorgang. | Entwurf bleibt nach Neustart erhalten. Versand ist eine gesonderte ausdrücklich beauftragte Aktion mit prüfbarem Ergebnis. |
+| Kalender | Direkte Google-Anbindung und Buchung nach Bestätigung der endgültigen Details. | OAuth, freie Zeiten, konkurrierender Termin und eindeutige Speicherung getestet. Unklarer Schreibausgang wird nicht blind wiederholt. |
+| Firmenwissen | Bestätigte Fakten mit Herkunft, Änderungshistorie und Verbindungen zu Vorgängen. | Korrektur ersetzt veraltete Aussagen im aktuellen Kontext. Eingehende Dokumente werden nicht ungeprüft zu gültigen Firmenregeln. |
+| Vertrieb und Technik | Geprüfte Übergaben zum AngebotsDesigner, Montagevorbereitung und Wartung. | Ein vollständiger Testvorgang mit echten Datenquellen und nachvollziehbaren Übergaben. |
 
-Erst nach diesen Nachweisen werden weitere automatische Aktionen einzeln
-freigeschaltet. Neue Quellen und Berechtigungen werden je Ablauf dokumentiert.
-Zahlungen, Steuerübermittlungen und verbindlicher Kundenversand sind eigene
-Integrationen mit eigenen Prüfungen, keine Nebenwirkung einer Chatantwort.
+## Protokoll und Fertigstellungsmaßstab
 
-Dieses Konzept ergänzt die laufenden Fehlerkorrekturen. Es ersetzt weder deren
-Installation noch die praktische Abnahme des Gesprächsmodus.
+Für jedes Paket werden geplant, implementiert, getestet, veröffentlicht und
+installiert getrennt festgehalten. Ein Release ist erst im Alltag abgenommen,
+wenn der beschriebene Nutzerablauf am Zielgerät funktioniert. Tests ersetzen weder
+eine reale Quellenverbindung noch vollständige Monatsdaten.
+
+Nächster konkreter Entwicklungsschritt ist das Datenmodell samt Importprüfung
+für Kontoauszüge. Anschließend folgen Zuordnung und Monatsoberfläche. Bestehende
+Buchhaltungssynchronisation, Originale und Besitzergrenzen müssen erhalten bleiben.
+Weitere Funktionen werden nicht als aktiv bezeichnet, bevor ihre Abnahme erfolgt.
