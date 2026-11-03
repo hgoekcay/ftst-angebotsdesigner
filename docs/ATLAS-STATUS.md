@@ -1,20 +1,38 @@
 # ATLAS and FTST project state
 
-Updated: 2026-10-31. This file is the current continuity record, not an instruction
+Updated: 2026-11-03. This file is the current continuity record, not an instruction
 to perform unapproved external actions. Check live versions before deployment.
 
-## Latest verified state
+## Latest documented state — reconciled 2026-11-03
 
-ATLAS 0.8.4 is installed and running, independently verified in Home Assistant.
-Both 0.8.3 and 0.8.4 updates used the enabled backup option. PR #79 merged as
-e072cdd87ef1f13af383ee98f6952ee84c01149e after all six CI jobs succeeded
-(run 41252302432; Python 3.13: 1333 passed, 4 skipped, 116 subtests).
-Text reply and briefing were verified live, as was the older-open-invoice sync.
-The PDF proposal action was tested on two existing documents without saving edits:
-one produced one proposal, the other none; form fields remained unchanged.
-Physical iPhone conversation remains unverified. Online provider remains disabled;
-one STRATO mailbox rejects login. Full bookkeeping and autonomous company workflows
-are not complete. See the final checkpoint and ATLAS-FIRMENABLAEUFE.md.
+The latest prior-session production observation is ATLAS 0.9.5 installed with
+backup on 2026-11-02. PR #88 merged as
+b168d096bf95d3689d220f0b2a9555c3aa7a26f3 after six successful CI jobs
+(run 41500846944). The October monthly workflow completed all four steps.
+Multipart export generation was observed. Only the first downloaded ZIP was
+independently inspected; complete retrieval/audit of the second remains open.
+
+A real OpenAI text/web-search request succeeded in that prior session after API
+credit was added. Earlier statements that API setup is missing are historical.
+Direct Google OAuth and full physical iPhone conversation acceptance remain
+unverified. Mail/source coverage remains incomplete.
+
+The October bank statement was reconciled in a separate preparation artifact.
+This is NOT an implemented ATLAS bank importer, persistent payment reconciliation
+or finalized ledger. No bank transaction or Billomat payment status was changed.
+Private financial records and report contents are not stored in this repository.
+
+On 2026-11-03 only repository documentation was inspected and revised. No fresh
+production login, runtime test, update or deployment is claimed. The user has
+shelved Hermes development and prioritizes ATLAS bookkeeping. The replacement
+[company workflow concept](ATLAS-FIRMENABLAEUFE.md) defines bank import,
+balance validation, proposal review, clarification and export acceptance before
+general automation. Next implementation step is owner-scoped statement storage
+and validated import, then matching and the monthly UI.
+
+Code Review Graph was not available through the inspected tool catalog; no graph
+analysis ran. Documentation was checked directly through the GitHub connector.
+Sections below preserve release history and may contain superseded setup states.
 
 ## Goal and decisions
 
