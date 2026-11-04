@@ -1,3 +1,8 @@
+# 0.27.6
+
+- PDF-Anhang aus der E-Mail-Prüfung in einer eigenen mobilen Ansicht öffnen: alle Seiten untereinander und sichtbarer Rückweg zur gespeicherten E-Mail.
+- Originalanhang lokal als Seitenbilder darstellen, ohne den unzuverlässigen eingebetteten iPhone-PDF-Viewer. PDF weiterhin unverändert speichern und teilen.
+
 # 0.27.5
 
 - Einheitliche, ruhigere Oberfläche mit Systemschrift, klarer Typografie, besser lesbaren Formularen und großzügigen Bedienflächen.

@@ -1,5 +1,25 @@
 # ATLAS and FTST project state
 
+## Designer mobile attachment review — 2026-11-04
+
+Prepared Designer 0.27.6 from main 685bc14 in an isolated hotfix branch.
+The email attachment review formerly navigated directly to an inline PDF,
+replacing app navigation and relying on iOS embedded PDF pagination. It now
+opens an app page with a sticky return link to the same saved email review,
+all frozen attachment pages as responsive local PNG images, and the existing
+authenticated PDF download/share action. PDF bytes and mail records remain
+unchanged; reviewing does not send messages. Account checks and no-store apply
+to every page. Poppler runs locally with bounded resolution, concurrency and
+timeout; temporary files are removed after rendering. No external PDF service.
+
+Validation: 33 mail tests passed, including real rendering of every page of a
+multi-page generated attachment, preserved PDF bytes, return/Ingress links,
+renderer failure and account isolation; targeted Ruff passed. Added production
+container rendering smoke check. Review used source/rg/tests, no graph claim.
+No browser/app surfaces are exposed in this session, so visual iPhone testing,
+live version verification, backup and installation remain outstanding. This is
+prepared code, not an installed fix. PR74 document sharing remains separate.
+
 Updated: 2026-11-03. This file is the current continuity record, not an instruction
 to perform unapproved external actions. Check live versions before deployment.
 

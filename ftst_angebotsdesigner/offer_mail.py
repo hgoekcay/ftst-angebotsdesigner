@@ -6,6 +6,7 @@ import io
 import json
 import re
 import secrets
+import subprocess
 import time
 from datetime import datetime, timezone
 from email import policy
@@ -24,6 +25,7 @@ from materials import account
 from offer_delivery import messages
 from storage import RecordConflict
 import offer_smtp
+import pdf_preview
 
 KIND = 'offer_mail_delivery'
 MAX_PDF = 15 * 1024 * 1024
@@ -296,7 +298,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         body = ('<div class="card"><h1>E-Mail prüfen & senden</h1><p><b>Von:</b> FT Sicherheitstechnik · info@ftst.eu<br>'
                 '<b>An:</b> ' + clean(record['recipient']) + '<br><b>Betreff:</b> ' + clean(record['subject']) + '</p>' +
                 delivery_status(record) + '<p role="alert">' + clean(error) + '</p>'
-                '<a class="btn light" href="' + ingress(path + '/pdf') + '">Genauen PDF-Anhang prüfen</a>'
+                '<a class="btn light" href="' + ingress(path + '/document') + '">Genauen PDF-Anhang prüfen</a>'
                 '<a class="btn light" href="' + ingress(path + '/eml') + '">E-Mail-Datei herunterladen</a>'
                 '<iframe title="E-Mail-Vorschau" sandbox="" style="display:block;width:100%;height:780px;border:1px solid #ddd;margin:20px 0" src="' + ingress(path + '/preview') + '"></iframe>')
         if record['status'] == 'prepared':
@@ -331,10 +333,39 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                     html = html.replace('cid:' + cid + '"', 'data:image/png;base64,' + base64.b64encode(image.get_payload(decode=True)).decode() + '"')
             response = Response(html, mimetype='text/html')
             response.headers['Content-Security-Policy'] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox"
-        elif part == 'pdf':
+        elif part in ('pdf', 'document') or re.fullmatch(r'page-[1-9][0-9]{0,2}', part):
             attachment = next(x for x in msg.iter_attachments() if x.get_content_type() == 'application/pdf')
-            response = Response(attachment.get_payload(decode=True), mimetype='application/pdf')
-            response.headers['Content-Disposition'] = 'inline; filename="Leistungsvorschlag.pdf"'
+            pdf = attachment.get_payload(decode=True)
+            if part == 'pdf':
+                response = Response(pdf, mimetype='application/pdf')
+                response.headers['Content-Disposition'] = 'attachment; filename="Leistungsvorschlag.pdf"'
+            elif part == 'document':
+                path = 'email-delivery/' + key
+                body = ('<div style="position:sticky;top:0;z-index:20;background:white;padding:12px;display:flex;flex-wrap:wrap;gap:8px">'
+                        '<a class="btn" href="' + ingress(path) + '">← Zurück zur E-Mail</a>'
+                        '<a class="btn light" data-pdf="Leistungsvorschlag.pdf" href="' + ingress(path + '/pdf') + '">PDF speichern / teilen</a></div>'
+                        '<div class="card"><h1>Dokument prüfen</h1><p>Dies ist der gespeicherte PDF-Anhang dieser E-Mail. Alle Seiten stehen untereinander. Zum Vergrößern die Zoom-Geste des Handys verwenden.</p>')
+                try:
+                    count = pdf_preview.page_count(pdf)
+                except Exception:
+                    return page('Dokument prüfen', body + '<p role="alert">Die Seitenvorschau ist nicht verfügbar. Bitte PDF speichern / teilen verwenden.</p></div>', 503)
+                body += '<p>' + str(count) + ' Seiten · Es wird nichts versendet.</p></div>'
+                for number in range(1, count + 1):
+                    label = 'Seite ' + str(number) + ' von ' + str(count)
+                    body += ('<figure style="margin:16px 0;max-width:100%"><figcaption>' + label + '</figcaption>'
+                             '<img loading="lazy" decoding="async" style="display:block;width:100%;max-width:100%;height:auto;background:white" src="' +
+                             ingress(path + '/page-' + str(number)) + '" alt="' + label + ' – falls das Bild nicht lädt, bitte PDF speichern / teilen verwenden."></figure>')
+                body += '<p><a class="btn" href="' + ingress(path) + '">Zurück zur E-Mail</a></p>'
+                return page('Dokument prüfen', body)
+            else:
+                number = int(part.split('-')[1])
+                try:
+                    if number > pdf_preview.page_count(pdf):
+                        abort(404)
+                    image = pdf_preview.render_page(pdf, number)
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    abort(503, 'Seitenvorschau nicht verfügbar. Bitte PDF speichern / teilen verwenden.')
+                response = Response(image, mimetype='image/png')
         elif part == 'eml':
             response = Response(raw, mimetype='message/rfc822')
             response.headers['Content-Disposition'] = 'attachment; filename="Leistungsvorschlag.eml"'
