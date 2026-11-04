@@ -1,5 +1,17 @@
 # ATLAS and FTST project state
 
+## Prepared portal property contract — 2026-11-04
+
+Separate dependent branch/version 0.27.7 adds an explicit building_type enum
+(neutral/residential/commercial/industrial) to new portal snapshots and a checked
+owner override on release. Deterministic suggestions use project wording, not
+customer names/legal form; ambiguity stays neutral. Lock/cylinder and access
+hardware get dedicated visual categories; installation labor stays service.
+65 targeted tests and Ruff passed. This branch MUST NOT be installed before the
+hosted portal accepts the new optional property and visual categories. Current
+live version11 schema rejects them. Existing issued revisions are not rewritten.
+Portal source retrieved separately for preparation, no hosted deployment claimed.
+
 ## Designer mobile navigation — 2026-11-04
 
 Prepared compact phone header, four fixed bottom tabs (offers/projects/customers/
