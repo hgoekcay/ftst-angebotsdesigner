@@ -19,6 +19,11 @@ from test_baseline import raw
 from test_persistence import isolated_storage, client
 
 
+@pytest.fixture(autouse=True)
+def no_real_sent_mailbox(monkeypatch):
+    monkeypatch.setattr(offer_mail.offer_sent, 'copy_to_sent', lambda *a, **kw: 'saved')
+
+
 def fields(client, url='/offer/42/email'):
     html = client.get(url).text
     csrf = re.search(r'name="csrf" value="([^"]+)"', html).group(1)

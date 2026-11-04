@@ -1,5 +1,8 @@
 # 0.27.6
 
+- Nach bestätigtem Direktversand eine Kopie der unveränderten E-Mail inklusive Anhängen im STRATO-Ordner „Gesendet“ ablegen. Versand und Postfachkopie getrennt anzeigen.
+- Fehlende Kopien separat nachholen; unklare IMAP-Ergebnisse nur abgleichen, ohne erneuten Kundenversand oder blindes doppeltes Ablegen.
+
 - PDF-Anhang aus der E-Mail-Prüfung in einer eigenen mobilen Ansicht öffnen: alle Seiten untereinander und sichtbarer Rückweg zur gespeicherten E-Mail.
 - Originalanhang lokal als Seitenbilder darstellen, ohne den unzuverlässigen eingebetteten iPhone-PDF-Viewer. PDF weiterhin unverändert speichern und teilen.
 

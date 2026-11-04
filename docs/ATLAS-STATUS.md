@@ -1,5 +1,25 @@
 # ATLAS and FTST project state
 
+## Designer sent mailbox copy — 2026-11-04
+
+User approved adding a Sent-folder copy for future direct mail. Prepared in the
+same 0.27.6 release/PR89: persist SMTP acceptance first, then copy the exact frozen
+MIME to the fixed STRATO sender mailbox using verified IMAP TLS. Separate durable
+copy status and CSRF-protected copy-only recovery; never SMTP on recovery. Check
+Message-ID before APPEND, select a unique Sent special-use folder or documented
+STRATO Sent Items, never create folders. Ambiguous APPEND/disconnected or crashed
+attempts reconcile by search only, with a five-minute in-flight lease. Historic
+accepted records can be copied individually; no bulk import or background sends.
+
+Validation: 41 mail/copy tests passed with fake IMAP (including TLS parameters,
+unchanged MIME attachments, duplicate lookup, explicit failure recovery, ambiguous
+APPEND, stale attempts, account/CSRF checks and no copy for uncertain SMTP).
+Ruff/diff checks passed. No live postbox changes or customer messages. Previous
+PDF hotfix CI41800775995 passed all seven jobs including actual image rendering
+inside the production container. New combined release CI is separate/pending.
+Still not installed: authenticated HA/browser access, backup and phone acceptance
+are outstanding. Credentials are reused from protected options, never in docs.
+
 ## Designer mobile attachment review — 2026-11-04
 
 Prepared Designer 0.27.6 from main 685bc14 in an isolated hotfix branch.

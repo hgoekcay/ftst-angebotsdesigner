@@ -25,6 +25,7 @@ from materials import account
 from offer_delivery import messages
 from storage import RecordConflict
 import offer_smtp
+import offer_sent
 import pdf_preview
 
 KIND = 'offer_mail_delivery'
@@ -196,7 +197,41 @@ def submit(store, identity, key):
         outcome = 'failed'
     else:
         outcome = offer_smtp.deliver(record['recipient'], raw)
-    return store.transact_record(identity, KIND, key, lambda value, _db: dict(value, status=outcome, finished_at=now()))
+    record = store.transact_record(identity, KIND, key, lambda value, _db: dict(value, status=outcome, finished_at=now()))
+    if outcome == 'accepted':
+        try:
+            return save_sent_copy(store, identity, key)
+        except Exception:
+            # SMTP acceptance is already durable. A copy/storage error must never
+            # make the UI suggest sending the customer message again.
+            return store.record(identity, KIND, key) or record
+    return record
+
+
+def save_sent_copy(store, identity, key):
+    token = uuid4().hex
+    def claim(value, _db):
+        if not value or value.get('status') != 'accepted':
+            raise RecordConflict('Nur bestätigte Versandvorgänge können im Postfach abgelegt werden.')
+        state = value.get('sent_copy_status')
+        if state == 'saved':
+            raise RecordConflict('Die Postfachkopie ist bereits gespeichert.')
+        if state == 'saving' and time.time() - value.get('sent_copy_epoch', 0) < 300:
+            raise RecordConflict('Die Postfachkopie wird gerade geprüft. Bitte später erneut prüfen.')
+        return dict(value, sent_copy_status='saving', sent_copy_epoch=time.time(), sent_copy_token=token,
+                    sent_copy_allow_append=state not in ('saving', 'uncertain'))
+    record = store.transact_record(identity, KIND, key, claim)
+    raw = store.mail_blob(identity, record['digest'])
+    outcome = 'failed' if record['sent_copy_allow_append'] else 'uncertain'
+    if raw and hashlib.sha256(raw).hexdigest() == record['digest']:
+        outcome = offer_sent.copy_to_sent(raw, record['message_id'],
+                                         allow_append=record['sent_copy_allow_append'],
+                                         sent_at=datetime.fromisoformat(record['finished_at']).timestamp())
+    def finish(value, _db):
+        if value.get('sent_copy_token') != token:
+            raise RecordConflict('Eine neuere Prüfung der Postfachkopie läuft bereits.')
+        return dict(value, sent_copy_status=outcome, sent_copy_checked_at=now())
+    return store.transact_record(identity, KIND, key, finish)
 
 
 def csrf():
@@ -285,6 +320,12 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         error = ''
         if request.method == 'POST':
             check_post()
+            if request.form.get('action') == 'sent-copy':
+                try:
+                    save_sent_copy(get_store(), account(), key)
+                except (ValueError, RecordConflict, OSError):
+                    return page('Postfachkopie prüfen', '<div class="card"><p>Die Postfachkopie konnte noch nicht bestätigt werden. Die Kunden-E-Mail wird nicht erneut versendet.</p><a href="' + ingress('email-delivery/' + key) + '">Zurück zur E-Mail</a></div>', 409)
+                return redirect(ingress('email-delivery/' + key), code=303)
             if request.form.get('confirm') != 'yes':
                 abort(400, 'Bitte Empfänger, Nachricht und PDF prüfen und bestätigen.')
             # Fresh status blocks withdrawn/draft offers, while the attachment remains the reviewed snapshot.
@@ -301,6 +342,19 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 '<a class="btn light" href="' + ingress(path + '/document') + '">Genauen PDF-Anhang prüfen</a>'
                 '<a class="btn light" href="' + ingress(path + '/eml') + '">E-Mail-Datei herunterladen</a>'
                 '<iframe title="E-Mail-Vorschau" sandbox="" style="display:block;width:100%;height:780px;border:1px solid #ddd;margin:20px 0" src="' + ingress(path + '/preview') + '"></iframe>')
+        if record['status'] == 'accepted':
+            copy_status = record.get('sent_copy_status', 'missing')
+            copy_label = {'saved': 'Kopie im Ordner „Gesendet“ gespeichert – auf Geräten mit diesem IMAP-Postfach sichtbar.',
+                          'saving': 'Postfachkopie wird geprüft. Bei unterbrochener Prüfung nach fünf Minuten erneut prüfen.',
+                          'uncertain': 'Speicherung im Postfach unklar. Erneutes Prüfen sucht nur nach der Kopie und legt keine zweite an.',
+                          'failed': 'Postfachkopie noch nicht gespeichert. IMAP-Zugang und Speicherplatz prüfen.',
+                          'missing': 'Für diesen Versand ist noch keine Postfachkopie bestätigt.'}.get(copy_status, 'Postfachkopie nicht bestätigt.')
+            body += '<section class="card"><h2>Kopie in Gesendet</h2><p role="status">' + copy_label + '</p>'
+            if copy_status != 'saved':
+                body += ('<form method="post">' + hidden() + '<button class="btn light" name="action" value="sent-copy">' +
+                         ('Postfachkopie prüfen' if copy_status in ('saving', 'uncertain') else 'Nur Postfachkopie nachholen') +
+                         '</button></form><p>Diese Aktion verschickt keine E-Mail an den Kunden.</p>')
+            body += '</section>'
         if record['status'] == 'prepared':
             if offer_smtp.configured():
                 body += ('<form method="post">' + hidden() + '<label><input type="checkbox" name="confirm" value="yes" required> Empfänger, E-Mail und PDF geprüft</label>'
@@ -406,7 +460,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 '<h2>Direktversand von info@ftst.eu</h2><p>' + ('Aktiviert und Zugang hinterlegt.' if offer_smtp.configured() else 'Noch nicht eingerichtet.') + '</p>'
                 '<p>Home Assistant → Apps → FTST AngebotsDesigner → Konfiguration: strato_smtp_enabled aktivieren. '
                 'Für strato_smtp_password das Postfachpasswort von info@ftst.eu hinterlegen. Ein bereits vorhandenes Passwort des direkten STRATO-Abrufs wird verwendet, wenn das SMTP-Feld leer bleibt.</p>'
-                '<p>Die Verbindung ist verschlüsselt. Der Anmeldetest versendet keine E-Mail. Gesendete Nachrichten und Anhänge bleiben im Versandverlauf dieser App; eine Kopie im STRATO-Ordner „Gesendet“ wird nicht angelegt.</p>'
+                '<p>Die Verbindung ist verschlüsselt. Der Anmeldetest versendet keine E-Mail. Nach bestätigter SMTP-Übergabe wird dieselbe Nachricht mit Anhängen per IMAP im STRATO-Ordner „Gesendet“ abgelegt. Der Status der Postfachkopie steht separat im Versandverlauf. Fehlende Kopien lassen sich dort nachholen, ohne erneut an den Kunden zu senden.</p>'
                 '<form method="post">' + hidden() + '<button class="btn light" name="action" value="check">SMTP-Anmeldung prüfen</button></form></div>'
                 '<div class="card"><h2>Bis zu drei Kundenlogos</h2><p>Originale unter <a href="' + ingress('materials') + '">Bilder</a> hochladen, hier auswählen und den tatsächlichen Kunden oder Standort nennen. Leere Plätze erscheinen nicht in der E-Mail.</p>'
                 '<form method="post">' + hidden())
