@@ -1,5 +1,19 @@
 # ATLAS and FTST project state
 
+## Designer 0.27.6 release and installation — 2026-11-04
+
+PR89 merged as ac4c03cb42d982eafc60e9e81fad60303fa31630 after all CI
+checks passed (run 41875532491, head cf0e359). 45 local targeted tests passed.
+Includes floating tabs Angebote/Fotos/Firma/Mehr and five removed entry points,
+PDF attachment return/page viewer, and Sent mailbox copies. Current portal remains
+compatible; dependent PR90 and STRATO migration were NOT installed.
+HA backup verified locally: FTST vor App-Update 0.27.6 2026-11-04, 299.41 MB,
+contains Designer 0.27.5 and HA settings. Update completed through HA UI: installed/latest version 0.27.6 and running.
+Live Ingress verified at 390x844: four home actions, floating four-tab bar,
+More page and its return link to home work. Browser viewport reset afterward.
+Physical iPhone acceptance and real Sent-mail copy remain untested; no test mail sent.
+
+
 ## Designer mobile navigation — 2026-11-04
 
 Prepared compact phone header, four fixed bottom tabs (offers/projects/customers/
@@ -677,4 +691,4 @@ synthetische Originale. Zwei ZIPs erzeugt und alle IDs und Originalhashes nach
 dem Entpacken verglichen. Kein echter Beleg in der Testumgebung. Source-Prüfung
 und gezielte Tests, kein frisch geprüfter Code-Graph-Index. Der produktive
 Oktoberlauf ist erst nach Installation und tatsächlicher Abnahme bestätigt.
-`nRelease 0.27.6 now includes the simplified home and floating four-tab navigation (Angebote, Fotos, Firma, Mehr). Ported independently of PR90 so current portal schema remains compatible. Backup and actual installation verification required.
+Release 0.27.6 now includes the simplified home and floating four-tab navigation (Angebote, Fotos, Firma, Mehr). Ported independently of PR90 so current portal schema remains compatible. Backup and actual installation verification required.
