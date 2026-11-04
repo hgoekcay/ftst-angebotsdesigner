@@ -1,5 +1,21 @@
 # ATLAS and FTST project state
 
+## Designer mobile navigation — 2026-11-04
+
+Prepared compact phone header, four fixed bottom tabs (offers/projects/customers/
+more), safe-area content clearance and a More page retaining all secondary tools.
+Shared page shell now includes deterministic local parent and home links, independent
+of browser history. Offer portal returns to its exact offer; external customer
+preview opens separately with noopener/noreferrer. Desktop navigation retained.
+79 targeted navigation/portal/mail tests and Ruff passed. No exposed browser means
+physical phone/visual acceptance remains pending; changes are not installed.
+
+Live Sites metadata confirms the customer portal remains on Sites hosting, version
+11. Its custom-domain/server migration needs the owner's domain, provider and
+hosting/runtime details. Product lock/cylinder classification and property-specific
+portal imagery are separate pending work: inspect the actual hosted schema/client
+before changing payload fields. Do not claim branding removal or migration done.
+
 ## Designer sent mailbox copy — 2026-11-04
 
 User approved adding a Sent-folder copy for future direct mail. Prepared in the

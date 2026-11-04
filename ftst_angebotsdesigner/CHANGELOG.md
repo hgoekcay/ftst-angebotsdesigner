@@ -1,5 +1,8 @@
 # 0.27.6
 
+- Kompakter mobiler Kopfbereich und feste untere Reiter für Angebote, Projekte, Kunden und Mehr. Zusätzliche Funktionen bleiben über Mehr erreichbar.
+- Gemeinsame Rückwege auf App-Unterseiten; Kundenlink-Einstellungen führen zum Angebot zurück. Externe Kundenvorschau separat öffnen, damit die App erhalten bleibt.
+
 - Nach bestätigtem Direktversand eine Kopie der unveränderten E-Mail inklusive Anhängen im STRATO-Ordner „Gesendet“ ablegen. Versand und Postfachkopie getrennt anzeigen.
 - Fehlende Kopien separat nachholen; unklare IMAP-Ergebnisse nur abgleichen, ohne erneuten Kundenversand oder blindes doppeltes Ablegen.
 
