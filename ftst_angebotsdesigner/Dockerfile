@@ -6,7 +6,7 @@ ARG BUILD_ARCH
 LABEL io.hass.version="${BUILD_VERSION}" io.hass.type="app" io.hass.arch="${BUILD_ARCH}"
 
 WORKDIR /app
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg poppler-utils
 COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --only-binary=:all: -r /app/requirements.txt
 COPY . /app

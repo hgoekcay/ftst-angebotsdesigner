@@ -33,3 +33,13 @@ SMTP verwendet ausschließlich `smtp.strato.de:465` mit verifiziertem TLS und fe
 Der Versandverlauf unterscheidet vorbereitet, Versand läuft/ungeklärt, vom Mailserver angenommen, nicht versendet und unklar. Serverannahme ist kein Zustellnachweis. Bei einem Timeout nach DATA nicht nochmals senden, sondern zuerst den Empfänger bzw. das Postfach prüfen. Nach einem Prozessabbruch bleibt ein begonnener Vorgang gesperrt. E-Mail samt PDF ist als EML und im Verlauf verfügbar; kein automatisches Ablegen im STRATO-Ordner „Gesendet“. Eine Datenbankwiederherstellung kann jüngere Versandnachweise verlieren; nach Wiederherstellung Versandhistorie abgleichen, bevor ältere vorbereitete Nachrichten gesendet werden.
 
 Die Vorschau ist nur innerhalb der angemeldeten App abrufbar. Keine öffentlichen Dokumentlinks. Die bestätigte PDF wird auch dann unverändert verschickt, wenn das Angebot zwischenzeitlich editiert wird; deshalb vor dem Senden die Vorschau prüfen. Frischer Billomat-Status verhindert Versand zwischenzeitlich zu Entwürfen gewordener Angebote.
+
+## Gesendet-Kopie ab 0.27.6 (vorbereitet, Installation separat prüfen)
+
+Die oben beschriebene Einschränkung aus 0.22.0 wird ersetzt: Nach dauerhaft gespeicherter SMTP-Annahme wird der unveränderte MIME-Anhang samt Nachricht automatisch über verifiziertes IMAP-TLS (`imap.strato.de:993`) in das feste Absenderpostfach kopiert. Das vorhandene SMTP-Postfachpasswort wird verwendet; die lesende Mail-Bridge bleibt unverändert.
+
+Die App erkennt einen eindeutigen `\\Sent`-Ordner, ansonsten verwendet sie STRATOs dokumentierten Ordner `Sent Items`. Sie erstellt keine neuen Ordner. Auf dem Handy muss dasselbe IMAP-Postfach eingebunden und dieser Serverordner dem Ordner „Gesendet“ zugeordnet sein. Quellen: [STRATO IMAP-Ordner](https://www.strato.de/faq/mail/was-ist-imap-und-wie-kann-ich-es-nutzen/) und [Server/Ports](https://www.strato.de/faq/mail/e-mailserver-adressen-ports-ssl-tls/).
+
+Im gespeicherten Versandvorgang erscheint der Status der Postfachkopie separat. „Nur Postfachkopie nachholen“ kann auch frühere, nachweislich angenommene Vorgänge kopieren. Diese Aktion benötigt eine gültige Sitzung/Formularbestätigung, prüft zuerst die ursprüngliche Message-ID und ruft niemals SMTP auf. Alte Vorgänge werden nicht ungefragt gesammelt importiert.
+
+Bei Verbindungsabbruch während APPEND wird nicht blind erneut kopiert. „Postfachkopie prüfen“ sucht dann nur nach der Message-ID; wenn sie fehlt, bleibt der Vorgang unklar und muss im Postfach geprüft werden. Nach einem Prozessabbruch kann eine laufende Kopie nach fünf Minuten auf diese Weise geprüft werden. SMTP-Annahme bleibt erhalten, selbst wenn die Ablage scheitert. Eine gespeicherte Kopie ist kein Zustell- oder Lesenachweis.

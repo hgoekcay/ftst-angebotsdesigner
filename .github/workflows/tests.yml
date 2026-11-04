@@ -9,6 +9,13 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  designer-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg BUILD_VERSION=0.27.6 --build-arg BUILD_ARCH=amd64 -t ftst-designer:test ftst_angebotsdesigner
+      - name: Render every page of a synthetic PDF in the production image
+        run: docker run --rm --entrypoint python3 ftst-designer:test -c 'import io; from reportlab.pdfgen.canvas import Canvas; from pdf_preview import page_count, render_page; b=io.BytesIO(); c=Canvas(b); c.drawString(50,700,"First page"); c.showPage(); c.drawString(50,700,"Second page"); c.save(); pdf=b.getvalue(); assert page_count(pdf)==2; assert all(render_page(pdf,n).startswith(bytes.fromhex("89504e47")) for n in (1,2))'
   mail-bridge:
     runs-on: ubuntu-latest
     steps:
@@ -30,6 +37,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-dev.txt
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: python -m compileall -q ftst_angebotsdesigner
       - run: python -m ruff check --select E9,F63,F7,F82 ftst_angebotsdesigner tests
       - run: python -m pytest -q

@@ -4,6 +4,9 @@ from email import policy
 from email.parser import BytesParser
 import re
 import smtplib
+from io import BytesIO
+
+from pypdf import PdfReader
 
 import pytest
 from PIL import Image
@@ -14,6 +17,11 @@ import offer_smtp
 from storage import OfferStore, RecordConflict
 from test_baseline import raw
 from test_persistence import isolated_storage, client
+
+
+@pytest.fixture(autouse=True)
+def no_real_sent_mailbox(monkeypatch):
+    monkeypatch.setattr(offer_mail.offer_sent, 'copy_to_sent', lambda *a, **kw: 'saved')
 
 
 def fields(client, url='/offer/42/email'):
@@ -85,6 +93,51 @@ def test_preview_has_real_pdf_inline_logo_and_safe_html(client):
     assert 'no-store' in preview.headers['Cache-Control']
     assert "default-src 'none'" in preview.headers['Content-Security-Policy']
     assert 'Noch nicht eingerichtet' in client.get('/email-settings').text
+
+
+def test_mobile_document_review_keeps_all_frozen_pages_and_return_path(client, monkeypatch):
+    url = prepared(client)
+    original = client.get(url + '/pdf').data
+    count = len(PdfReader(BytesIO(original)).pages)
+    assert count > 1
+    monkeypatch.setattr(module, 'make_pdf', lambda *_: pytest.fail('Must use frozen attachment'))
+    monkeypatch.setattr(offer_smtp, 'deliver', lambda *_: pytest.fail('Review must not send'))
+    prefix = '/api/hassio_ingress/test'
+    review = client.get(url + '/document', headers={'X-Ingress-Path': prefix})
+    assert review.status_code == 200
+    assert 'no-store' in review.headers['Cache-Control']
+    assert '<iframe' not in review.text and '<embed' not in review.text
+    assert 'href="' + prefix + url + '">← Zurück zur E-Mail' in review.text
+    assert 'position:sticky' in review.text
+    assert 'data-pdf="Leistungsvorschlag.pdf"' in review.text
+    for number in range(1, count + 1):
+        assert 'src="' + prefix + url + '/page-' + str(number) + '"' in review.text
+        response = client.get(url + '/page-' + str(number))
+        assert response.status_code == 200
+        assert response.mimetype == 'image/png'
+        assert response.headers['Cache-Control'] == 'no-store'
+        with Image.open(BytesIO(response.data)) as image:
+            assert max(image.size) == 1600
+    assert client.get(url + '/page-' + str(count + 1)).status_code == 404
+    assert client.get(url + '/pdf').data == original
+    assert '/document"' in client.get(url).text
+
+
+def test_document_review_failure_keeps_return_and_download(client, monkeypatch):
+    url = prepared(client)
+    monkeypatch.setattr(offer_mail.pdf_preview, 'page_count', lambda _: (_ for _ in ()).throw(ValueError()))
+    response = client.get(url + '/document')
+    assert response.status_code == 503
+    assert 'Zurück zur E-Mail' in response.text and 'data-pdf=' in response.text
+
+
+def test_page_renderer_failure_and_account_separation(client, monkeypatch):
+    url = prepared(client)
+    monkeypatch.setattr(offer_mail.pdf_preview, 'render_page', lambda *_: (_ for _ in ()).throw(OSError()))
+    assert client.get(url + '/page-1').status_code == 503
+    monkeypatch.setenv('BILLOMAT_ID', 'another-account')
+    for part in ('document', 'page-1', 'pdf'):
+        assert client.get(url + '/' + part).status_code == 404
 
 
 @pytest.mark.parametrize('legacy', [False, True])

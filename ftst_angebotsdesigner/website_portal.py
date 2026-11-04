@@ -472,7 +472,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         rows += '<h2>Optionale Ajax-Erweiterungen</h2><p>Ausgewählte Zusatzartikel starten mit Menge 0. Der Kunde kann sie zum freigegebenen Billomat-Verkaufspreis netto plus 19 % hinzufügen.</p>'
         rows += ''.join('<label><input type="checkbox" name="extra_article" value="' + clean(aid) + '"> ' + clean(article['title']) + ' · ' + clean(article['sales_price']) + ' EUR netto</label><br>' for aid, article in extra.items())
         if not extra: rows += '<p>Kein passender gespeicherter Netto-EUR-Katalog verfügbar. Bitte den Billomat-Katalog in der Entwurfsbearbeitung aktualisieren. Vor Freigabe werden ausgewählte Zusatzpreise erneut live geprüft.</p>'
-        existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" rel="noreferrer">Persönlichen Kundenlink öffnen</a></p>') if saved and not saved.get('revoked') else ''
+        existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" target="_blank" rel="noopener noreferrer">Persönlichen Kundenlink in neuem Fenster öffnen</a></p><p>Die Angebotsapp bleibt geöffnet. Nach der Vorschau können Sie hier weiterarbeiten.</p>') if saved and not saved.get('revoked') else ''
         body = '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'
         body += '<p>Angebotsrabatt: ' + clean(str(offer.get('reduction') or '0')) + '. Dieser gilt auch für freigegebene Mengenänderungen und Zusatzartikel. Mehrwertsteuer: 19 % auf das rabattierte Gesamtnetto.</p>'
         if existing:
