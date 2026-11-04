@@ -6,7 +6,7 @@ def test_bottom_tabs_and_ingress_links_are_present():
     client = module.app.test_client()
     response = client.get('/more', headers={'X-Ingress-Path': '/api/hassio_ingress/test'})
     assert response.status_code == 200
-    for path in ('offers', 'projects', 'customers', 'more', 'chat', 'materials', 'email-settings'):
+    for path in ('offers', 'materials', 'company', 'more', 'email-settings'):
         assert 'href="/api/hassio_ingress/test/' + path + '"' in response.text
     assert 'aria-label="Hauptnavigation"' in response.text
     assert 'aria-current="page"' in response.text

@@ -677,3 +677,4 @@ synthetische Originale. Zwei ZIPs erzeugt und alle IDs und Originalhashes nach
 dem Entpacken verglichen. Kein echter Beleg in der Testumgebung. Source-Prüfung
 und gezielte Tests, kein frisch geprüfter Code-Graph-Index. Der produktive
 Oktoberlauf ist erst nach Installation und tatsächlicher Abnahme bestätigt.
+`nRelease 0.27.6 now includes the simplified home and floating four-tab navigation (Angebote, Fotos, Firma, Mehr). Ported independently of PR90 so current portal schema remains compatible. Backup and actual installation verification required.

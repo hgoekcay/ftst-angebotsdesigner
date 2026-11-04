@@ -5,21 +5,21 @@ from flask import current_app, request
 from werkzeug.exceptions import HTTPException
 
 SECTIONS = [('offers', 'Angebote', '<path d="M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4"/>'),
-            ('projects', 'Projekte', '<path d="M3 7h7l2-3h9v16H3z"/>'),
-            ('customers', 'Kunden', '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>'),
+            ('materials', 'Fotos', '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 18 6-6 4 4 3-3 5 5"/>'),
+            ('company', 'Firma', '<path d="M4 21V3h16v18M8 7h2m4 0h2M8 11h2m4 0h2M10 21v-6h4v6"/>'),
             ('more', 'Mehr', '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>')]
-MORE = [('chat', 'KI-Assistent'), ('intake-templates', 'Aufnahmebögen'),
+MORE = [('intake-templates', 'Aufnahmebögen'),
         ('inventory', 'Lager'), ('materials', 'Bilder'), ('company', 'Firma'),
-        ('mail', 'Antwortassistent'), ('email-settings', 'E-Mail-Einstellungen'),
-        ('portal/responses', 'Kundenantworten'), ('billomat', 'Billomat'), ('ai', 'Lokale KI')]
+        ('email-settings', 'E-Mail-Einstellungen'),
+        ('portal/responses', 'Kundenantworten'), ('billomat', 'Billomat')]
 
 
 def navigation(ingress):
     path = request.path.strip('/')
     group = path.split('/')[0]
-    active = {'offer': 'offers', 'project': 'projects', 'customer': 'customers',
+    active = {'': 'offers', 'offer': 'offers', 'project': 'projects', 'customer': 'customers',
               'email-delivery': 'offers'}.get(group, group)
-    if active not in ('offers', 'projects', 'customers'):
+    if active not in ('offers', 'materials', 'company'):
         active = 'more'
     tabs = '<nav class="bottom-tabs" aria-label="Hauptnavigation">'
     for route, label, icon in SECTIONS:
