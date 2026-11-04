@@ -1,5 +1,23 @@
 # ATLAS and FTST project state
 
+## Access brands/accessory review — 2026-11-04
+
+Owner specified ekey fingerprint, Smartloxx and Bold, including Bold Connect and
+Smartloxx multiControl. Prepared role-aware recognition: locks, readers and
+controllers/gateways stay distinct; compatibility targets, installation labor and
+ambiguous brands do not receive model identity. Draft and portal review pages show
+brand-specific accessory checks (remote access, EMA integration, controller,
+power, dimensions and existing/set components). No guessed accessory quantity or
+price is inserted: actual selected Billomat rows remain the pricing source.
+
+Original Bold Connect manufacturer PNG retrieved and inspected in separate portal
+checkout; exact standalone item mapping only, not sets/unknown generations. Other
+original images await ekey series and multiControl board/enclosure selection.
+93 targeted draft/portal/access tests passed. Portal standalone3tests passed;
+integration suite cannot run yet because miniflare/dependencies are absent and
+the Sites installer cannot find npm. No portal/HA deployment claimed. PR90 still
+requires portal schema and image allowlist deployment before HA installation.
+
 ## Prepared portal property contract — 2026-11-04
 
 Separate dependent branch/version 0.27.7 adds an explicit building_type enum
