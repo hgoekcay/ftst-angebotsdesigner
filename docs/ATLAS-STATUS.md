@@ -1,5 +1,27 @@
 # ATLAS and FTST project state
 
+## Latest thirty invoices hotfix — 2026-11-05
+
+0.27.9 splits invoices and delivery notes in desktop and More menus. Billomat
+requires DESC inside order_by; separate order parameter was ignored and displayed
+2021 records. Fixed to date DESC,id DESC, page 1/per_page 30 for invoices, no
+pagination. Existing status/number filters remain. 27 targeted tests passed.
+Publication and installation pending. Official reference: https://www.billomat.com/en/api/basics/read-data/
+
+
+## Invoice release installation checkpoint — 2026-11-05
+
+PR91 prepares Designer 0.27.8 (0.27.7 reserved for uninstalled portal work).
+Backup completed and inspected: FTST vor Rechnungsversand 0.27.8 2026-11-05,
+303.96 MB, encrypted on This System, includes Designer 0.27.6 and HA settings.
+Release head 7997cfa6d54289dd59c422fb8669d33c6e6a4129; CI481 / run 42087854673 passed all seven jobs. PR91 merged as
+9bb682b1b5dbdd89ebaf837753674ebcedc9a6b8; HA installation started.
+Installed/latest version 0.27.8 and running confirmed in HA. Live invoice list
+loaded from Billomat; an existing invoice detail and original PDF preparation
+succeeded with PDF ready / not sent and file-share control. Returned to list.
+No customer messages sent. Physical WhatsApp recipient/send flow untested.
+
+
 ## Original invoice sharing — 2026-11-05
 
 User requires invoices unchanged from Billomat. Integrated prepared document_delivery
