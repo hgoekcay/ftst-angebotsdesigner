@@ -1,3 +1,9 @@
+# 0.27.8
+
+- Unter Mehr: Rechnungen und Lieferscheine unverändert als Original-PDF aus Billomat abrufen.
+- Dokumentnummer und Status filtern; PDF über das Teilen-Menü an WhatsApp oder eine E-Mail-App übergeben. Empfänger und Versand dort selbst bestätigen.
+- Keine Neuberechnung, Umgestaltung oder automatische Versendung von Rechnungen.
+
 # 0.27.6
 
 - Kompakter mobiler Kopfbereich und feste untere Reiter für Angebote, Projekte, Kunden und Mehr. Zusätzliche Funktionen bleiben über Mehr erreichbar.
