@@ -1,5 +1,19 @@
 # ATLAS and FTST project state
 
+## Original invoice sharing — 2026-11-05
+
+User requires invoices unchanged from Billomat. Integrated prepared document_delivery
+module and its tests with released 0.27.6 navigation under More / Rechnungen &
+Lieferscheine. Fixed GET-only PDF endpoint passes original bytes, no template or
+regeneration. Downloads use attachment disposition; WhatsApp/email use existing
+explicit OS file-sharing with recipient selection. No automatic delivery claims.
+Official invoice PDF endpoint verified: https://www.billomat.com/api/rechnungen/
+Validation: 27 Python tests and 10 existing browser-sharing tests passed, including
+byte-for-byte original PDF pass-through, no write routes and share cancellation.
+Local preparation only, not installed. Live original-PDF comparison and physical
+phone share-sheet acceptance still pending. No customer message sent.
+
+
 ## Designer 0.27.6 release and installation — 2026-11-04
 
 PR89 merged as ac4c03cb42d982eafc60e9e81fad60303fa31630 after all CI

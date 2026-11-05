@@ -25,6 +25,7 @@ import offer_cache
 import offer_followup
 import offer_delivery
 import offer_mail
+import document_delivery
 import website_portal
 import offer_chat
 import quote_transfer
@@ -361,6 +362,8 @@ mail_assistant.register(app, base, ingress, clean, offer_store)
 strato_views.register(app, base, ingress, clean, offer_store)
 billomat_receipts.register(app, base, ingress, clean)
 
+document_delivery.register(app, base, ingress, clean)
+
 if __name__=="__main__":
     bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
     if bid and key:
@@ -373,4 +376,5 @@ if __name__=="__main__":
         app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))
     finally:
         automation.stop()
+
 
