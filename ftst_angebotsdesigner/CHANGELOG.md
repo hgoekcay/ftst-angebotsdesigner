@@ -1,3 +1,8 @@
+# 0.27.9
+
+- Rechnungen und Lieferscheine als getrennte Menüpunkte.
+- Rechnungen: korrekte absteigende Billomat-Sortierung, nur die neuesten 30, keine weiteren Seiten.
+
 # 0.27.8
 
 - Unter Mehr: Rechnungen und Lieferscheine unverändert als Original-PDF aus Billomat abrufen.

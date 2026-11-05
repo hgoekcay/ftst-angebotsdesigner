@@ -87,7 +87,7 @@ def register(app, base, ingress, escape):
         if selected_status and selected_status not in statuses:
             abort(400)
         query = request.args.get('q', '').strip()[:100]
-        params = {'page': int(page), 'per_page': 30, 'order_by': 'id', 'order': 'desc',
+        params = {'page': 1 if kind == 'invoices' else int(page), 'per_page': 30, 'order_by': 'date DESC,id DESC',
                   'status': selected_status or ','.join(sorted(statuses))}
         if query:
             params[number] = query
@@ -99,13 +99,13 @@ def register(app, base, ingress, escape):
             rows = [rows]
         if not isinstance(rows, list) or len(rows) > 30 or any(not isinstance(r, dict) for r in rows):
             raise DocumentError('Unerwartete Dokumentliste.')
-        body = '<section class="card"><h1>Rechnungen und Lieferscheine</h1><p>Original-PDFs unverändert aus Billomat übernehmen und über WhatsApp oder Ihre E-Mail-App teilen. Layout, Rechnungsnummer und Beträge bleiben wie in Billomat.</p>'
-        for key, spec in KINDS.items():
-            body += '<a class="btn light" href="' + ingress('documents?kind=' + key) + '">' + spec[2] + '</a>'
+        body = '<section class="card"><h1>' + plural + '</h1><p>Original-PDFs unverändert aus Billomat übernehmen und über WhatsApp oder Ihre E-Mail-App teilen. Layout, Rechnungsnummer und Beträge bleiben wie in Billomat.</p>'
         body += '<h2>' + plural + '</h2><form method="get"><input type="hidden" name="kind" value="' + kind + '"><label for="document-search">Dokumentnummer suchen</label><input id="document-search" name="q" maxlength="100" value="' + escape(query) + '"><button class="btn">Suchen / aktualisieren</button></form><p>Bis zu 30 Dokumente pro Seite. Entwürfe und stornierte Rechnungen sind vom Teilen ausgeschlossen.</p></section>'
         options = '<option value="">Alle freigegebenen Dokumente</option>'
         for status in sorted(statuses):
             options += '<option value="' + status + '"' + (' selected' if status == selected_status else '') + '>' + STATUS_LABELS[status] + '</option>'
+        if kind == 'invoices':
+            body = body.replace('Bis zu 30 Dokumente pro Seite.', 'Die neuesten 30 Rechnungen, neueste zuerst.')
         body = body.replace('<button class="btn">Suchen / aktualisieren</button>', '<div class="field"><label for="document-status">Status</label><select id="document-status" name="status">' + options + '</select></div><button class="btn">Suchen / aktualisieren</button>', 1)
         shown = 0
         for row in rows:
@@ -120,7 +120,7 @@ def register(app, base, ingress, escape):
             body += '<section class="card">Keine passenden freigegebenen Dokumente auf dieser Seite.</section>'
         from urllib.parse import urlencode
         for label, target in [('Vorherige Seite', int(page)-1), ('Weitere Dokumente', int(page)+1)]:
-            if target > 0 and (target < int(page) or len(rows) == 30):
+            if kind != 'invoices' and target > 0 and (target < int(page) or len(rows) == 30):
                 body += '<a class="btn light" href="' + ingress('documents?' + urlencode({'kind':kind, 'page':target, 'q':query, 'status':selected_status})) + '">' + label + '</a>'
         return base(plural, body)
 

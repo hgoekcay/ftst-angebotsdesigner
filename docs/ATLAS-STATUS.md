@@ -1,5 +1,14 @@
 # ATLAS and FTST project state
 
+## Latest thirty invoices hotfix — 2026-11-05
+
+0.27.9 splits invoices and delivery notes in desktop and More menus. Billomat
+requires DESC inside order_by; separate order parameter was ignored and displayed
+2021 records. Fixed to date DESC,id DESC, page 1/per_page 30 for invoices, no
+pagination. Existing status/number filters remain. 27 targeted tests passed.
+Publication and installation pending. Official reference: https://www.billomat.com/en/api/basics/read-data/
+
+
 ## Invoice release installation checkpoint — 2026-11-05
 
 PR91 prepares Designer 0.27.8 (0.27.7 reserved for uninstalled portal work).

@@ -3,16 +3,20 @@ import app
 import document_delivery as d
 
 
-def test_status_filter_survives_pagination(client, monkeypatch):
+def test_invoice_list_is_latest_thirty_without_pagination(client, monkeypatch):
     def read(path, params):
         assert params['status'] == 'OVERDUE'
+        assert params['order_by'] == 'date DESC,id DESC'
+        assert params['page'] == 1 and params['per_page'] == 30
+        assert 'order' not in params
         return {'invoices': {'invoice': [dict(id=str(i+1), status='OVERDUE', invoice_number='RE-'+str(i)) for i in range(30)]}}
     monkeypatch.setattr(d, 'read', read)
-    response = client.get('/documents?status=OVERDUE&q=RE')
+    response = client.get('/documents?status=OVERDUE&q=RE&page=9')
     assert response.status_code == 200
     assert 'value="OVERDUE" selected' in response.text
-    assert 'page=2' in response.text and 'q=RE' in response.text
-    assert 'status=OVERDUE' in response.text
+    assert 'Weitere Dokumente' not in response.text
+    assert 'Vorherige Seite' not in response.text
+    assert 'Die neuesten 30 Rechnungen' in response.text
     assert 'Überfällig' in response.text
 
 
