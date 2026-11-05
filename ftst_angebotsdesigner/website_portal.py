@@ -21,9 +21,23 @@ from offer_mail import csrf, form_identity
 from website_portal_client import PortalClient, PortalError
 from ftst_product_images import product_image as ftst_product_image
 import portal_product_photos
+import access_products
 
 KIND = 'website_portal_offer'
 CENT = Decimal('.01')
+BUILDING_TYPES = {'neutral': 'Noch unklar / neutrale Darstellung', 'residential': 'Wohnhaus',
+                  'commercial': 'Gewerbe / Geschäft / Büro', 'industrial': 'Industrie / Halle / Lager'}
+
+
+def suggested_building_type(offer):
+    # Use the described installation site, never infer industry from a person's name
+    # or a legal form (a GmbH can also order security for a private house).
+    text = ' '.join(str(offer.get(k) or '') for k in ('title', 'customer_title', 'project_summary')).lower()
+    clues = {'industrial': ('industrie', 'lagerhalle', 'werkshalle', 'produktionshalle', 'fabrik', 'logistikzentrum'),
+             'commercial': ('geschäft', 'geschaeft', 'büro', 'buero', 'ladenlokal', 'praxis', 'juwelier', 'tankstelle'),
+             'residential': ('wohnhaus', 'einfamilienhaus', 'mehrfamilienhaus', 'wohnung', 'privathaus')}
+    matches = [kind for kind, words in clues.items() if any(word in text for word in words)]
+    return matches[0] if len(matches) == 1 else 'neutral'
 
 
 def amount(value):
@@ -88,6 +102,13 @@ def category(title):
     t = title.lower()
     if any(x in t for x in ('montage', 'inbetriebnahme', 'home assistant', 'home-assistant', 'software', 'dienstleistung', 'arbeitszeit', 'anfahrt', 'abfahrt', 'fahrtskosten')):
         return 'service'
+    identified = access_products.identify(title)
+    if identified:
+        if identified[1] == 'lock': return 'lock'
+        if identified[1] in ('gateway', 'controller', 'reader'): return 'access'
+        return 'other'
+    if any(x in t for x in ('türschloss', 'tuerschloss', 'schließzylinder', 'schliesszylinder', 'zylinderschloss', 'smart lock', 'smartlock', 'elektronischer zylinder')): return 'lock'
+    if any(x in t for x in ('zutrittskontrolle', 'zutrittsleser', 'türöffner', 'tueroeffner', 'zutrittssystem')): return 'access'
     if any(x in t for x in ('kamera', 'camera', 'turret', 'bullet', 'dome')): return 'camera'
     if any(x in t for x in ('curtain outdoor', 'curtainoutdoor', 'dualcurtain', 'perimeter', 'außenschutz', 'aussenschutz')): return 'perimeter'
     if any(x in t for x in ('outdoor', 'aussen', 'außen')) and any(x in t for x in ('motion', 'bewegung')): return 'outdoor_motion'
@@ -149,7 +170,10 @@ def commercial_totals(subtotal, pricing):
     return dict(net=money(net), tax=money(tax), gross=money(net + tax))
 
 
-def snapshot(offer, revision, editable_ids=(), extra_articles=()):
+def snapshot(offer, revision, editable_ids=(), extra_articles=(), building_type=None):
+    building_type = building_type or suggested_building_type(offer)
+    if building_type not in BUILDING_TYPES:
+        raise ValueError('Bitte eine gültige Objektart auswählen.')
     if offer.get('is_draft') or offer.get('status') == 'DRAFT':
         raise ValueError('Entwürfe können nicht veröffentlicht werden.')
     if offer.get('currency_code', 'EUR') != 'EUR':
@@ -240,7 +264,7 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
                 revision=revision, number=str(offer.get('offer_number') or offer.get('number') or offer['id']),
                 issued_at=issued.isoformat(), valid_until=valid.isoformat(), approved_for_customer=True,
                 title=offer.get('customer_title') or offer.get('title') or 'Ihr Sicherheitsprojekt',
-                intro=offer.get('customer_intro') or '', customer_display=display, object_address=address,
+                intro=offer.get('customer_intro') or '', customer_display=display, object_address=address, building_type=building_type,
                 company=dict(name='FT Sicherheitstechnik', contact='Hafenbahnstraße 15, 68305 Mannheim',
                              email='info@ftst.eu', phone='+49 621 159 647 34'),
                 project_summary=offer.get('project_summary') or '', currency='EUR', price_source='BILLOMAT',
@@ -251,6 +275,9 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
 
 
 def product_image(title, description=''):
+    access_photo = access_products.product_image(title)
+    if access_photo:
+        return access_photo
     ftst_photo = ftst_product_image(title, description)
     if ftst_photo:
         return ftst_photo
@@ -415,7 +442,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 if any(aid not in catalog for aid in extra_ids):
                     raise ValueError('Zusatzartikel ist nicht freigegeben.')
                 try:
-                    s = snapshot(offer, int(previous.get('snapshot', {}).get('revision', 0)) + 1, request.form.getlist('editable'), [catalog[aid] for aid in extra_ids])
+                    s = snapshot(offer, int(previous.get('snapshot', {}).get('revision', 0)) + 1, request.form.getlist('editable'), [catalog[aid] for aid in extra_ids], building_type=request.form.get('building_type'))
                 except ValueError as error:
                     return failure(str(error))
                 pdf = make_pdf(offer).getvalue()
@@ -441,7 +468,10 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 return failure('Die Verbindung zu Billomat oder zum Kundenportal ist vorübergehend fehlgeschlagen. Ein Kundenlink konnte nicht bestätigt werden.', 503)
             return redirect(ingress('offer/' + oid))
         saved = store.record(identity, KIND, oid)
-        rows = '<h2>Gerätemengen für den Kunden</h2><p>Erkannte Geräte sind vorausgewählt. Die Angebotsmenge wird übernommen; der Kunde kann sie anschließend ändern. Haken entfernen, um eine Position festzulegen.</p>'
+        chosen_building = (saved or {}).get('snapshot', {}).get('building_type') or suggested_building_type(offer)
+        rows = '<label for="building-type">Objektart für die Kundendarstellung</label><select id="building-type" name="building_type">' + ''.join(
+            '<option value="' + key + '"' + (' selected' if key == chosen_building else '') + '>' + label + '</option>' for key, label in BUILDING_TYPES.items()) + '</select><p>Vorschlag anhand der Projektbeschreibung. Bitte prüfen; bei unklaren Angaben bleibt die Darstellung neutral. Die Gebäudegrafik ist schematisch, kein tatsächlicher Montageplan.</p>'
+        rows += '<h2>Gerätemengen für den Kunden</h2><p>Erkannte Geräte sind vorausgewählt. Die Angebotsmenge wird übernommen; der Kunde kann sie anschließend ändern. Haken entfernen, um eine Position festzulegen.</p>'
         rows += '<p>Produktbilder für Kameras, Rekorder, Türsprechanlagen und Zubehör gezielt prüfen. Fehlende Bilder zuerst in der <a href="' + clean(ingress('materials')) + '">Bilderbibliothek</a> hochladen. Bereits veröffentlichte Links bleiben unverändert.</p>'
         product_assets = portal_product_photos.available(store, identity)
         remembered_photos = portal_product_photos.remembered(store, identity, offer)
@@ -473,7 +503,7 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
         rows += ''.join('<label><input type="checkbox" name="extra_article" value="' + clean(aid) + '"> ' + clean(article['title']) + ' · ' + clean(article['sales_price']) + ' EUR netto</label><br>' for aid, article in extra.items())
         if not extra: rows += '<p>Kein passender gespeicherter Netto-EUR-Katalog verfügbar. Bitte den Billomat-Katalog in der Entwurfsbearbeitung aktualisieren. Vor Freigabe werden ausgewählte Zusatzpreise erneut live geprüft.</p>'
         existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" target="_blank" rel="noopener noreferrer">Persönlichen Kundenlink in neuem Fenster öffnen</a></p><p>Die Angebotsapp bleibt geöffnet. Nach der Vorschau können Sie hier weiterarbeiten.</p>') if saved and not saved.get('revoked') else ''
-        body = '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'
+        body = access_products.review_html(offer.get('items') or []) + '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'
         body += '<p>Angebotsrabatt: ' + clean(str(offer.get('reduction') or '0')) + '. Dieser gilt auch für freigegebene Mengenänderungen und Zusatzartikel. Mehrwertsteuer: 19 % auf das rabattierte Gesamtnetto.</p>'
         if existing:
             body += '<p>Der vorhandene Kundenlink behält seine bisherige Freigabe. Erstellen Sie mit diesen Einstellungen einen neuen Kundenlink, damit Mengenänderungen und Produktbilder übernommen werden.</p>'

@@ -1,3 +1,8 @@
+# 0.27.7 (vorbereitet; benötigt Portal-Schema-Update)
+
+- Objektart anhand der Projektbeschreibung vorschlagen und vor der Kundenfreigabe bestätigen/ändern. Unklare Angaben bleiben neutral.
+- Schlösser/Zylinder und Zutrittsleser als eigene Darstellungskategorien übertragen.
+
 # 0.27.6
 
 - Kompakter mobiler Kopfbereich und feste untere Reiter für Angebote, Projekte, Kunden und Mehr. Zusätzliche Funktionen bleiben über Mehr erreichbar.

@@ -389,6 +389,8 @@ def register(app, base, ingress, escape, get_store):
         if result['problems']:
             guide += '<h3>Aktuell noch zu erledigen</h3><ul>' + problems + '</ul>'
         guide += '</section>'
+        from access_products import review_html
+        guide += review_html(draft['rows'] + result['lines'])
         presentation_link = f'<p><a class="btn light" href="{ingress("projects/"+key+"/quote/presentation")}">Kundentexte & Fotos gestalten</a></p>'
         if not draft.get('revision'):
             presentation_link = '<p>Kundentexte und Fotos können nach dem ersten Speichern gestaltet werden.</p>'
