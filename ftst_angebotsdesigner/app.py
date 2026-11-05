@@ -25,6 +25,7 @@ import offer_cache
 import offer_followup
 import offer_delivery
 import offer_mail
+import document_delivery
 import website_portal
 import offer_chat
 import quote_transfer
@@ -32,7 +33,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.27.6"
+APP_VERSION = "0.27.8"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
@@ -241,7 +242,7 @@ def apply_source(raw,src):
 def base(title,body):
     from app_navigation import navigation
     back, tabs = navigation(ingress)
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>{html.escape(title)}</title><style>{CSS}</style><link rel="stylesheet" href="{ingress("ui-assets/"+APP_VERSION+"/apple-design.css")}"></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("offers")}">Angebote</a><a href="{ingress("intake-templates")}">Aufnahmebögen</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{back}{body}</main>{tabs}<script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>{html.escape(title)}</title><style>{CSS}</style><link rel="stylesheet" href="{ingress("ui-assets/"+APP_VERSION+"/apple-design.css")}"></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("documents")}">Rechnungen & Lieferscheine</a><a href="{ingress("offers")}">Angebote</a><a href="{ingress("intake-templates")}">Aufnahmebögen</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{back}{body}</main>{tabs}<script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -361,6 +362,8 @@ mail_assistant.register(app, base, ingress, clean, offer_store)
 strato_views.register(app, base, ingress, clean, offer_store)
 billomat_receipts.register(app, base, ingress, clean)
 
+document_delivery.register(app, base, ingress, clean)
+
 if __name__=="__main__":
     bid=os.getenv("BILLOMAT_ID", "").strip(); key=os.getenv("BILLOMAT_API_KEY", "")
     if bid and key:
@@ -373,4 +376,5 @@ if __name__=="__main__":
         app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))
     finally:
         automation.stop()
+
 

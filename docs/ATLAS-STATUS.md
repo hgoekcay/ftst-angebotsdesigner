@@ -1,5 +1,33 @@
 # ATLAS and FTST project state
 
+## Original invoice sharing — 2026-11-05
+
+User requires invoices unchanged from Billomat. Integrated prepared document_delivery
+module and its tests with released 0.27.6 navigation under More / Rechnungen &
+Lieferscheine. Fixed GET-only PDF endpoint passes original bytes, no template or
+regeneration. Downloads use attachment disposition; WhatsApp/email use existing
+explicit OS file-sharing with recipient selection. No automatic delivery claims.
+Official invoice PDF endpoint verified: https://www.billomat.com/api/rechnungen/
+Validation: 27 Python tests and 10 existing browser-sharing tests passed, including
+byte-for-byte original PDF pass-through, no write routes and share cancellation.
+Local preparation only, not installed. Live original-PDF comparison and physical
+phone share-sheet acceptance still pending. No customer message sent.
+
+
+## Designer 0.27.6 release and installation — 2026-11-04
+
+PR89 merged as ac4c03cb42d982eafc60e9e81fad60303fa31630 after all CI
+checks passed (run 41875532491, head cf0e359). 45 local targeted tests passed.
+Includes floating tabs Angebote/Fotos/Firma/Mehr and five removed entry points,
+PDF attachment return/page viewer, and Sent mailbox copies. Current portal remains
+compatible; dependent PR90 and STRATO migration were NOT installed.
+HA backup verified locally: FTST vor App-Update 0.27.6 2026-11-04, 299.41 MB,
+contains Designer 0.27.5 and HA settings. Update completed through HA UI: installed/latest version 0.27.6 and running.
+Live Ingress verified at 390x844: four home actions, floating four-tab bar,
+More page and its return link to home work. Browser viewport reset afterward.
+Physical iPhone acceptance and real Sent-mail copy remain untested; no test mail sent.
+
+
 ## Designer mobile navigation — 2026-11-04
 
 Prepared compact phone header, four fixed bottom tabs (offers/projects/customers/
@@ -677,4 +705,4 @@ synthetische Originale. Zwei ZIPs erzeugt und alle IDs und Originalhashes nach
 dem Entpacken verglichen. Kein echter Beleg in der Testumgebung. Source-Prüfung
 und gezielte Tests, kein frisch geprüfter Code-Graph-Index. Der produktive
 Oktoberlauf ist erst nach Installation und tatsächlicher Abnahme bestätigt.
-`nRelease 0.27.6 now includes the simplified home and floating four-tab navigation (Angebote, Fotos, Firma, Mehr). Ported independently of PR90 so current portal schema remains compatible. Backup and actual installation verification required.
+Release 0.27.6 now includes the simplified home and floating four-tab navigation (Angebote, Fotos, Firma, Mehr). Ported independently of PR90 so current portal schema remains compatible. Backup and actual installation verification required.
