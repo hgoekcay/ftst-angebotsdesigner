@@ -84,7 +84,7 @@ jobs:
         run: docker run --rm --entrypoint python3 ftst-atlas:test -c 'import tempfile; from app import App; a=App(tempfile.mkdtemp(),dev=True); assert not a.bookkeeping_sync.enabled_for("dev"); assert a.bookkeeping.list("dev")==[]; assert not a.voice.status("dev")["enabled"]; assert len(a.workflows.catalog("dev")["workflows"])==2; import pypdf, submissions_server, bookkeeping_export, bookkeeping_reports; a.jobs.stop()'
 
   photo-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
