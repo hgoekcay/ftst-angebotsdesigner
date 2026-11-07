@@ -64,14 +64,15 @@ def enqueue(store, account, token, categories):
     key = (str(store.path), account, token)
     with _guard:
         if key in _pending:
-            return
+            return True
         if len(_pending) >= MAX_FILES:
-            abort(429, 'Es werden bereits 20 Fotos verarbeitet. Bitte später erneut versuchen.')
+            return False
         _pending.add(key)
         _jobs.put_nowait((store, account, token, categories))
         if _worker is None or not _worker.is_alive():
             _worker = threading.Thread(target=_run, daemon=True, name='reference-photos')
             _worker.start()
+        return True
 
 
 def token_value(value):
@@ -130,7 +131,8 @@ def register(app, get_store, account, types):
             if existing.get('digest') != digest:
                 abort(409, 'Dieser Upload gehört zu einem anderen Bild.')
             if existing['status'] == 'queued':
-                enqueue(store, identity, token, categories)
+                if not enqueue(store, identity, token, categories):
+                    existing['message'] = 'Bilderkennung ausgelastet. Angaben je Foto selbst ergänzen und speichern.'
             return jsonify(public(existing))
         name = Path(upload.filename.replace('\\', '/')).stem[:160]
         row = dict(token=token, digest=digest, status='queued', title=name or 'Referenzfoto',
@@ -151,7 +153,8 @@ def register(app, get_store, account, types):
             # created, so retrying the same upload does not become a permanent 409.
             path.unlink(missing_ok=True)
             raise
-        enqueue(store, identity, token, categories)
+        if not enqueue(store, identity, token, categories):
+            row['message'] = 'Bilderkennung ausgelastet. Angaben je Foto selbst ergänzen und speichern.'
         return jsonify(public(row)), 202
 
     @app.get('/materials/batch/<token>')
@@ -161,8 +164,8 @@ def register(app, get_store, account, types):
         row = store.record(identity, 'image_upload', token_value(token))
         if not row:
             abort(404)
-        if row['status'] == 'queued':
-            enqueue(store, identity, token, categories)
+        if row['status'] == 'queued' and not enqueue(store, identity, token, categories):
+            row['message'] = 'Bilderkennung ausgelastet. Angaben je Foto selbst ergänzen und speichern.'
         return jsonify(public(row))
 
     @app.get('/materials/batch/<token>/preview')
