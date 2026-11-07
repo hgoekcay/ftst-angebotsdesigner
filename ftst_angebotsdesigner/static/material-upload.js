@@ -19,7 +19,7 @@
   const locked = r => saving || pending(r) || r.status === 'committed';
   const usable = r => r.uploaded && ['ready', 'queued'].includes(r.status);
   function merge(r, result) {
-    if (r.status === 'committed') return;
+    if (r.status === 'committed' || pending(r)) return;
     r.dirty ||= {};
     for (const key of ['title', 'category', 'description']) if (!r.dirty[key] && typeof result[key] === 'string') r[key] = result[key];
     for (const key of ['status', 'message']) if (typeof result[key] === 'string') r[key] = result[key];
@@ -85,7 +85,7 @@
       const c = cardFor(r); visible.push(c.card);
       c.image.alt = r.title || ('Foto ' + (index + 1));
       const src = r.preview || root + '/' + r.token + '/preview';
-      if (c.image.src !== src) c.image.src = src;
+      if (c.source !== src) { c.image.src = src; c.source = src; }
       c.check.checked = r.selected !== false; c.check.disabled = !!locked(r);
       for (const [key, control] of Object.entries(c.controls)) {
         const id = 'photo-' + index + '-' + key; control.id = id; c.labels[key].htmlFor = id;
