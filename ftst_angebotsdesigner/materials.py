@@ -112,17 +112,19 @@ def image_groups(images, ingress, escape, selected=None):
                       'Produktlogo': 'FTronics · Produktmarke'}.get(item.get('kind'), item.get('kind') or 'Eigener Upload')
             checkbox = '' if selected is None else (f'<input type="checkbox" name="images" value="{escape(key)}" '
                        f'{"checked" if key in selected else ""}><span>Für dieses Angebot auswählen</span>')
+            edit = '' if selected is not None or item.get('bundled') else ('<a class="btn light" href="' + ingress("materials/" + key + "/edit") + '">Titel und Beschreibung bearbeiten</a>')
             tag = 'article' if selected is None else 'label'
             cards.append(f'<{tag} class="material-tile"><img class="material-preview" loading="lazy" src="{ingress("materials/"+key)}" alt="{escape(title)}">'
                          f'<span class="material-details"><span class="material-kind">{escape(source)}</span>'
                          f'<span class="material-title">{escape(title)}</span><span class="muted">{escape(item.get("description") or "")}</span>'
-                         f'<span style="display:block;margin-top:12px">{checkbox}</span></span></{tag}>')
+                         f'<span style="display:block;margin-top:12px">{checkbox}{edit}</span></span></{tag}>')
         label = 'Logos & Marken' if category == 'Logo' else category
         sections.append(f'<section class="material-group"><h2>{escape(label)}</h2><p class="muted">{len(items)} Motive verfügbar</p><div class="material-grid">{"".join(cards)}</div></section>')
     return MATERIAL_STYLE + ''.join(sections)
 
 def register(app, base, ingress, escape, get_store, types, get_offer=None):
-    app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024
+    # Keep the 12 MiB file limit, with space for the multipart envelope.
+    app.config['MAX_CONTENT_LENGTH'] = 13 * 1024 * 1024
     material_uploads.register(app, get_store, account, types)
 
     def field(name, label, value='', multiline=False):
@@ -194,7 +196,7 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
             return redirect(ingress('materials'))
         cards = image_groups(catalog(store, account()), ingress, escape)
         categories = escape(json.dumps(list(types), ensure_ascii=False))
-        upload = f'''<div class="card"><h1>Fotos & Referenzen</h1><p>Bis zu 20 Fotos gemeinsam auswählen. Die lokale Bilderkennung schlägt Titel und Kategorien vor. Vorschläge vor dem Speichern prüfen; unsichere Bilder selbst zuordnen.</p>
+        upload = f'''<div class="card"><h1>Fotos & Referenzen</h1><p>Bis zu 20 Fotos gemeinsam auswählen. Jedes Foto hat einen eigenen Titel, eine Kategorie und eine Beschreibung. Sie können die Angaben sofort bearbeiten und nach dem Upload auch ohne automatische Bilderkennung speichern.</p>
         <form id="photo-batch" data-endpoint="{ingress('materials/batch')}" data-library="{ingress('materials')}" data-categories="{categories}">
         <label for="photo-files">Fotos auswählen</label><input id="photo-files" type="file" accept="image/png,image/jpeg,image/webp" multiple>
         <p>JPG, PNG oder WebP, maximal 12 MB je Foto. HEIC bitte vorher als JPG exportieren. Die Fotos bleiben auf Ihrem Server.</p>
@@ -202,8 +204,50 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
         <div id="photo-review" class="material-grid"></div><div class="material-actions"><button id="photo-commit" class="btn" hidden>Geprüfte Fotos gemeinsam speichern</button></div>
         <noscript><p>Für den Mehrfachupload bitte JavaScript aktivieren.</p></noscript>
         <style>#photo-commit[hidden]{{display:none}}.photo-review-card{{min-width:0;padding:16px}}.photo-review-card label{{margin-top:14px}}.photo-review-card p{{overflow-wrap:anywhere}}</style>
-        <script defer src="{ingress('static/material-upload.js')}"></script>'''
+        <script defer src="{ingress('ui-assets/' + app.config.get('CHAT_ASSET_VERSION', 'current') + '/material-upload.js')}"></script>'''
         return base('Fotos & Referenzen', f'<div class="back"><a href="{ingress()}">← Startseite</a></div>{upload}{cards}')
+
+    @app.route('/materials/<key>/edit', methods=['GET', 'POST'])
+    def material_edit(key):
+        material_uploads.token_value(key)
+        store, identity = get_store(), account()
+        original = store.record(identity, 'image', key)
+        image = catalog(store, identity).get(key)
+        if original is None or not image or image.get('bundled'):
+            abort(404)
+        csrf = session.setdefault('material_edit_csrf', secrets.token_urlsafe(32))
+        values = {k: original.get(k, '') for k in ('title', 'category', 'description')}
+        error = ''
+        if request.method == 'POST':
+            if (not hmac.compare_digest(request.form.get('csrf', '').encode(), csrf.encode())
+                    or request.form.get('account') != identity):
+                abort(400, 'Bitte das Bild neu öffnen und erneut speichern.')
+            values = {k: request.form.get(k, '').strip() for k in values}
+            if not values['title'] or len(values['title']) > 200 or len(values['description']) > 2000:
+                error = 'Bitte einen Titel bis 200 Zeichen und eine Beschreibung bis 2000 Zeichen eingeben.'
+            elif values['category'] not in types:
+                error = 'Bitte eine gültige Kategorie auswählen.'
+            if not error:
+                def update(current, db):
+                    if current is None:
+                        abort(404)
+                    return dict(current, **values)
+                store.transact_record(identity, 'image', key, update)
+                return redirect(ingress('materials') + '?saved=1')
+        options = ''.join('<option value="' + escape(kind) + '"' +
+                          (' selected' if kind == values['category'] else '') + '>' +
+                          escape(kind) + '</option>' for kind in types)
+        notice = '<p role="alert">' + escape(error) + '</p>' if error else ''
+        body = '<div class="back"><a href="' + ingress('materials') + '">← Zur Bilderbibliothek</a></div>'
+        body += '<section class="card"><h1>Bildangaben bearbeiten</h1>' + notice
+        body += '<img class="material-preview" src="' + ingress('materials/' + key) + '" alt="' + escape(values['title']) + '">'
+        body += '<form method="post"><input type="hidden" name="csrf" value="' + escape(csrf) + '">'
+        body += '<input type="hidden" name="account" value="' + escape(identity) + '">'
+        body += field('title', 'Bildtitel', values['title'])
+        body += '<label for="category">Kategorie</label><select id="category" name="category">' + options + '</select>'
+        body += field('description', 'Beschreibung dieses Bildes', values['description'], multiline=True)
+        body += '<button class="btn">Bildangaben speichern</button></form></section>'
+        return base('Bildangaben bearbeiten', body), (400 if error else 200)
 
     @app.get('/materials/<key>')
     def material(key):
