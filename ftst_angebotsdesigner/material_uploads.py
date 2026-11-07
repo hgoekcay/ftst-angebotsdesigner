@@ -1,5 +1,6 @@
 """Staged, account-bound photo imports with a bounded local analysis queue."""
 import hashlib
+from functools import wraps
 import io
 import json
 import queue
@@ -11,6 +12,7 @@ from pathlib import Path
 from flask import abort, jsonify, request, send_file
 from PIL import Image, ImageOps, UnidentifiedImageError
 import image_classification
+from werkzeug.exceptions import HTTPException
 
 MAX_FILES = 20
 _jobs = queue.Queue(maxsize=MAX_FILES)
@@ -37,7 +39,17 @@ def _run():
                 except Exception:
                     row['message'] = 'Bilderkennung derzeit nicht verfügbar. Bitte selbst zuordnen.'
                 row['status'] = 'ready'
-                store.put_record(account, 'image_upload', token, row)
+                def finish(current, db):
+                    saved = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
+                                       (account, 'image_upload', token)).fetchone()
+                    latest = json.loads(saved[0]) if saved else None
+                    if latest and latest['status'] == 'queued':
+                        latest.update({k: row.get(k, '') for k in ('title', 'category', 'description', 'message')})
+                        latest['status'] = 'ready'
+                        db.execute('UPDATE records SET payload=? WHERE account=? AND kind=? AND id=?',
+                                   (json.dumps(latest, ensure_ascii=False), account, 'image_upload', token))
+                    return {'finished': True}
+                store.transact_record(account, 'image_upload_analysis', token, finish)
         except Exception:
             # A temporary database failure must not kill the worker for later uploads.
             pass
@@ -91,10 +103,21 @@ def public(row):
     return {key: row.get(key, '') for key in ('token', 'status', 'title', 'category', 'description', 'message')}
 
 
+def batch_errors(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        try:
+            return view(*args, **kwargs)
+        except HTTPException as error:
+            return jsonify(error=error.description), error.code
+    return wrapped
+
+
 def register(app, get_store, account, types):
     categories = tuple(types)
 
     @app.post('/materials/batch/prepare')
+    @batch_errors
     def photo_prepare():
         store, identity = get_store(), account()
         token = token_value(request.form.get('token'))
@@ -132,6 +155,7 @@ def register(app, get_store, account, types):
         return jsonify(public(row)), 202
 
     @app.get('/materials/batch/<token>')
+    @batch_errors
     def photo_status(token):
         store, identity = get_store(), account()
         row = store.record(identity, 'image_upload', token_value(token))
@@ -142,6 +166,7 @@ def register(app, get_store, account, types):
         return jsonify(public(row))
 
     @app.get('/materials/batch/<token>/preview')
+    @batch_errors
     def photo_preview(token):
         store = get_store()
         if not store.record(account(), 'image_upload', token_value(token)):
@@ -149,6 +174,7 @@ def register(app, get_store, account, types):
         return send_file(store.directory / 'images' / (token + '.png'), mimetype='image/png')
 
     @app.post('/materials/batch/commit')
+    @batch_errors
     def photo_commit():
         value = request.get_json(silent=True)
         if not isinstance(value, dict):
@@ -157,7 +183,7 @@ def register(app, get_store, account, types):
         rows = value.get('items')
         if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_FILES:
             abort(400, 'Bitte 1 bis 20 Fotos auswählen.')
-        checked, tokens = [], set()
+        checked, tokens, manual = [], set(), set()
         for row in rows:
             if not isinstance(row, dict):
                 abort(400)
@@ -165,6 +191,10 @@ def register(app, get_store, account, types):
             if token in tokens:
                 abort(400)
             tokens.add(token)
+            if 'manual' in row and not isinstance(row['manual'], bool):
+                abort(400, 'Manuelle Bildprüfung muss ausdrücklich bestätigt sein.')
+            if row.get('manual') is True:
+                manual.add(token)
             if row.get('category') not in categories:
                 abort(400, 'Bitte für jedes ausgewählte Foto eine Kategorie angeben.')
             if any(not isinstance(row.get(k, ''), str) or len(row.get(k, '')) > limit
@@ -174,14 +204,18 @@ def register(app, get_store, account, types):
                 abort(400, 'Bitte einen Bildtitel angeben.')
             checked.append((token, {k: row.get(k, '').strip() for k in ('title', 'category', 'description')}))
         store, identity = get_store(), account()
+        fingerprint = hashlib.sha256(json.dumps(checked, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
         def commit(current, db):
+            if current and current.get('fingerprint') and current['fingerprint'] != fingerprint:
+                abort(409, 'Diese Speicherung gehört zu anderen Bildangaben. Bitte erneut prüfen.')
+
             ready = []
             for token, record in checked:
                 found = db.execute('SELECT payload FROM records WHERE account=? AND kind=? AND id=?',
                                    (identity, 'image_upload', token)).fetchone()
                 row = json.loads(found[0]) if found else None
-                if not row or row['status'] not in ('ready', 'committed'):
+                if not row or (row['status'] not in ('ready', 'committed') and not (row['status'] == 'queued' and token in manual)):
                     abort(409, 'Die Bilder sind noch nicht bereit. Bitte warten oder erneut laden.')
                 if not (store.directory / 'images' / (token + '.png')).is_file():
                     abort(409, 'Bilddatei fehlt. Bitte erneut hochladen.')
@@ -196,10 +230,10 @@ def register(app, get_store, account, types):
                     continue
                 db.execute('INSERT INTO records(account,kind,id,payload) VALUES(?,?,?,?)',
                            (identity, 'image', token, json.dumps(record, ensure_ascii=False)))
-                row['status'] = 'committed'
+                row.update(record, status='committed', message='Gespeichert.')
                 db.execute('UPDATE records SET payload=? WHERE account=? AND kind=? AND id=?',
                            (json.dumps(row, ensure_ascii=False), identity, 'image_upload', token))
-            return {'count': len(ready)}
+            return {'count': len(ready), 'fingerprint': fingerprint}
 
         result = store.transact_record(identity, 'image_upload_batch', batch, commit)
-        return jsonify(result)
+        return jsonify(count=result['count'])
