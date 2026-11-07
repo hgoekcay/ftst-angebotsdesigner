@@ -16,18 +16,25 @@ and CSRF checks; image bytes and existing offer revisions are unchanged. The
 12-MiB per-file limit has multipart overhead space (13-MiB request ceiling).
 Batch HTTP errors return precise JSON; the upload script is versioned.
 
-Validation prepared: backend/manual-worker race, limits, account/CSRF, independent
-saved image metadata and Node DOM-flow regressions. A dedicated Chromium CI job
-uses the actual Designer app with a synthetic temporary store, no inference or
-external integrations, and checks 390/1280 px. CI results are still pending at
-this checkpoint. No local execution was available; no graph engine/index was
-used. Investigation followed materials.register -> material-upload.js ->
-material_uploads routes/worker -> OfferStore transactions and asset_library.
-No production HA installation, customer uploads, Billomat writes or messages.
+Validated release code: 6044ef243b3b152f42c6ae6f91905f8f3bf00a4f,
+PR93, CI486 / run42366440702: all eight jobs successful. Python3.13:
+1487 passed, 4 skipped, 136 subtests passed; existing Node suite: 43 passed.
+Real Chromium against the actual Designer app with a synthetic temporary store
+passed at 390/1280 px: independent descriptions, manual save while another photo
+remains queued, unchanged input nodes/text after late suggestions, individual
+saved-image editing, unchanged image bytes, and no JavaScript errors. Evidence
+is retained as the photo-browser-proof CI artifact. Upload boundaries,
+worker/manual-commit races, account/CSRF checks and frozen retries are covered.
 
-Next: complete CI including real Chromium, review the tested head, then release
-the prepared update; backup and actual HA installation require its administrative
-connection. Preserve all user images and separate current/installed versions.
+No local execution was available; no graph engine/index was used. Source review
+followed materials.register -> material-upload.js -> material_uploads routes/
+worker -> OfferStore transactions and asset_library. No production HA
+installation, customer uploads, Billomat writes or messages were performed.
+
+Next: merge the verified repair and install Designer0.27.10 using the existing
+HA administrative connection with backup. Installation and a physical-phone
+acceptance check are still unverified here. Existing uploaded files remain
+unchanged; published customer revisions are not rewritten.
 
 ## Latest thirty invoices hotfix — 2026-11-05
 
