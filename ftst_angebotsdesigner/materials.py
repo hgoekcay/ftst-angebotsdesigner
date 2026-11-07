@@ -176,7 +176,10 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
             if not upload:
                 abort(400, 'Bitte ein Bild auswählen.')
             try:
-                picture = PILImage.open(upload.stream)
+                raw = upload.stream.read(12 * 1024 * 1024 + 1)
+                if len(raw) > 12 * 1024 * 1024:
+                    abort(413, 'Je Foto höchstens 12 MB.')
+                picture = PILImage.open(io.BytesIO(raw))
                 if picture.width * picture.height > 25_000_000:
                     abort(400, 'Bild zu groß. Bitte auf höchstens 25 Megapixel verkleinern.')
                 picture = ImageOps.exif_transpose(picture).convert('RGBA')
@@ -243,9 +246,9 @@ def register(app, base, ingress, escape, get_store, types, get_offer=None):
         body += '<img class="material-preview" src="' + ingress('materials/' + key) + '" alt="' + escape(values['title']) + '">'
         body += '<form method="post"><input type="hidden" name="csrf" value="' + escape(csrf) + '">'
         body += '<input type="hidden" name="account" value="' + escape(identity) + '">'
-        body += field('title', 'Bildtitel', values['title'])
+        body += field('title', 'Bildtitel', values['title']).replace('maxlength="500"', 'maxlength="200"')
         body += '<label for="category">Kategorie</label><select id="category" name="category">' + options + '</select>'
-        body += field('description', 'Beschreibung dieses Bildes', values['description'], multiline=True)
+        body += field('description', 'Beschreibung dieses Bildes', values['description'], multiline=True).replace('<textarea ', '<textarea maxlength="2000" ')
         body += '<button class="btn">Bildangaben speichern</button></form></section>'
         return base('Bildangaben bearbeiten', body), (400 if error else 200)
 
