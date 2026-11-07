@@ -1,5 +1,34 @@
 # ATLAS and FTST project state
 
+## Designer photo upload correction — 2026-11-07
+
+Prepared Designer 0.27.10: each staged photo retains its own editable title,
+category and description while uploads/recognition continue. All files are
+prepared before polling; keyed review cards preserve input identity/focus.
+Late suggestions only fill untouched fields. Explicit human review can commit
+queued photos; the worker rechecks current status inside a transaction and
+cannot overwrite committed human metadata. Queue capacity leaves valid staged
+uploads manually usable. Lost commit responses retain a frozen request for
+identical retries; definite validation errors unlock corrections.
+
+Own uploaded library photos have per-image metadata edit forms with account
+and CSRF checks; image bytes and existing offer revisions are unchanged. The
+12-MiB per-file limit has multipart overhead space (13-MiB request ceiling).
+Batch HTTP errors return precise JSON; the upload script is versioned.
+
+Validation prepared: backend/manual-worker race, limits, account/CSRF, independent
+saved image metadata and Node DOM-flow regressions. A dedicated Chromium CI job
+uses the actual Designer app with a synthetic temporary store, no inference or
+external integrations, and checks 390/1280 px. CI results are still pending at
+this checkpoint. No local execution was available; no graph engine/index was
+used. Investigation followed materials.register -> material-upload.js ->
+material_uploads routes/worker -> OfferStore transactions and asset_library.
+No production HA installation, customer uploads, Billomat writes or messages.
+
+Next: complete CI including real Chromium, review the tested head, then release
+the prepared update; backup and actual HA installation require its administrative
+connection. Preserve all user images and separate current/installed versions.
+
 ## Latest thirty invoices hotfix — 2026-11-05
 
 0.27.9 splits invoices and delivery notes in desktop and More menus. Billomat
