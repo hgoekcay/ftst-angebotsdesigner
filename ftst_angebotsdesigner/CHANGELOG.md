@@ -1,3 +1,10 @@
+# 0.27.10
+
+- Mehrere Fotos unabhängig beschreiben, auch während Upload und Bilderkennung; eigene Angaben und Eingabefokus bleiben erhalten.
+- Hochgeladene Fotos nach ausdrücklicher Prüfung ohne Wartezeit auf die Erkennung speichern; verspätete KI-Ergebnisse überschreiben keine gespeicherten Angaben.
+- Titel, Kategorie und Beschreibung eigener Bibliotheksbilder nachträglich einzeln bearbeiten, ohne die Bilddatei zu verändern.
+- Multipart-Reserve für 12-MiB-Dateien, genaue Fehlermeldungen und sichere Wiederholung unklarer Speicheranfragen.
+
 # 0.27.9
 
 - Rechnungen und Lieferscheine als getrennte Menüpunkte.

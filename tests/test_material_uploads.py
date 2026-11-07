@@ -164,7 +164,10 @@ def test_other_account_cannot_preview_read_or_commit_upload(service, monkeypatch
 def test_queue_capacity_keeps_saved_photo_recoverable(service, monkeypatch):
     for index in range(20):
         module._pending.add(('occupied', 'other', str(index)))
-    assert prepare(service).status_code == 429
+    response = prepare(service)
+    assert response.status_code == 202
+    assert 'selbst' in response.json['message']
+    assert service.store.records('one', 'image') == {}
     assert service.store.record('one', 'image_upload', TOKEN)['status'] == 'queued'
     module._pending.clear()
     assert prepare(service).status_code == 200
@@ -205,7 +208,7 @@ def test_failed_database_write_does_not_leave_unretryable_file(service, monkeypa
 def test_worker_recovers_after_database_failure(service, monkeypatch):
     prepare(service)
     with monkeypatch.context() as scoped:
-        scoped.setattr(service.store, 'put_record', Mock(side_effect=StorageError('database temporarily unavailable')))
+        scoped.setattr(service.store, 'transact_record', Mock(side_effect=StorageError('database temporarily unavailable')))
         run_jobs(service, scoped)
     assert module._pending == set()
     assert service.store.record('one', 'image_upload', TOKEN)['status'] == 'queued'
@@ -259,3 +262,91 @@ def test_duplicate_photo_or_oversized_batch_is_rejected(service):
     many = [dict(token=f'{index:032x}', **SUGGESTION) for index in range(21)]
     assert commit(service, many).status_code == 400
     assert service.store.records('one', 'image') == {}
+
+
+@pytest.mark.parametrize('classification_fails', [False, True])
+def test_late_classifier_cannot_overwrite_manual_commit(service, monkeypatch, classification_fails):
+    human = dict(title='Manuell geprüft', category='Alarmanlage', description='Eigene Beschreibung')
+    prepare(service)
+    def classify_and_commit(*args):
+        response = commit(service, [dict(token=TOKEN, manual=True, **human)])
+        assert response.status_code == 200
+        if classification_fails:
+            raise image_classification.Unavailable('Synthetischer Modellfehler')
+        return SUGGESTION
+    service.classifier.side_effect = classify_and_commit
+    run_jobs(service, monkeypatch)
+    assert service.store.record('one', 'image', TOKEN) == human
+    assert service.store.record('one', 'image_upload', TOKEN)['status'] == 'committed'
+    status = service.client.get('/materials/batch/' + TOKEN).json
+    assert status['status'] == 'committed'
+    assert {k: status[k] for k in human} == human
+
+@pytest.mark.parametrize('manual', ['true', 'false', 1, 0, [], {}])
+def test_manual_commit_requires_boolean_flag(service, manual):
+    prepare(service)
+    response = commit(service, [dict(token=TOKEN, manual=manual, **SUGGESTION)])
+    assert response.status_code == 400
+    assert service.store.records('one', 'image') == {}
+
+def test_manual_partial_commit_preserves_other_queued_photo(service, monkeypatch):
+    prepare(service, TOKEN)
+    prepare(service, TOKEN2)
+    human = dict(title='Foto eins', category='Alarmanlage', description='Eigener Text')
+    assert commit(service, [dict(token=TOKEN, manual=True, **human)]).status_code == 200
+    assert service.store.record('one', 'image_upload', TOKEN2)['status'] == 'queued'
+    run_jobs(service, monkeypatch)
+    assert service.classifier.call_count == 1
+    assert service.store.record('one', 'image', TOKEN) == human
+    assert service.store.record('one', 'image_upload', TOKEN)['status'] == 'committed'
+    assert service.store.record('one', 'image_upload', TOKEN2)['status'] == 'ready'
+
+
+def test_explicit_manual_false_keeps_queued_photo_unpublished(service):
+    prepare(service)
+    result = commit(service, [dict(token=TOKEN, manual=False, **SUGGESTION)])
+    assert result.status_code == 409
+    assert result.is_json
+    assert service.store.records('one', 'image') == {}
+
+
+def test_batch_request_fingerprint_rejects_different_subset_without_publish(service, monkeypatch):
+    prepare(service, TOKEN)
+    prepare(service, TOKEN2)
+    run_jobs(service, monkeypatch)
+    assert commit(service, [dict(token=TOKEN, **SUGGESTION)]).status_code == 200
+    changed = commit(service, [dict(token=TOKEN2, **SUGGESTION)])
+    assert changed.status_code == 409
+    assert set(service.store.records('one', 'image')) == {TOKEN}
+    assert service.store.record('one', 'image_upload', TOKEN2)['status'] == 'ready'
+    assert commit(service, [dict(token=TOKEN2, **SUGGESTION)], batch='d' * 32).status_code == 200
+    assert set(service.store.records('one', 'image')) == {TOKEN, TOKEN2}
+
+
+def test_full_queue_still_allows_explicit_manual_commit(service):
+    module._pending.update(('occupied', 'other', str(index)) for index in range(20))
+    response = prepare(service)
+    assert response.status_code == 202 and response.json['status'] == 'queued'
+    status = service.client.get('/materials/batch/' + TOKEN)
+    assert status.status_code == 200 and 'selbst' in status.json['message']
+    assert commit(service, [dict(token=TOKEN, manual=True, **SUGGESTION)]).status_code == 200
+    assert service.store.record('one', 'image', TOKEN) == SUGGESTION
+
+
+def test_invalid_queued_manual_metadata_does_not_publish(service):
+    prepare(service)
+    changed = dict(SUGGESTION, title='')
+    response = commit(service, [dict(token=TOKEN, manual=True, **changed)])
+    assert response.status_code == 400 and response.is_json
+    assert 'Bildtitel' in response.json['error']
+    assert service.store.records('one', 'image') == {}
+
+
+def test_batch_http_errors_return_specific_json_messages(service):
+    response = service.client.get('/materials/batch/' + 'f' * 32)
+    assert response.status_code == 404
+    assert response.is_json and isinstance(response.json['error'], str)
+    response = prepare(service, content=b'not an image')
+    assert response.status_code == 400 and response.is_json
+    assert 'JPG' in response.json['error']
+    assert service.store.records('one', 'image_upload') == {}

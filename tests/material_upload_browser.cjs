@@ -216,10 +216,10 @@ test('pending commit locks fields, removal and file selection until saved', asyn
   assert.equal(saved[0].status, 'committed');
 });
 
-test('failed commit unlocks review fields and allows local removal without deletion request', async () => {
+test('definitively rejected commit unlocks review fields and allows local removal without deletion request', async () => {
   const h = harness({handle: async (url, options) => {
     if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
-    if (url.endsWith('/commit')) throw new TypeError('Network interruption');
+    if (url.endsWith('/commit')) return response({error: 'Bitte Angaben prüfen.'}, 400);
     throw Error('Unexpected request ' + url);
   }});
   await h.choose(['A.jpg']); await h.upload(); await h.save();
@@ -248,7 +248,7 @@ test('rejected photos can be removed to free the twenty-photo limit and stay rem
   assert.ok(JSON.parse(stored.get(storageKey)).rows.some(row => row.sourceName === 'Replacement.jpg'));
 });
 
-test('upload start immediately locks previously prepared review controls', async () => {
+test('upload start keeps prepared review controls editable while removal remains locked', async () => {
   let release;
   const waiting = new Promise(resolve => { release = resolve; });
   const h = harness({handle: async (url, options) => {
@@ -260,9 +260,192 @@ test('upload start immediately locks previously prepared review controls', async
   await h.form.emit('submit'); await flush();
   assert.equal(h.input.disabled, true);
   const card = h.list.children[0];
-  assert.equal(card.children.find(child => child.id === 'photo-0-title').disabled, true);
+  assert.equal(card.children.find(child => child.id === 'photo-0-title').disabled, false);
+  const description = card.children.find(child => child.id === 'photo-0-description');
+  description.value = 'Eigene Beschreibung während Foto B hochlädt'; await description.emit('input');
   assert.equal(card.children.find(child => child.textContent === 'Aus Auswahl entfernen').disabled, true);
   release(); await flush();
   assert.equal(h.input.disabled, false);
   assert.equal(h.commit.disabled, false);
+  assert.equal(h.list.children[0].children.find(child => child.id === 'photo-0-description').value, 'Eigene Beschreibung während Foto B hochlädt');
+});
+
+
+function descriptionControl(h,index){ return h.list.children[index].children.find(n=>n.tag==='textarea'); }
+function titleControl(h,index){ return h.list.children[index].children.find(n=>n.tag==='input'); }
+function categoryControl(h,index){ return h.list.children[index].children.find(n=>n.tag==='select'); }
+
+test('ready and queued photos remain independently editable while another suggestion is pending', async()=>{
+  let release, delayed;
+  const waiting=new Promise(resolve=>{release=resolve;});
+  const h=harness({handle:async(url,options)=>{
+    if(url.endsWith('/prepare')){
+      const token=options.body.get('token');
+      if(options.body.get('image').name==='A.jpg') return response(ready(token,'AI-A'));
+      delayed=token; return response({token,status:'queued',title:'B',category:'',description:''});
+    }
+    return waiting;
+  }});
+  await h.choose(['A.jpg','B.jpg']); await h.upload();
+  const a=descriptionControl(h,0),b=descriptionControl(h,1);
+  assert.equal(a.disabled,false); assert.equal(b.disabled,false);
+  a.value='Eigener Text A';await a.emit('input');
+  b.value='Eigener Text B';await b.emit('input');
+  const category=categoryControl(h,1);category.value='Alarmanlage';await category.emit('input');
+  release(response(ready(delayed,'AI-B')));await flush();
+  assert.equal(descriptionControl(h,0),a,'poll refresh must keep the existing input node');
+  assert.equal(descriptionControl(h,1),b,'poll refresh must not replace the second textarea');
+  assert.equal(descriptionControl(h,0).value,'Eigener Text A');
+  assert.equal(descriptionControl(h,1).value,'Eigener Text B');
+  assert.equal(categoryControl(h,1).value,'Alarmanlage');
+  assert.equal(titleControl(h,1).value,'AI-B','untouched title may receive the suggestion');
+});
+
+test('twenty descriptions are committed with their own photo tokens',async()=>{
+  let sent;
+  const h=harness({handle:async(url,options)=>{
+    if(url.endsWith('/prepare'))return response(ready(options.body.get('token')));
+    if(url.endsWith('/commit')){sent=JSON.parse(options.body);return response({count:sent.items.length});}
+    throw Error('Unexpected request');
+  }});
+  await h.choose(Array.from({length:20},(_,i)=>'Bild-'+i+'.jpg'));await h.upload();
+  for(let i=0;i<20;i++){const d=descriptionControl(h,i);assert.equal(d.disabled,false);d.value='Manuelle Beschreibung '+i;await d.emit('input');}
+  await h.save();
+  assert.equal(sent.items.length,20);
+  assert.equal(new Set(sent.items.map(i=>i.token)).size,20);
+  assert.deepEqual(sent.items.map(i=>i.description),Array.from({length:20},(_,i)=>'Manuelle Beschreibung '+i));
+});
+
+test('lost commit response keeps the exact payload frozen until idempotent retry',async()=>{
+  const sent=[];
+  const h=harness({handle:async(url,options)=>{
+    if(url.endsWith('/prepare'))return response(ready(options.body.get('token')));
+    if(url.endsWith('/commit')){
+      sent.push(JSON.parse(options.body));
+      if(sent.length===1)throw new TypeError('Connection lost after server accepted');
+      return response({count:sent.at(-1).items.length});
+    }
+    throw Error('Unexpected request');
+  }});
+  await h.choose(['A.jpg']);await h.upload();await h.save();
+  const d=descriptionControl(h,0);assert.equal(d.disabled,true);
+  d.value='Dieser spätere Text gehört nicht zur eingefrorenen Bestätigung';await d.emit('input');
+  await h.save();
+  assert.deepEqual(sent[1],sent[0]);
+  assert.equal(h.commit.hidden,true);
+});
+
+test('all files are uploaded before classification polling begins', async () => {
+  const events = [];
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) {
+      events.push('prepare:' + options.body.get('image').name);
+      return response({token: options.body.get('token'), status: 'queued'});
+    }
+    events.push('poll');
+    return response(ready(url.split('/').pop()));
+  }});
+  await h.choose(['A.jpg', 'B.jpg', 'C.jpg']); await h.upload();
+  assert.deepEqual(events.slice(0, 3), ['prepare:A.jpg', 'prepare:B.jpg', 'prepare:C.jpg']);
+  assert.equal(events.filter(event => event === 'poll').length, 3);
+});
+
+test('new photo descriptions remain editable and survive their preparation response', async () => {
+  let release, token;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const h = harness({handle: async (url, options) => {
+    assert.ok(url.endsWith('/prepare'));
+    token = options.body.get('token');
+    return waiting;
+  }});
+  await h.choose(['A.jpg']);
+  const control = descriptionControl(h, 0);
+  assert.equal(control.disabled, false);
+  control.value = 'Vor dem Hochladen selbst beschrieben'; await control.emit('input');
+  await h.upload();
+  assert.equal(descriptionControl(h, 0), control);
+  assert.equal(control.disabled, false);
+  release(response(ready(token))); await flush();
+  assert.equal(descriptionControl(h, 0).value, 'Vor dem Hochladen selbst beschrieben');
+});
+
+test('queued manually completed photo can be saved before inference returns', async () => {
+  let release, sent, token;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) {
+      token = options.body.get('token');
+      return response({token, status: 'queued', title: 'A', category: '', description: ''});
+    }
+    if (url.endsWith('/commit')) { sent = JSON.parse(options.body); return response({count: sent.items.length}); }
+    return waiting;
+  }});
+  await h.choose(['A.jpg']); await h.upload();
+  const category = categoryControl(h, 0); category.value = 'Alarmanlage'; await category.emit('input');
+  const description = descriptionControl(h, 0); description.value = 'Manuell geprüft'; await description.emit('input');
+  assert.equal(h.commit.disabled, false);
+  await h.save();
+  assert.equal(sent.items.length, 1);
+  assert.equal(sent.items[0].manual, true);
+  assert.equal(sent.items[0].description, 'Manuell geprüft');
+  release(response(ready(token))); await flush();
+  const saved = JSON.parse(h.stored.get(storageKey));
+  assert.equal(saved.rows[0].status, 'committed');
+  assert.equal(saved.rows[0].description, 'Manuell geprüft');
+});
+
+test('successful partial saves receive distinct batch identities', async () => {
+  const sent = [];
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
+    if (url.endsWith('/commit')) { sent.push(JSON.parse(options.body)); return response({count: sent.at(-1).items.length}); }
+    throw Error('Unexpected request');
+  }});
+  await h.choose(['A.jpg', 'B.jpg']); await h.upload();
+  function check(index) {
+    return h.list.children[index].children.find(child => child.tag === 'label' && child.children.some(n => n.type === 'checkbox')).children.find(n => n.type === 'checkbox');
+  }
+  const second = check(1); second.checked = false; await second.emit('change');
+  await h.save();
+  second.checked = true; await second.emit('change');
+  await h.save();
+  assert.equal(sent.length, 2);
+  assert.notEqual(sent[0].batch, sent[1].batch);
+  assert.equal(sent[0].items.length, 1);
+  assert.equal(sent[1].items.length, 1);
+  assert.notEqual(sent[0].items[0].token, sent[1].items[0].token);
+});
+
+test('pending commit restored after reload retries frozen fields without uploading again', async () => {
+  const stored = new Map(), sent = [];
+  const handle = async (url, options) => {
+    if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
+    if (url.endsWith('/commit')) {
+      sent.push(JSON.parse(options.body));
+      if (sent.length === 1) throw new TypeError('Response lost');
+      return response({count: sent.at(-1).items.length});
+    }
+    throw Error('Unexpected request');
+  };
+  const first = harness({handle, stored});
+  await first.choose(['A.jpg']); await first.upload(); await first.save();
+  assert.ok(JSON.parse(stored.get(storageKey)).pendingCommit);
+  const restored = harness({handle, stored});
+  assert.equal(descriptionControl(restored, 0).disabled, true);
+  assert.equal(restored.requests.length, 0);
+  await restored.save();
+  assert.deepEqual(sent[1], sent[0]);
+  assert.equal(restored.requests.some(request => request.url.endsWith('/prepare')), false);
+  assert.equal(JSON.parse(stored.get(storageKey)).pendingCommit, null);
+});
+
+test('specific server JSON error is shown and definite rejection permits editing', async () => {
+  const h = harness({handle: async (url, options) => {
+    if (url.endsWith('/prepare')) return response(ready(options.body.get('token')));
+    return response({error: 'Bitte für jedes ausgewählte Foto eine Kategorie angeben.'}, 400);
+  }});
+  await h.choose(['A.jpg']); await h.upload(); await h.save();
+  assert.match(h.message.textContent, /für jedes ausgewählte Foto eine Kategorie/);
+  assert.equal(descriptionControl(h, 0).disabled, false);
+  assert.equal(JSON.parse(h.stored.get(storageKey)).pendingCommit, null);
 });

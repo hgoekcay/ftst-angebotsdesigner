@@ -33,7 +33,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.27.9"
+APP_VERSION = "0.27.10"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
@@ -43,7 +43,7 @@ app.config['FTST_DATA_DIR'] = str(data_directory())
 
 @app.get('/ui-assets/<version>/<filename>')
 def versioned_ui_asset(version, filename):
-    if version != APP_VERSION or filename not in {'offer-delivery.js', 'pdf-download.js', 'offer-chat.js', 'apple-design.css'}:
+    if version != APP_VERSION or filename not in {'offer-delivery.js', 'pdf-download.js', 'offer-chat.js', 'apple-design.css', 'material-upload.js'}:
         abort(404)
     response = send_file(os.path.join(app.root_path, 'static', filename),
                          mimetype=('text/css' if filename.endswith('.css') else 'application/javascript') + '; charset=utf-8', conditional=False)
