@@ -1,5 +1,26 @@
 # ATLAS and FTST project state
 
+## Optional chat connection — 2026-11-09
+
+Prepared a disabled-by-default OAuth MCP listener on internal port 8100. It reads
+Billomat offers, clients and articles through the existing bounded GET transport,
+and projects through an account-scoped field projection. It reuses the configured
+Billomat key without exposing it. No offer writes, sends, general HA control or
+CCTV API are included. Existing Ingress protection remains unchanged. OAuth
+transport is isolated from the existing mail service and uses a separate store.
+
+Validated locally on Python 3.12: 127 targeted tests passed (connection, Billomat
+offer writes and quote transfer/routes), including unauthenticated rejection,
+host restrictions, account isolation, refresh persistence, rotation and reuse
+revocation. No production reads/writes, deployment or ChatGPT connection occurred.
+No code graph engine was available. Full Alpine/Python 3.13 image build remains
+unverified. No release version bump.
+
+Next: review this branch, verify image build, choose an operator-controlled HTTPS
+origin and configure the separate OAuth login through protected HA options.
+Install a separately versioned release and verify the custom MCP connection in
+the personal ChatGPT account. See docs/CHAT-VERBINDUNG.md for activation and rollback.
+
 ## Designer photo upload correction — 2026-11-07
 
 Prepared Designer 0.27.10: each staged photo retains its own editable title,

@@ -372,6 +372,8 @@ if __name__=="__main__":
     automation = MailAutomation(offer_store, materials.account())
     automation.start(app.config['FTST_DATA_DIR'])
     website_portal.start_sync(offer_store, make_pdf)
+    from connect_service import start_optional_connection
+    start_optional_connection()
     try:
         app.run(host="0.0.0.0",port=int(os.getenv("PORT","8099")))
     finally:
