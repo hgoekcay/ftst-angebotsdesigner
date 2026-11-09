@@ -16,6 +16,9 @@ panel_title: "FTST Angebote"
 panel_admin: true
 webui: "http://[HOST]:[PORT:8099]/"
 options:
+  connect_enabled: false
+  connect_public_url: ""
+  connect_password: ""
   website_portal_enabled: false
   website_portal_url: ""
   website_portal_secret: ""
@@ -38,6 +41,9 @@ options:
   openai_model: "gpt-4.1"
   openai_transcribe_model: "gpt-4o-mini-transcribe"
 schema:
+  connect_enabled: bool
+  connect_public_url: str?
+  connect_password: password?
   website_portal_enabled: bool
   website_portal_url: str?
   website_portal_secret: password?
