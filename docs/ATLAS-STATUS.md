@@ -1,5 +1,26 @@
 # ATLAS and FTST project state
 
+## Bank validation foundation — 2026-11-18
+
+Isolated branch `feat/atlas-payment-allocation`, base `4d1b344`.
+Added pure canonical EUR CSV validation and explicit partial/batch allocation
+preview in `ftst_atlas/bank_validation.py`. Exact cents, complete-statement
+balance/date checks, bounded inputs and duplicate/over-allocation rejection.
+No routes, persistence, UI, auto-matching, payment-status writes, bank access,
+private financial data, version bump or production changes. This is a tested
+foundation, not an integrated bank import. See [architecture and next integration
+steps](ATLAS-BANK-VALIDATION.md). Existing document preparation remains unchanged.
+Code Review Graph executable unavailable; source/import/test tracing used.
+
+Validation: 95 focused bank/bookkeeping tests plus 21 subtests passed on Python
+3.12; critical Ruff and compile checks passed. Final full regression: 1,534 tests
+and 136 subtests passed in 83.21 seconds. No HA installation: owner is performing
+backup/update. Prepared as a draft only; no merge or deployment.
+Next: owner/account-scoped immutable statement storage, transactional idempotent
+allocation persistence, then guarded routes and UI. Caller-supplied preview
+balances are not authorization or authoritative persisted payment evidence.
+
+
 ## Local project overview slice — 2026-11-18
 
 Prepared on isolated branch `feat/project-operations-overview`, base
