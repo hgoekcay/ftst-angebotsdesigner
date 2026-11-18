@@ -1,5 +1,146 @@
 # ATLAS and FTST project state
 
+## Trusted local source-to-draft adapter — 2026-11-18
+
+Previous format CI44286015885 passed fully. Added `bank_source_adapter.py` to
+refresh draft invoice baselines from owner-scoped `Bookkeeping.get` records using
+only invoice ID and expected prior revision. Balances, direction, currency and
+revision fingerprints come from the source, not caller form fields. A shared
+fingerprint helper keeps preview and baseline source identity consistent.
+
+Unreviewed, paid/canceled, malformed, foreign-currency or missing/unreadable source
+records block an existing baseline instead of silently retaining draft capacity.
+Owner scope is checked before reading the source. Active-draft source changes
+still require review/reversal; outdated refresh revisions fail. A source read
+failure conservatively blocks even a concurrently refreshed baseline, never
+confirms a payment. An unchanged blocked snapshot cannot auto-unblock; explicit
+reviewed recovery is still a future integration requirement.
+
+The source database is read-only for this adapter. Tests use synthetic source
+records and the actual Bookkeeping SQLite class; its dump remains unchanged.
+No production endpoint, account authentication service, atomic cross-store source
+freshness, PDF import or payment confirmation. No HA or financial actions.
+Final complete suite: 1,612 tests and 136 subtests passed (85.98s). Critical
+Ruff, compile and diff checks passed. Independent source-adapter review found
+no additional blocker within the documented isolated scope. New CI separate.
+
+## Bank-format verification and stronger controls — 2026-11-18
+
+Prior allocation CI44279791274 passed fully. Verified that PR98 supports only
+canonical single-account EUR CSV, not Revolut PDF or the derived German-locale
+semicolon list. No PDF importer or native bank CSV support is claimed. The lossy
+list cannot recover multiline references. See [format safety gates](ATLAS-BANK-FORMATS.md).
+
+Added optional gross credit/debit totals and transaction-count validation to the
+canonical parser and staging call; existing net-balance control remains mandatory.
+All three additional controls are required together, checked even on exact-source
+retries, and mismatches reject before writes. Controls are not yet stored as
+independent source evidence. Tests preserve quoted CRLF references, reject
+localized/PDF/summary inputs, catch net-zero omission/duplication, and isolate
+Giro/Pro/Pocket-like account scopes using synthetic data only.
+No original statement or financial contents accessed or uploaded by this task.
+No production/HA changes. Final full regression: 1,595 tests and 136 subtests
+passed (80.31s); focused bank/bookkeeping: 156 tests and 21 subtests. Critical
+Ruff, compile and diff checks passed. New head CI tracked separately.
+
+## Atomic draft allocation lifecycle — 2026-11-18
+
+Prior bridge CI44273865746 passed completely. `bank_allocations.py` adds isolated
+SQLite draft reservations, not payment confirmations. Explicit account enrollment
+and actor/owner equality guard mutation scope; authenticated actor identity must
+still be supplied by a future service. Invoice baselines require trusted reviewed
+source provisioning and exact revisions. They are not automatically refreshed
+from the live bookkeeping store.
+
+BEGIN IMMEDIATE covers bank/invoice remaining draft capacity, revision checks,
+batch insertion and all lines. Idempotency keys reject changed payloads; identical
+retries replay the current state, including after reversal. Reversal preserves
+lines and actor/time history, releases capacity and never resurrects a prior key.
+Invoice capacity is shared across the owner's accounts. Changed source baselines
+with active reservations are blocked until review/reversal and a fresh revision;
+old-snapshot retries cannot clear the block. Zero open amounts close draft capacity;
+explicit invalidation blocks canceled/unusable source states. Baseline updates
+require the expected prior revision to reject out-of-order refreshes. A separate
+review found the zero-balance edge case; it is fixed and regression-tested.
+No invoice/payment statuses change.
+
+Synthetic tests cover batch rollback, restart/retries, cross-account invoice caps,
+competing transactions, concurrent same-key calls, stale/conflicting revisions,
+owner/account guards and supplier debits. Final full regression: 1,585 tests
+and 136 subtests passed (87.53s). All 21 draft-lifecycle tests passed; critical
+Ruff, compile and diff checks passed. New remote CI is tracked separately.
+No production wiring, UI, shared users, live bank adapter or deployment. HA update
+reported complete by owner; no HA operations performed and backup not assumed.
+Next: authenticated account registry, trusted source adapter and snapshot freshness
+inside a single authoritative confirmation transaction. Until then these remain
+local unconfirmed draft reservations, not a reconciled balance or payment ledger.
+
+## Read-only bank/invoice preview bridge — 2026-11-18
+
+Prior staging commit CI 44272820586 passed fully. Added `bank_reconciliation.py`
+and a scoped transaction read. Explicit selections accept only invoice ID and
+requested amount. Bank amounts come from stored statement rows; invoice direction,
+currency and source open amounts come from `Bookkeeping.get(owner, id)`, not form
+fields. Only reviewed, issue-free, non-canceled OPEN/OVERDUE Billomat snapshots in
+EUR pass. Cent-exact source decimals retain precision without rounding. Changes
+to selected source fields produce different snapshot tokens for future review.
+No inference by reference/amount and no payment-status writes.
+
+Output is `unconfirmed_source_snapshot`: stale local source data and previously
+allocated payments are not resolved here. Confirmation is explicitly unsupported.
+No routes, UI, authenticated account registry, reservation, production DB wiring
+or HA changes. Tokens are neither authorization nor atomic locks. Final complete
+regression: 1,564 tests and 136 subtests passed (97.43s); critical Ruff, compile
+and diff checks passed. Real Bookkeeping and statement SQLite stores use synthetic
+data, and invoice DB dump stays unchanged across partial/batch previews.
+Next: authoritative same-transaction allocation/reversal model and account access
+checks before any confirmation endpoint. Source adapters require verified stable
+transaction IDs; existing canonical CSV is not a bank-specific importer.
+
+## Isolated bank statement staging — 2026-11-18
+
+Follow-up to draft PR98. Prior foundation CI run 44268004284 passed completely.
+`bank_statements.py` now stages canonical EUR statement bytes with SHA-256,
+metadata, timestamp and normalized transactions in an explicitly supplied SQLite
+path. All queries are owner/account scoped. Exact retries are idempotent;
+changed metadata for identical bytes and any overlapping transaction IDs reject
+the complete import atomically, including previously inserted new rows.
+No route, application DB wiring, migration, UI, payment status, external bank
+access or production change. This is isolated tested infrastructure, not a live
+bank importer or reconciled ledger. Account authorization must be resolved by a
+future caller; account-scoped keys do not authenticate supplied identities.
+
+Tests cover original preservation, restart, owner/account isolation, malformed
+input, metadata conflicts, rollback and competing retries/imports using temporary
+SQLite databases and synthetic data. Final full regression: 1,542 tests and
+136 subtests passed (98.20s); focused bank/bookkeeping: 103 tests and 21 subtests.
+Critical Ruff, compile and diff checks passed. New remote CI is separate.
+Next: stable provider-ID adapters and authorized account selection; then a separate
+transactional allocation/reversal model using authoritative invoice balances.
+Do not connect this store to production until review and migration/access checks.
+No code overlap with PR97; shared status documentation only.
+
+## Bank validation foundation — 2026-11-18
+
+Isolated branch `feat/atlas-payment-allocation`, base `4d1b344`.
+Added pure canonical EUR CSV validation and explicit partial/batch allocation
+preview in `ftst_atlas/bank_validation.py`. Exact cents, complete-statement
+balance/date checks, bounded inputs and duplicate/over-allocation rejection.
+No routes, persistence, UI, auto-matching, payment-status writes, bank access,
+private financial data, version bump or production changes. This is a tested
+foundation, not an integrated bank import. See [architecture and next integration
+steps](ATLAS-BANK-VALIDATION.md). Existing document preparation remains unchanged.
+Code Review Graph executable unavailable; source/import/test tracing used.
+
+Validation: 95 focused bank/bookkeeping tests plus 21 subtests passed on Python
+3.12; critical Ruff and compile checks passed. Final full regression: 1,534 tests
+and 136 subtests passed in 83.21 seconds. No HA installation: owner is performing
+backup/update. Prepared as a draft only; no merge or deployment.
+Next: owner/account-scoped immutable statement storage, transactional idempotent
+allocation persistence, then guarded routes and UI. Caller-supplied preview
+balances are not authorization or authoritative persisted payment evidence.
+
+
 ## Local project overview slice — 2026-11-18
 
 Prepared on isolated branch `feat/project-operations-overview`, base
