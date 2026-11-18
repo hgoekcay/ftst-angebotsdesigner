@@ -1,5 +1,44 @@
 # ATLAS and FTST project state
 
+## Local project overview slice — 2026-11-18
+
+Prepared on isolated branch `feat/project-operations-overview`, base
+`10659c8f9dfefbb746d269ebbeb78ca68aadfde1`. Existing `/projects` now displays
+account-scoped persisted workflow evidence, its next action, open-question count,
+and installation-intake readiness with pending-edit/missing-location warnings.
+Links reuse the existing intake, quote/transfer, installation and material/schedule
+pages. Reuses `project_workflow.progress` and `montage.overview`; no new lifecycle
+state, schema, external request, reservation, payment decision or customer send.
+The overview explicitly does not prove an order, technical release or appointment.
+It reports saved source state, not a transactional cross-record/live snapshot.
+
+Source impact: `projects.projects` -> `project_overview.render` -> existing
+workflow and installation classifiers -> account-scoped `OfferStore.records`.
+Only the new module, list integration, tests and this handoff were changed. Other
+open PRs were not checked out or modified. Code Review Graph engine was absent
+from PATH and the documented local bin path; direct source/test tracing used.
+
+Validation: 49 focused pytest cases passed (overview, workflow, montage, projects,
+project-transfer links). Includes account isolation, escaped titles, Ingress paths,
+unknown transfers, pending changes, missing rooms, repeated reads and read-only
+persistence. Critical Ruff, compileall and diff checks passed. Full suite passed 1497 tests and 136 subtests; two subsequently added cases
+also passed in the focused run. Browser visual QA is NOT passed locally:
+the separate cloud browser returned ERR_CONNECTION_REFUSED for the local Flask
+preview, and local Chromium could not create its IPC socket (EPERM), including
+an approved unsandboxed attempt. A synthetic fixture and repeatable 390/1280px
+Playwright check are included in the existing browser CI with screenshots;
+GitHub CI run 44260883918 passed all eight jobs at head
+a738a8c1de794c0922ce7fcaf04eb72d0eb631dd; both viewport screenshots were
+visually reviewed and showed no horizontal overflow. Physical phone remains
+unverified. Release 0.27.11 is prepared, not yet installed.
+Before install: verify release-head CI, unchanged main, and a current app backup.
+Rollback: restore only the Designer app from the pre-update backup if live
+acceptance fails; avoid restoring unrelated HA configuration.
+Next: complete visual desktop/mobile review and full release CI, then consider
+explicit responsible-person/next-date evidence on existing project records.
+Do not infer order confirmation, stock availability or payment from quote status.
+
+
 ## Designer photo upload correction — 2026-11-07
 
 Prepared Designer 0.27.10: each staged photo retains its own editable title,
