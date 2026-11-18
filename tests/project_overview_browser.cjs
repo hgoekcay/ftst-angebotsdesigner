@@ -23,7 +23,15 @@ const {chromium} = require('playwright');
       const errors=[],writes=[],external=[];
       page.on('pageerror',error=>errors.push(error.message));
       page.on('request',request=>{if(request.method()!=='GET')writes.push(request.url());if(!request.url().startsWith(origin))external.push(request.url());});
-      await page.goto(origin+'/projects');
+      await page.goto(origin+'/');
+      await page.getByRole('link',{name:'Vorgangsübersicht öffnen',exact:true}).click();
+      assert(await page.getByRole('heading',{name:'Vorgangsübersicht',exact:true}).isVisible());
+      if(width<600) {
+        await page.getByRole('link',{name:'Mehr',exact:true}).click();
+        await page.getByRole('link',{name:'Projekte',exact:true}).filter({visible:true}).click();
+      } else {
+        await page.locator('.appnav').getByRole('link',{name:'Projekte',exact:true}).click();
+      }
       assert(await page.getByRole('heading',{name:'Vorgangsübersicht',exact:true}).isVisible());
       const review=page.locator('section.card').filter({has:page.getByRole('link',{name:'Demo Büro',exact:true})});
       assert((await review.innerText()).includes('Neuere Aufnahme noch nicht übernommen'));

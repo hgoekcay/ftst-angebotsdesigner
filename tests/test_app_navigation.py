@@ -6,7 +6,7 @@ def test_bottom_tabs_and_ingress_links_are_present():
     client = module.app.test_client()
     response = client.get('/more', headers={'X-Ingress-Path': '/api/hassio_ingress/test'})
     assert response.status_code == 200
-    for path in ('offers', 'materials', 'company', 'more', 'email-settings'):
+    for path in ('offers', 'materials', 'company', 'more', 'email-settings', 'projects'):
         assert 'href="/api/hassio_ingress/test/' + path + '"' in response.text
     assert 'aria-label="Hauptnavigation"' in response.text
     assert 'aria-current="page"' in response.text
@@ -34,3 +34,10 @@ def test_mobile_layout_hides_top_menu_and_reserves_bottom_space():
     assert '.appnav{display:none!important}' in css
     assert 'grid-template-columns:repeat(4,minmax(0,1fr))' in css
     assert '100px + env(safe-area-inset-bottom,0px)' in css
+
+
+def test_project_overview_entry_on_home_and_desktop_navigation():
+    response = module.app.test_client().get("/", headers={"X-Ingress-Path": "/api/hassio_ingress/test"})
+    assert response.status_code == 200
+    assert 'href="/api/hassio_ingress/test/projects">Vorgangsübersicht öffnen</a>' in response.text
+    assert 'href="/api/hassio_ingress/test/projects">Projekte</a>' in response.text

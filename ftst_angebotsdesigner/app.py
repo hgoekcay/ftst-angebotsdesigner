@@ -33,7 +33,7 @@ from price_notes import item_notes, offer_notes, unit_price_heading
 from reportlab.platypus import Image
 from storage import OfferStore, StorageError, data_directory
 
-APP_VERSION = "0.27.11"
+APP_VERSION = "0.27.12"
 app = Flask(__name__)
 app.config['CHAT_ASSET_VERSION'] = APP_VERSION
 app.secret_key = os.getenv("FLASK_SECRET", "ftst-dev")
@@ -242,7 +242,7 @@ def apply_source(raw,src):
 def base(title,body):
     from app_navigation import navigation
     back, tabs = navigation(ingress)
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>{html.escape(title)}</title><style>{CSS}</style><link rel="stylesheet" href="{ingress("ui-assets/"+APP_VERSION+"/apple-design.css")}"></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("documents?kind=invoices")}">Rechnungen</a><a href="{ingress("documents?kind=delivery-notes")}">Lieferscheine</a><a href="{ingress("offers")}">Angebote</a><a href="{ingress("intake-templates")}">Aufnahmebögen</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{back}{body}</main>{tabs}<script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
+    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>{html.escape(title)}</title><style>{CSS}</style><link rel="stylesheet" href="{ingress("ui-assets/"+APP_VERSION+"/apple-design.css")}"></head><body><div class="top"><div class="topin"><div class="app-brand"><a href="{ingress()}"><img class="app-logo" src="{ingress("materials/"+DEFAULT_LOGO)}" alt="FT Sicherheitstechnik ®"></a><div class="sub">FTST AngebotsDesigner</div></div><nav class="appnav"><a href="{ingress("projects")}">Projekte</a><a href="{ingress("documents?kind=invoices")}">Rechnungen</a><a href="{ingress("documents?kind=delivery-notes")}">Lieferscheine</a><a href="{ingress("offers")}">Angebote</a><a href="{ingress("intake-templates")}">Aufnahmebögen</a><a href="{ingress("inventory")}">Lager</a><a href="{ingress("materials")}">Bilder</a><a href="{ingress("company")}">Firma</a><span class="small">v{APP_VERSION}</span></nav></div></div><main class="wrap">{back}{body}</main>{tabs}<script defer src="{ingress("ui-assets/"+APP_VERSION+"/pdf-download.js")}"></script></body></html>'
 
 def get_offer(oid):
     bid=os.getenv("BILLOMAT_ID"); key=os.getenv("BILLOMAT_API_KEY")
@@ -268,7 +268,7 @@ def health():
 
 @app.get("/")
 def index():
-    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a></div>')
+    return base("FTST",f'<div class="card hero"><div class="eyebrow">FTST AngebotsDesigner</div><h1>Professionelle Angebote aus Billomat</h1><p>Billomat-Angebote auswählen, kundengerecht bearbeiten und als A4-PDF ausgeben.</p><a class="btn" href="{ingress("projects")}">Vorgangsübersicht öffnen</a><a class="btn light" href="{ingress("offers")}">Angebote öffnen</a><a class="btn light" href="{ingress("company")}">Firmendaten</a><a class="btn light" href="{ingress("materials")}">Fotos & Referenzen</a><a class="btn light" href="{ingress("billomat")}">Billomat-Daten laden</a></div>')
 
 @app.get("/offers")
 def offers():

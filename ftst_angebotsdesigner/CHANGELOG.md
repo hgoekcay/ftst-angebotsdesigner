@@ -1,3 +1,7 @@
+# 0.27.12
+
+- Vorgangsübersicht direkt auf der Startseite sowie Projekte im Desktop-Menü und im mobilen Mehr-Menü erreichbar.
+
 # 0.27.11
 
 - Projektübersicht mit gespeichertem Bearbeitungsstand, nächstem Schritt und offenen Rückfragen.
