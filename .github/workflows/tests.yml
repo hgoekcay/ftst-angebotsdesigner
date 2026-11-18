@@ -118,3 +118,14 @@ jobs:
           name: project-overview-proof
           path: ${{ runner.temp }}/overview-artifacts
           if-no-files-found: ignore
+      - name: Check isolated portal photo framing
+        env:
+          NODE_PATH: ${{ runner.temp }}/photo-browser/node_modules
+          PORTAL_PHOTO_ARTIFACTS: ${{ runner.temp }}/portal-photo-artifacts
+        run: node tests/portal_photo_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: portal-photo-proof
+          path: ${{ runner.temp }}/portal-photo-artifacts
+          if-no-files-found: ignore
