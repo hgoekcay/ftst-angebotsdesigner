@@ -223,7 +223,7 @@ def snapshot(offer, revision, editable_ids=(), extra_articles=()):
         aid = str(article['id'])
         title = article['title']
         options = [dict(id='original', title=title, description=(article.get('description') or '')[:2000],
-                        manufacturer='Ajax', supplier_sku='', variant='', color='',
+                        manufacturer='Ajax' if re.search(r'\bajax\b', title, re.I) else '', supplier_sku='', variant='', color='',
                         effective_unit_net=money(article['sales_price']))]
         photo = product_image(title)
         if photo: options[0]['product_image_id'] = photo
@@ -317,19 +317,33 @@ def additional_catalog(raw):
     if raw.get('settings', {}).get('net_gross') != 'NET' or raw.get('settings', {}).get('currency_code') != 'EUR':
         raise ValueError('Zusatzartikel benötigen Billomat-Netto-EUR-Preise.')
     units = {str(u['id']): u.get('name') for u in raw['units']}
+    taxes = {str(t['id']): t for t in raw.get('taxes', [])}
+    defaults = [t for t in taxes.values() if str(t.get('is_default')) == '1']
     result = {}
     for article in raw['articles']:
         title = str(article.get('title') or '')
-        if 'ajax' not in title.lower() or category(title) not in ('camera', 'outdoor_motion', 'perimeter', 'outdoor_siren'):
+        if not title.strip() or category(title) == 'service':
             continue
         aid = str(article.get('id'))
         if not aid.isascii() or not aid.isdigit() or not units.get(str(article.get('unit_id'))): continue
         if (article.get('currency_code') or 'EUR') != 'EUR': continue
         if article.get('sales_price') in (None, ''): continue
-        price = money(article['sales_price'])
+        selected_tax = taxes.get(str(article.get('tax_id')))
+        if not selected_tax and article.get('tax_id') in (None, '', 0, '0') and len(defaults) == 1:
+            selected_tax = defaults[0]
+        try:
+            if not selected_tax or Decimal(str(selected_tax.get('rate'))) != 19:
+                continue
+            price = money(article['sales_price'])
+        except (ValueError, InvalidOperation):
+            continue
         result[aid] = dict(id=aid, title=title, description=article.get('description') or '',
                            sales_price=price, unit=units[str(article['unit_id'])])
     return result
+
+
+def additional_fingerprint(article):
+    return hashlib.sha256(json.dumps(article, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
 def read_catalog():
@@ -414,6 +428,9 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
                 catalog = read_catalog() if extra_ids else {}
                 if any(aid not in catalog for aid in extra_ids):
                     raise ValueError('Zusatzartikel ist nicht freigegeben.')
+                if any(request.form.get('extra_fingerprint:' + aid) != additional_fingerprint(catalog[aid])
+                       for aid in extra_ids):
+                    raise ValueError('Zusatzartikel oder Preis geändert. Vorschau neu laden und erneut prüfen.')
                 try:
                     s = snapshot(offer, int(previous.get('snapshot', {}).get('revision', 0)) + 1, request.form.getlist('editable'), [catalog[aid] for aid in extra_ids])
                 except ValueError as error:
@@ -469,8 +486,8 @@ def register(app, base, ingress, clean, get_store, get_offer, make_pdf):
             extra = additional_catalog(cached['data']) if configured() and cached.get('data') else {}
         except Exception:
             extra = {}
-        rows += '<h2>Optionale Ajax-Erweiterungen</h2><p>Ausgewählte Zusatzartikel starten mit Menge 0. Der Kunde kann sie zum freigegebenen Billomat-Verkaufspreis netto plus 19 % hinzufügen.</p>'
-        rows += ''.join('<label><input type="checkbox" name="extra_article" value="' + clean(aid) + '"> ' + clean(article['title']) + ' · ' + clean(article['sales_price']) + ' EUR netto</label><br>' for aid, article in extra.items())
+        rows += '<h2>Optionale Geräte und Zubehör</h2><p>Nur passende Artikel nach Prüfung von Modell, Kompatibilität und 19-%-Steuersatz auswählen. Ausgewählte Zusatzartikel starten mit Menge 0. Der Kunde kann sie zum freigegebenen Billomat-Verkaufspreis netto plus 19 % hinzufügen.</p>'
+        rows += ''.join('<input type="hidden" name="extra_fingerprint:' + clean(aid) + '" value="' + additional_fingerprint(article) + '"><label><input type="checkbox" name="extra_article" value="' + clean(aid) + '"> ' + clean(article['title']) + ' · ' + clean(article['sales_price']) + ' EUR netto</label><br>' for aid, article in extra.items())
         if not extra: rows += '<p>Kein passender gespeicherter Netto-EUR-Katalog verfügbar. Bitte den Billomat-Katalog in der Entwurfsbearbeitung aktualisieren. Vor Freigabe werden ausgewählte Zusatzpreise erneut live geprüft.</p>'
         existing = ('<p><a href="' + clean(saved['link']['customer_url']) + '" target="_blank" rel="noopener noreferrer">Persönlichen Kundenlink in neuem Fenster öffnen</a></p><p>Die Angebotsapp bleibt geöffnet. Nach der Vorschau können Sie hier weiterarbeiten.</p>') if saved and not saved.get('revoked') else ''
         body = '<section class="card"><h1>Persönlicher Kundenlink</h1><p>Nur geprüfte Positionen freigeben. Der Kunde kann ausgewählte Mengen selbst ändern und zum berechneten Endpreis bestätigen. Montage bleibt fest.</p>'

@@ -134,10 +134,10 @@ def test_feature_default_disabled():
 
 def test_optional_catalog_has_exact_net_prices_and_zero_baseline():
     from website_portal import additional_catalog
-    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'), units=[dict(id=1, name='Stück')],
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'), units=[dict(id=1, name='Stück')], taxes=[dict(id=1, rate='19', is_default='1')],
                articles=[dict(id=55, title='Ajax MotionProtect Outdoor weiß', sales_price='123.45', unit_id=1),
                          dict(id=56, title='Ajax DualCurtain Outdoor weiß', sales_price='180.00', unit_id=1),
-                         dict(id=57, title='Unbekannte Kamera', sales_price='1.00', unit_id=1)])
+                         dict(id=57, title='Montage', sales_price='1.00', unit_id=1)])
     catalog = additional_catalog(raw)
     assert set(catalog) == {'55', '56'}
     s = snapshot(offer(), 1, [], list(catalog.values()))
@@ -345,7 +345,7 @@ def test_portal_failure_is_readable_and_get_uses_cached_catalog(tmp_path, monkey
     monkeypatch.setenv('WEBSITE_PORTAL_ENABLED', 'true')
     def forbidden(): raise AssertionError('GET must not request live catalog')
     monkeypatch.setattr(website_portal, 'read_catalog', forbidden)
-    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'), units=[dict(id=1, name='Stück')],
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'), units=[dict(id=1, name='Stück')], taxes=[dict(id=1, rate='19', is_default='1')],
                articles=[dict(id=55, title='Ajax MotionProtect Outdoor weiß', sales_price='123.45', unit_id=1)])
     store.put_record('test', 'catalog', 'shared', dict(data=raw, at='test'))
     o = offer(); o['total_net'] = '1'
@@ -434,3 +434,69 @@ def test_fixed_hardware_also_gets_product_image():
     assert not snap['lines'][0]['editable']
     assert snap['lines'][0]['product_image_id'] == 'ax-door-protect-w'
     assert snap['lines'][0]['product_image_note'].startswith('Beispielabbildung')
+
+
+def test_additional_catalog_includes_other_brands_and_all_hardware_without_guessing():
+    from website_portal import additional_catalog
+    titles = ['FTronics Kamera FC-8D', '4-Kanal-Rekorder', 'Türsprechanlage',
+              'PoE-Switch', 'Festplatte', 'Anschlussbox', 'RJ45-Stecker', 'CAT6 Kabel']
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'),
+               units=[dict(id=1, name='Stück')], taxes=[dict(id=1, rate='19', is_default='1')],
+               articles=[dict(id=n, title=t, sales_price='10.00', unit_id=1)
+                         for n, t in enumerate(titles, 50)])
+    catalog = additional_catalog(raw)
+    assert len(catalog) == len(titles)
+    result = snapshot(offer(), 1, [], list(catalog.values()))
+    extras = result['lines'][-len(titles):]
+    assert [line['title'] for line in extras] == titles
+    assert all(line['quantity'] == '0' for line in extras)
+    assert all(line['options'][0]['manufacturer'] == '' for line in extras)
+    assert 'product_image_id' not in extras[1]['options'][0]
+    assert result['totals']['gross'] == '345.10'
+
+
+def test_additional_catalog_excludes_unverified_tax_and_bad_price():
+    from website_portal import additional_catalog, additional_fingerprint
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'),
+               units=[dict(id=1, name='Stück')], taxes=[dict(id=1, rate='19', is_default='1'), dict(id=2, rate='7')],
+               articles=[dict(id=1, title='Türsprechanlage', sales_price='20.00', unit_id=1),
+                         dict(id=2, title='Switch', sales_price='20.00', unit_id=1, tax_id=2),
+                         dict(id=3, title='Kamera', sales_price='-1', unit_id=1),
+                         dict(id=4, title='Kabel', sales_price='20.00', unit_id=1, tax_id=99)])
+    result = additional_catalog(raw)
+    assert set(result) == {'1'}
+    original = additional_fingerprint(result['1'])
+    assert original != additional_fingerprint(dict(result['1'], sales_price='21.00'))
+    raw['taxes'] = []
+    assert additional_catalog(raw) == {}
+
+def test_changed_extra_price_blocks_before_pdf_or_publish(tmp_path, monkeypatch):
+    import html, re, website_portal
+    from flask import Flask
+    app = Flask(__name__); app.secret_key = 'test'
+    store = OfferStore(tmp_path)
+    monkeypatch.setenv('BILLOMAT_ID', 'test')
+    monkeypatch.setenv('WEBSITE_PORTAL_ENABLED', 'true')
+    raw = dict(settings=dict(net_gross='NET', currency_code='EUR'),
+               units=[dict(id=1, name='Stück')], taxes=[dict(id=1, rate='19', is_default='1')],
+               articles=[dict(id=55, title='Türsprechanlage', sales_price='123.45', unit_id=1)])
+    store.put_record('test', 'catalog', 'shared', dict(data=raw, at='test'))
+    catalog = website_portal.additional_catalog(raw)
+    old_digest = website_portal.additional_fingerprint(catalog['55'])
+    catalog['55']['sales_price'] = '130.00'
+    monkeypatch.setattr(website_portal, 'read_catalog', lambda: catalog)
+    def forbidden(*args): raise AssertionError('must not generate PDF or publish')
+    monkeypatch.setattr(website_portal, 'client', forbidden)
+    website_portal.register(app, lambda title, body: body, lambda path: '/' + path,
+                            html.escape, lambda: store, lambda oid: offer(), forbidden)
+    c = app.test_client()
+    page = c.get('/offer/42/portal')
+    assert 'name="extra_fingerprint:55" value="' + old_digest + '"' in page.text
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    for supplied in (None, old_digest):
+        data = dict(csrf=token, account='test', approved='yes', digest=fingerprint(offer()), extra_article='55')
+        if supplied: data['extra_fingerprint:55'] = supplied
+        result = c.post('/offer/42/portal', data=data)
+        assert result.status_code == 422
+        assert 'Preis geändert' in result.text
+        assert not store.record('test', 'website_portal_offer', '42')
