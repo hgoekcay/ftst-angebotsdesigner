@@ -1,5 +1,37 @@
 # ATLAS and FTST project state
 
+## Atomic draft allocation lifecycle — 2026-11-18
+
+Prior bridge CI44273865746 passed completely. `bank_allocations.py` adds isolated
+SQLite draft reservations, not payment confirmations. Explicit account enrollment
+and actor/owner equality guard mutation scope; authenticated actor identity must
+still be supplied by a future service. Invoice baselines require trusted reviewed
+source provisioning and exact revisions. They are not automatically refreshed
+from the live bookkeeping store.
+
+BEGIN IMMEDIATE covers bank/invoice remaining draft capacity, revision checks,
+batch insertion and all lines. Idempotency keys reject changed payloads; identical
+retries replay the current state, including after reversal. Reversal preserves
+lines and actor/time history, releases capacity and never resurrects a prior key.
+Invoice capacity is shared across the owner's accounts. Changed source baselines
+with active reservations are blocked until review/reversal and a fresh revision;
+old-snapshot retries cannot clear the block. Zero open amounts close draft capacity;
+explicit invalidation blocks canceled/unusable source states. Baseline updates
+require the expected prior revision to reject out-of-order refreshes. A separate
+review found the zero-balance edge case; it is fixed and regression-tested.
+No invoice/payment statuses change.
+
+Synthetic tests cover batch rollback, restart/retries, cross-account invoice caps,
+competing transactions, concurrent same-key calls, stale/conflicting revisions,
+owner/account guards and supplier debits. Final full regression: 1,585 tests
+and 136 subtests passed (87.53s). All 21 draft-lifecycle tests passed; critical
+Ruff, compile and diff checks passed. New remote CI is tracked separately.
+No production wiring, UI, shared users, live bank adapter or deployment. HA update
+reported complete by owner; no HA operations performed and backup not assumed.
+Next: authenticated account registry, trusted source adapter and snapshot freshness
+inside a single authoritative confirmation transaction. Until then these remain
+local unconfirmed draft reservations, not a reconciled balance or payment ledger.
+
 ## Read-only bank/invoice preview bridge — 2026-11-18
 
 Prior staging commit CI 44272820586 passed fully. Added `bank_reconciliation.py`

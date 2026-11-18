@@ -89,6 +89,42 @@ against the full stored transaction, not a confirmed available balance. No bank 
 invoice updates occur. Tests include the real Bookkeeping SQLite class, checked
 byte-for-byte via its SQL dump before/after a synthetic partial/batch preview.
 
+## Atomic local draft reservations
+
+`bank_allocations.DraftAllocations` extends isolated statement storage. A trusted
+service provisions owner/account enrollment and reviewed invoice baselines with
+revision, EUR open amount and direction. These methods must never be exposed as
+arbitrary form inputs. Actor/owner comparison is a scope check, not authentication;
+there are no shared-user roles or production account registry yet.
+
+`reserve` accepts a request key and invoice ID/revision/amount selections. One
+SQLite BEGIN IMMEDIATE transaction checks account enrollment, owner-scoped bank
+row, active draft totals for the transaction and for each invoice across accounts,
+then writes the whole batch. Wrong direction, stale revision, duplicate selections
+or over-allocation reject everything. Same-key/same-payload retries return the
+existing state; changed payloads fail. `reverse` retains lines and creation audit,
+records reversal actor/time once and releases draft capacity. A replay of the
+original key after reversal returns reversed, never silently reserves again.
+
+Baseline changes while reservations are active, or contradictory content for an
+existing revision, set a persistent blocked flag before returning a conflict.
+Reservations against that invoice then fail. Returning to an old snapshot cannot
+unblock it. After active drafts are reversed, trusted provisioning of a new
+revision may establish a fresh baseline. Updates require `expected_revision`
+matching the stored baseline, preventing delayed responses from replacing a newer
+revision. Zero open amounts are valid closed baselines; they permit no reservation.
+The trusted adapter must call `invalidate_invoice` for canceled/unusable/unknown
+source states rather than dropping a refresh error and retaining old capacity.
+No attempt is made to automatically
+subtract reservations from refreshed open amounts that may already include them.
+
+This is an unconfirmed draft lifecycle only. It is not connected to the read-only
+preview bridge, source synchronization, routes or payment-status writes. Local
+remaining draft capacity is NOT an authoritative financial open balance. External
+invoice changes cannot yet be detected atomically; authentication, freshness,
+account registry, cancellation/credit handling and production migrations remain
+required before a confirmation API. Existing snapshots are never marked paid.
+
 ## Next safe integration
 
 1. Add owner/account-scoped immutable statement storage and original SHA-256,
