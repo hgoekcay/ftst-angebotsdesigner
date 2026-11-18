@@ -1,3 +1,17 @@
+# Portal catalog preparation — 2026-11-18
+
+Prepared locally only: internal extra-item selection includes non-service hardware
+and accessories from Billomat, not only four Ajax categories. Every extra still
+requires explicit selection and publication approval, starts at quantity zero,
+and is refetched before publication. Explicit/default tax must resolve uniquely to
+19 percent. Changed item/price after preview blocks publishing instead of
+silently accepting a changed price. No guessed manufacturer or model pictures.
+56 focused tests passed, including missing/stale extra-item fingerprints
+blocking before PDF generation or publish. Full CI pending.
+Existing published revisions remain unchanged. No version bump or HA install.
+Photo framing correction is prepared separately in the Site source; domain and
+actual affected proposal need verification before any publication.
+
 # ATLAS and FTST project state
 
 ## Local project overview slice — 2026-11-18
