@@ -11,12 +11,14 @@ const svg=(w,h)=>'data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://ww
   for(const width of [390,1280]){
    const page=await browser.newPage({viewport:{width,height:1000}});
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.setContent('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><main class="page"><h1>Foto-Rahmenprüfung</h1><p>Synthetische Prüfbilder. Alle vier farbigen Kanten müssen sichtbar bleiben.</p><h2>Freigegebenes Projektfoto</h2><div class="comparison"><div class="scene"><img class="approved-project-photo" src="'+svg(300,600)+'" alt="Hochformat mit vier Kanten"></div></div><h2>Referenzfotos</h2><div class="project-gallery"><figure><img src="'+svg(600,200)+'" alt="Breites Referenzfoto"><figcaption>Breitformat vollständig</figcaption></figure><figure><img src="'+svg(200,600)+'" alt="Hohes Referenzfoto"><figcaption>Hochformat vollständig</figcaption></figure></div><h2>Produktfoto (unverändert)</h2><div class="product-portrait"><img src="'+svg(200,600)+'" alt="Hohes Produktfoto"></div></main></body></html>',{waitUntil:'load'});
+   await page.setContent('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><main class="page"><h1>Foto-Prüfung</h1><p>Synthetische Prüfbilder. Alle vier farbigen Kanten müssen sichtbar bleiben.</p><h2>Freigegebenes Projektfoto</h2><div class="comparison"><div class="scene"><img class="approved-project-photo" src="'+svg(300,600)+'" alt="Hochformat mit vier Kanten"></div></div><h2>Referenzfotos</h2><div class="project-gallery"><figure><img src="'+svg(600,200)+'" alt="Breites Referenzfoto"><figcaption>Breitformat vollständig</figcaption></figure><figure><img src="'+svg(200,600)+'" alt="Hohes Referenzfoto"><figcaption>Hochformat vollständig</figcaption></figure></div><h2>Produktfoto (unverändert)</h2><div class="product-portrait"><img src="'+svg(200,600)+'" alt="Hohes Produktfoto"></div></main></body></html>',{waitUntil:'load'});
    await page.locator('img').evaluateAll(imgs=>Promise.all(imgs.map(i=>i.decode())));
    const images=await page.locator('img').evaluateAll(imgs=>imgs.map(i=>({alt:i.alt,fit:getComputedStyle(i).objectFit,natural:[i.naturalWidth,i.naturalHeight],box:[i.clientWidth,i.clientHeight]})));
    assert.equal(images.length,4);assert(images.every(i=>i.fit==='contain'&&i.natural.every(n=>n>0)));
-   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   const overflow=await page.evaluate(()=>[...document.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).map(e=>({tag:e.tagName,cls:e.className,text:e.textContent.slice(0,50),right:e.getBoundingClientRect().right})));
+   console.log(JSON.stringify({width,overflow}));
    await page.screenshot({path:path.join(folder,'photo-framing-'+width+'.png'),fullPage:true});
+   assert.equal(overflow.length,0);
    // Repeated load must retain the same framing, with no scripts or network writes.
    await page.setViewportSize({width,height:800});
    assert.deepEqual(await page.locator('img').evaluateAll(imgs=>imgs.map(i=>getComputedStyle(i).objectFit)),['contain','contain','contain','contain']);
