@@ -107,3 +107,14 @@ jobs:
           name: photo-browser-proof
           path: ${{ runner.temp }}/photo-artifacts
           if-no-files-found: ignore
+      - name: Check project overview on phone and desktop
+        env:
+          NODE_PATH: ${{ runner.temp }}/photo-browser/node_modules
+          OVERVIEW_ARTIFACTS: ${{ runner.temp }}/overview-artifacts
+        run: node tests/project_overview_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: project-overview-proof
+          path: ${{ runner.temp }}/overview-artifacts
+          if-no-files-found: ignore

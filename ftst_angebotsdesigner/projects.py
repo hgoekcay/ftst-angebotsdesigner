@@ -14,6 +14,7 @@ from materials import account
 from project_ai import extract, AIError
 from storage import RecordConflict
 from project_workflow import render as render_workflow
+from project_overview import render as render_overview
 
 
 def register(app, base, ingress, escape, get_store):
@@ -32,8 +33,10 @@ def register(app, base, ingress, escape, get_store):
                      'notes':request.form.get('notes','')[:20000], 'offer_id':'', 'analysis':{}}
             store.put_record(account(), 'project', key, value)
             return redirect(ingress('projects/'+key))
-        rows = ''.join(f'<div class="card"><a href="{ingress("projects/"+key)}">{escape(value.get("title"))}</a></div>' for key,value in store.records(account(),'project').items())
-        return base('Projekte', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Neues Projekt</h1><p>Notizen, Merkzettel und Sprachnotizen an einem Ort.</p><form method="post"><label for="title">Projekt / Kunde</label><input id="title" name="title" required><label for="notes">Ihre Notizen</label><textarea id="notes" name="notes"></textarea><p><button class="btn">Projekt anlegen</button></p></form></div>{rows}')
+        rows = render_overview(store, account(), ingress)
+        response = app.make_response(base('Projekte', f'<div class="back"><a href="{ingress()}">← Startseite</a></div><div class="card"><h1>Neues Projekt</h1><p>Notizen, Merkzettel und Sprachnotizen an einem Ort.</p><form method="post"><label for="title">Projekt / Kunde</label><input id="title" name="title" required><label for="notes">Ihre Notizen</label><textarea id="notes" name="notes"></textarea><p><button class="btn">Projekt anlegen</button></p></form></div>{rows}'))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.route('/projects/<key>', methods=['GET','POST'])
     def project_detail(key):
