@@ -70,6 +70,25 @@ Tests use temporary databases only: exact originals, replay after restart,
 isolation, metadata conflict, complete rollback on overlaps, malformed input and
 concurrent retries/conflicting imports.
 
+## Read-only invoice selection bridge
+
+`bank_reconciliation.preview_selected` now joins a scoped stored transaction to
+explicitly selected `Bookkeeping.get(owner, invoice_id)` records. The caller may
+supply only invoice IDs and chosen allocation amounts, never invoice balances.
+Billomat source open amounts, direction and currency come from local snapshots;
+only reviewed, issue-free, non-canceled OPEN/OVERDUE EUR records qualify. Source
+amounts with extra decimal zeros are normalized exactly, never rounded. Unknown,
+paid, draft or other unsupported source states fail closed. Missing originals
+are not resolved by this preview and still need the existing review/export checks.
+
+A source fingerprint changes when relevant fields change, but is neither a lock
+nor authorization. Returned `unconfirmed_source_snapshot`/`confirmation_supported:
+false` explicitly describe the boundary: previous allocations and source freshness
+are NOT reconciled. The apparent unallocated amount is only this isolated proposal
+against the full stored transaction, not a confirmed available balance. No bank or
+invoice updates occur. Tests include the real Bookkeeping SQLite class, checked
+byte-for-byte via its SQL dump before/after a synthetic partial/batch preview.
+
 ## Next safe integration
 
 1. Add owner/account-scoped immutable statement storage and original SHA-256,

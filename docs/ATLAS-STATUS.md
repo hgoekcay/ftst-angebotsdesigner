@@ -1,5 +1,27 @@
 # ATLAS and FTST project state
 
+## Read-only bank/invoice preview bridge — 2026-11-18
+
+Prior staging commit CI 44272820586 passed fully. Added `bank_reconciliation.py`
+and a scoped transaction read. Explicit selections accept only invoice ID and
+requested amount. Bank amounts come from stored statement rows; invoice direction,
+currency and source open amounts come from `Bookkeeping.get(owner, id)`, not form
+fields. Only reviewed, issue-free, non-canceled OPEN/OVERDUE Billomat snapshots in
+EUR pass. Cent-exact source decimals retain precision without rounding. Changes
+to selected source fields produce different snapshot tokens for future review.
+No inference by reference/amount and no payment-status writes.
+
+Output is `unconfirmed_source_snapshot`: stale local source data and previously
+allocated payments are not resolved here. Confirmation is explicitly unsupported.
+No routes, UI, authenticated account registry, reservation, production DB wiring
+or HA changes. Tokens are neither authorization nor atomic locks. Final complete
+regression: 1,564 tests and 136 subtests passed (97.43s); critical Ruff, compile
+and diff checks passed. Real Bookkeeping and statement SQLite stores use synthetic
+data, and invoice DB dump stays unchanged across partial/batch previews.
+Next: authoritative same-transaction allocation/reversal model and account access
+checks before any confirmation endpoint. Source adapters require verified stable
+transaction IDs; existing canonical CSV is not a bank-specific importer.
+
 ## Isolated bank statement staging — 2026-11-18
 
 Follow-up to draft PR98. Prior foundation CI run 44268004284 passed completely.

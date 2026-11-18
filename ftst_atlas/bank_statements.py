@@ -92,3 +92,11 @@ class StatementStore:
             return None
         return {'digest': digest, 'source': row[0], 'metadata': json.loads(row[1]),
                 'created_at': row[2], 'status': 'staged_unreconciled'}
+
+    def get_transaction(self, owner, account, transaction_id):
+        """Scoped source snapshot only; amount is NOT a remaining allocatable balance."""
+        owner, account, transaction_id = _id(owner), _id(account), _id(transaction_id)
+        with closing(self._connect()) as db:
+            row = db.execute('SELECT digest, payload FROM bank_transactions_v1 WHERE owner=? AND account=? AND transaction_id=?',
+                             (owner, account, transaction_id)).fetchone()
+        return None if row is None else {'statement_digest': row[0], **json.loads(row[1])}
