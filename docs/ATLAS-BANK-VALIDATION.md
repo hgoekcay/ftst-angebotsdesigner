@@ -3,6 +3,8 @@
 Prepared offline, not connected to production routes, application storage or UI. No live bank connector,
 booking, tax journal, Billomat payment update or release is implemented here.
 
+Format boundaries and bank-adapter acceptance gates: [ATLAS-BANK-FORMATS.md](ATLAS-BANK-FORMATS.md).
+
 ## Existing architecture
 
 `bookkeeping.py` retains owner-scoped originals, document hashes, fields, review

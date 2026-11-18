@@ -46,7 +46,7 @@ class StatementStore:
         return db
 
     def import_csv(self, owner, account, data, *, opening_balance, closing_balance,
-                   start_date, end_date):
+                   start_date, end_date, control_totals=None):
         """Atomic immutable staging. Same bytes/metadata replay; overlaps reject all.
 
         Transaction IDs must be stable within this account across files. No
@@ -55,7 +55,7 @@ class StatementStore:
         owner, account = _id(owner), _id(account)
         preview = validate_csv(data, opening_balance=opening_balance,
                                closing_balance=closing_balance, start_date=start_date,
-                               end_date=end_date)
+                               end_date=end_date, control_totals=control_totals)
         metadata = json.dumps(dict(opening_balance=preview['opening_balance'],
                                    closing_balance=preview['closing_balance'],
                                    start_date=start_date, end_date=end_date), sort_keys=True)

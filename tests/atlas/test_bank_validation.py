@@ -98,3 +98,40 @@ def test_exact_cent_boundary_and_allocation_limit():
     assert result['unallocated_amount'] == '0.00'
     with pytest.raises(bank.BankValidationError):
         bank.preview_allocation(available_amount='1000.00', direction='outgoing', allocations=[allocation(str(i)) for i in range(101)])
+
+
+def test_gross_controls_detect_net_zero_omission_or_extra_rows():
+    controls = dict(credits='120.00', debits='1.00', transaction_count=2)
+    good = b't1,2026-01-02,120.00,EUR,x\nt2,2026-01-03,-1.00,EUR,y\n'
+    assert validate(good, control_totals=controls)['controls_checked'] is True
+    # Same ending balance alone cannot distinguish these two incomplete/extra cases.
+    for rows in (b't1,2026-01-02,119.00,EUR,x\n', good + b't3,2026-01-03,5.00,EUR,x\nt4,2026-01-03,-5.00,EUR,x\n'):
+        assert validate(rows)['net_change'] == '119.00'
+        with pytest.raises(bank.BankValidationError):
+            validate(rows, control_totals=controls)
+
+
+@pytest.mark.parametrize('controls', [{}, dict(credits='119.00', debits='0.00', transaction_count=True),
+    dict(credits='119.00', debits='-1.00', transaction_count=1),
+    dict(credits='119.00', debits='0.00', transaction_count=2),
+    dict(credits='119,00', debits='0.00', transaction_count=1)])
+def test_invalid_or_incomplete_controls_fail_closed(controls):
+    with pytest.raises(bank.BankValidationError):
+        validate(control_totals=controls)
+
+
+def test_no_pdf_or_localized_export_autodetection():
+    for source in [b'%PDF-1.7 synthetic only',
+                   b'\xef\xbb\xbfDatum;Betrag;Verwendungszweck\r\n02.01.2026;119,00;synthetic\r\n',
+                   HEADER + b't1,02.01.2026,119.00,EUR,x\n',
+                   HEADER + b't1,2026-01-02,"119,00",EUR,x\n']:
+        with pytest.raises(bank.BankValidationError):
+            bank.validate_csv(source, opening_balance='0.00', closing_balance='119.00', start_date='2026-01-01', end_date='2026-01-31')
+
+
+def test_multiline_reference_preserved_and_summary_not_silently_ignored():
+    rows = b't1,2026-01-02,119.00,EUR,"line 1; detail\r\nline 2, reference\r\nline 3"\r\n'
+    result = validate(rows, control_totals=dict(credits='119.00', debits='0.00', transaction_count=1))
+    assert result['transactions'][0]['reference'] == 'line 1; detail\r\nline 2, reference\r\nline 3'
+    with pytest.raises(bank.BankValidationError):
+        validate(rows + b'Gesamtzusammenfassung,,,,119.00\r\n')

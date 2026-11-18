@@ -1,5 +1,24 @@
 # ATLAS and FTST project state
 
+## Bank-format verification and stronger controls — 2026-11-18
+
+Prior allocation CI44279791274 passed fully. Verified that PR98 supports only
+canonical single-account EUR CSV, not Revolut PDF or the derived German-locale
+semicolon list. No PDF importer or native bank CSV support is claimed. The lossy
+list cannot recover multiline references. See [format safety gates](ATLAS-BANK-FORMATS.md).
+
+Added optional gross credit/debit totals and transaction-count validation to the
+canonical parser and staging call; existing net-balance control remains mandatory.
+All three additional controls are required together, checked even on exact-source
+retries, and mismatches reject before writes. Controls are not yet stored as
+independent source evidence. Tests preserve quoted CRLF references, reject
+localized/PDF/summary inputs, catch net-zero omission/duplication, and isolate
+Giro/Pro/Pocket-like account scopes using synthetic data only.
+No original statement or financial contents accessed or uploaded by this task.
+No production/HA changes. Final full regression: 1,595 tests and 136 subtests
+passed (80.31s); focused bank/bookkeeping: 156 tests and 21 subtests. Critical
+Ruff, compile and diff checks passed. New head CI tracked separately.
+
 ## Atomic draft allocation lifecycle — 2026-11-18
 
 Prior bridge CI44273865746 passed completely. `bank_allocations.py` adds isolated

@@ -111,3 +111,22 @@ def test_invalid_lookup_and_no_implicit_database(store):
     for value in (':memory:', '', None, 123):
         with pytest.raises(ValueError):
             bank.StatementStore(value)
+
+
+def test_controls_rechecked_on_retry_and_do_not_mutate_original(store):
+    first = put(store, control_totals=dict(credits='10.00', debits='0.00', transaction_count=1))
+    original = store.get_statement('owner1', 'account1', first['digest'])
+    assert put(store, control_totals=dict(credits='10.00', debits='0.00', transaction_count=1))['status'] == 'already_staged'
+    with pytest.raises(ValueError):
+        put(store, control_totals=dict(credits='11.00', debits='1.00', transaction_count=1))
+    assert store.get_statement('owner1', 'account1', first['digest']) == original
+    assert counts(store) == (1, 1)
+
+
+def test_distinct_account_types_are_separate_scopes(store):
+    for account in ('giro', 'pro', 'pocket1', 'pocket2'):
+        assert put(store, account=account)['status'] == 'staged_unreconciled'
+    assert counts(store) == (4, 4)
+    # Classification is supplied by a trusted account map, not guessed from reference.
+    for account in ('giro', 'pro', 'pocket1', 'pocket2'):
+        assert put(store, account=account)['status'] == 'already_staged'

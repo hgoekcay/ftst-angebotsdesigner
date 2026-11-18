@@ -46,7 +46,7 @@ def _id(value):
     return value
 
 
-def validate_csv(data, *, opening_balance, closing_balance, start_date, end_date):
+def validate_csv(data, *, opening_balance, closing_balance, start_date, end_date, control_totals=None):
     """Validate a complete, single-account EUR statement or reject all rows.
 
     Account/owner identity is intentionally not inferred from CSV text. Caller
@@ -58,12 +58,22 @@ def validate_csv(data, *, opening_balance, closing_balance, start_date, end_date
     if start_date > end_date:
         raise BankValidationError('Zeitraum ist widersprüchlich.')
     opening, closing = _cents(opening_balance), _cents(closing_balance)
+    controls = None
+    if control_totals is not None:
+        if not isinstance(control_totals, dict) or set(control_totals) != {'credits', 'debits', 'transaction_count'}:
+            raise BankValidationError('Kontrollsummen benötigen Zugänge, Abgänge und Buchungsanzahl.')
+        credit_control, debit_control = _cents(control_totals['credits']), _cents(control_totals['debits'])
+        count_control = control_totals['transaction_count']
+        if (credit_control < 0 or debit_control < 0 or type(count_control) is not int
+                or not 0 <= count_control <= MAX_ROWS):
+            raise BankValidationError('Kontrollsummen sind ungültig.')
+        controls = (credit_control, debit_control, count_control)
     try:
         text = data.decode('utf-8-sig')
         reader = csv.DictReader(io.StringIO(text, newline=''), strict=True)
         if reader.fieldnames != HEADERS:
             raise BankValidationError('CSV-Kopf entspricht nicht dem unterstützten Format v1.')
-        rows, seen, total = [], set(), 0
+        rows, seen, total, credits, debits = [], set(), 0, 0, 0
         for row in reader:
             if len(rows) >= MAX_ROWS or set(row) != set(HEADERS) or any(v is None for v in row.values()):
                 raise BankValidationError('CSV-Zeile fehlt, enthält Zusatzfelder oder überschreitet das Limit.')
@@ -82,11 +92,17 @@ def validate_csv(data, *, opening_balance, closing_balance, start_date, end_date
                 raise BankValidationError('Verwendungszweck ist ungültig oder zu lang.')
             rows.append(dict(row, amount=_money(amount)))
             total += amount
+            credits += max(amount, 0)
+            debits += max(-amount, 0)
     except (UnicodeError, csv.Error):
         raise BankValidationError('CSV ist nicht vollständig als UTF-8 lesbar.') from None
     if opening + total != closing:
         raise BankValidationError('Anfangssaldo und Transaktionen stimmen nicht mit dem Endsaldo überein.')
-    return {'format': 'atlas-bank-csv/1', 'currency': 'EUR', 'transactions': rows,
+    if controls is not None and controls != (credits, debits, len(rows)):
+        raise BankValidationError('Zugänge, Abgänge oder Buchungsanzahl stimmen nicht mit den Kontrollsummen überein.')
+    return {'credit_total': _money(credits), 'debit_total': _money(debits),
+            'transaction_count': len(rows), 'controls_checked': controls is not None,
+            'format': 'atlas-bank-csv/1', 'currency': 'EUR', 'transactions': rows,
             'opening_balance': _money(opening), 'closing_balance': _money(closing),
             'net_change': _money(total), 'status': 'validated_preview'}
 
