@@ -28,7 +28,7 @@ const {chromium} = require('playwright');
       assert(await page.getByRole('heading',{name:'Vorgangsübersicht',exact:true}).isVisible());
       if(width<600) {
         await page.getByRole('link',{name:'Mehr',exact:true}).click();
-        await page.getByRole('link',{name:'Projekte',exact:true}).filter({visible:true}).click();
+        await page.getByRole('main').getByRole('link',{name:'Projekte',exact:true}).click();
       } else {
         await page.locator('.appnav').getByRole('link',{name:'Projekte',exact:true}).click();
       }
