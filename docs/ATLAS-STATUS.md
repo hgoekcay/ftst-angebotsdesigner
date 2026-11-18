@@ -1,5 +1,28 @@
 # ATLAS and FTST project state
 
+## Isolated bank statement staging — 2026-11-18
+
+Follow-up to draft PR98. Prior foundation CI run 44268004284 passed completely.
+`bank_statements.py` now stages canonical EUR statement bytes with SHA-256,
+metadata, timestamp and normalized transactions in an explicitly supplied SQLite
+path. All queries are owner/account scoped. Exact retries are idempotent;
+changed metadata for identical bytes and any overlapping transaction IDs reject
+the complete import atomically, including previously inserted new rows.
+No route, application DB wiring, migration, UI, payment status, external bank
+access or production change. This is isolated tested infrastructure, not a live
+bank importer or reconciled ledger. Account authorization must be resolved by a
+future caller; account-scoped keys do not authenticate supplied identities.
+
+Tests cover original preservation, restart, owner/account isolation, malformed
+input, metadata conflicts, rollback and competing retries/imports using temporary
+SQLite databases and synthetic data. Final full regression: 1,542 tests and
+136 subtests passed (98.20s); focused bank/bookkeeping: 103 tests and 21 subtests.
+Critical Ruff, compile and diff checks passed. New remote CI is separate.
+Next: stable provider-ID adapters and authorized account selection; then a separate
+transactional allocation/reversal model using authoritative invoice balances.
+Do not connect this store to production until review and migration/access checks.
+No code overlap with PR97; shared status documentation only.
+
 ## Bank validation foundation — 2026-11-18
 
 Isolated branch `feat/atlas-payment-allocation`, base `4d1b344`.

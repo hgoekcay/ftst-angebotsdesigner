@@ -1,6 +1,6 @@
 # Bank import validation foundation
 
-Prepared offline, not connected to routes, storage or UI. No live bank connector,
+Prepared offline, not connected to production routes, application storage or UI. No live bank connector,
 booking, tax journal, Billomat payment update or release is implemented here.
 
 ## Existing architecture
@@ -42,6 +42,33 @@ amount. Duplicate invoice IDs within a batch are rejected. Unallocated money
 and remaining invoice balances stay visible; results are unconfirmed previews,
 not payment statuses. Refunds, credits, netted bank fees, FX and transfers need
 separate explicit models and must not be forced into this path.
+
+## Isolated staging follow-up (not application-integrated)
+
+`bank_statements.StatementStore` requires an explicit SQLite path. There is no
+production default, app import, route or automatic schema migration in the live
+application. `import_csv` revalidates original bytes; stores bytes/hash, canonical
+metadata, timestamp and normalized transactions in one write transaction. The API
+has no mutation or deletion operation for saved statements.
+
+The owner/account/source hash forms statement identity. Exact bytes and identical
+metadata replay without writing again, including after restart or concurrent
+retries. Contradictory metadata for the same bytes fails. Stable transaction IDs
+are unique within owner/account: any overlap rejects the entire new statement,
+not just duplicate rows. This is deliberately conservative; overlapping exports
+need a reviewed adapter/reconciliation design before use. No fuzzy deduplication
+or reuse of row-position IDs is safe.
+
+Reads require owner/account/digest and return no record outside that scope.
+Callers must still authenticate the owner and authorize account ownership; IDs
+are not authorization. SQLite is local staging, not encrypted credential storage.
+Storage permissions, quotas, schema lifecycle, audited corrections/retention and
+production routes remain unresolved. Import success means `staged_unreconciled`,
+never paid or booked. No allocation persistence is included.
+
+Tests use temporary databases only: exact originals, replay after restart,
+isolation, metadata conflict, complete rollback on overlaps, malformed input and
+concurrent retries/conflicting imports.
 
 ## Next safe integration
 
