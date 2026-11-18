@@ -27,9 +27,13 @@ the separate cloud browser returned ERR_CONNECTION_REFUSED for the local Flask
 preview, and local Chromium could not create its IPC socket (EPERM), including
 an approved unsandboxed attempt. A synthetic fixture and repeatable 390/1280px
 Playwright check are included in the existing browser CI with screenshots;
-remote results must be checked before claiming visual acceptance. Physical phone, Home Assistant installation, CI/release and live-data
-acceptance remain unverified. No production deploy or version bump.
-
+GitHub CI run 44260883918 passed all eight jobs at head
+a738a8c1de794c0922ce7fcaf04eb72d0eb631dd; both viewport screenshots were
+visually reviewed and showed no horizontal overflow. Physical phone remains
+unverified. Release 0.27.11 is prepared, not yet installed.
+Before install: verify release-head CI, unchanged main, and a current app backup.
+Rollback: restore only the Designer app from the pre-update backup if live
+acceptance fails; avoid restoring unrelated HA configuration.
 Next: complete visual desktop/mobile review and full release CI, then consider
 explicit responsible-person/next-date evidence on existing project records.
 Do not infer order confirmation, stock availability or payment from quote status.

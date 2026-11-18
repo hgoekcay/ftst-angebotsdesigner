@@ -1,3 +1,9 @@
+# 0.27.11
+
+- Projektübersicht mit gespeichertem Bearbeitungsstand, nächstem Schritt und offenen Rückfragen.
+- Hinweise zu bestätigter Montageplanung, neueren unbestätigten Änderungen und fehlenden Montageorten; direkte Verknüpfungen zu bestehenden Arbeitsschritten.
+- Reine Leseansicht ohne neue Freigaben, Reservierungen, Zahlungsentscheidungen oder Kundenversand.
+
 # 0.27.10
 
 - Mehrere Fotos unabhängig beschreiben, auch während Upload und Bilderkennung; eigene Angaben und Eingabefokus bleiben erhalten.
