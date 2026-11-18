@@ -1,5 +1,29 @@
 # ATLAS and FTST project state
 
+## Trusted local source-to-draft adapter — 2026-11-18
+
+Previous format CI44286015885 passed fully. Added `bank_source_adapter.py` to
+refresh draft invoice baselines from owner-scoped `Bookkeeping.get` records using
+only invoice ID and expected prior revision. Balances, direction, currency and
+revision fingerprints come from the source, not caller form fields. A shared
+fingerprint helper keeps preview and baseline source identity consistent.
+
+Unreviewed, paid/canceled, malformed, foreign-currency or missing/unreadable source
+records block an existing baseline instead of silently retaining draft capacity.
+Owner scope is checked before reading the source. Active-draft source changes
+still require review/reversal; outdated refresh revisions fail. A source read
+failure conservatively blocks even a concurrently refreshed baseline, never
+confirms a payment. An unchanged blocked snapshot cannot auto-unblock; explicit
+reviewed recovery is still a future integration requirement.
+
+The source database is read-only for this adapter. Tests use synthetic source
+records and the actual Bookkeeping SQLite class; its dump remains unchanged.
+No production endpoint, account authentication service, atomic cross-store source
+freshness, PDF import or payment confirmation. No HA or financial actions.
+Final complete suite: 1,612 tests and 136 subtests passed (85.98s). Critical
+Ruff, compile and diff checks passed. Independent source-adapter review found
+no additional blocker within the documented isolated scope. New CI separate.
+
 ## Bank-format verification and stronger controls — 2026-11-18
 
 Prior allocation CI44279791274 passed fully. Verified that PR98 supports only

@@ -127,6 +127,28 @@ invoice changes cannot yet be detected atomically; authentication, freshness,
 account registry, cancellation/credit handling and production migrations remain
 required before a confirmation API. Existing snapshots are never marked paid.
 
+## Trusted local source-to-draft adapter
+
+`bank_source_adapter.refresh_invoice_basis` accepts only authenticated-context
+actor/owner, selected invoice ID and expected existing revision. It reads the
+owner-scoped Bookkeeping record and validates reviewed/issue-free Billomat origin,
+OPEN/OVERDUE state, EUR currency, direction and cent-exact source open amount.
+`invoice_snapshot_token` is shared with the read-only preview bridge. The adapter
+then freezes that actual source basis; a form cannot supply the balance.
+
+Missing, paid/canceled, unreviewed, unsupported or unreadable source records block
+existing baselines. Read failures are safe errors without original content.
+Invalidation is conservative: if another refresh wins concurrently, it may also
+be blocked rather than risk stale capacity. Explicit recovery of an unchanged
+blocked snapshot remains unimplemented; returning to identical source data does
+not automatically re-enable reservation. Existing active drafts retain history
+and must be reviewed/reversed. No external invoice writes happen.
+
+This is NOT a production service or source-freshness guarantee: the two databases
+still cannot atomically lock a real-time external invoice revision. The caller
+must authenticate actor, authorize account and resolve source freshness before
+any future confirmation. No automatic payments or confirmed statuses are added.
+
 ## Next safe integration
 
 1. Add owner/account-scoped immutable statement storage and original SHA-256,

@@ -18,6 +18,13 @@ def _source_amount(value):
     return whole + '.' + (fraction + '00')[:2]
 
 
+def invoice_snapshot_token(record):
+    """Stable relevant-source fingerprint, not authorization or a source lock."""
+    relevant = {'fields': record['fields'], 'sha256': record.get('sha256'),
+                'reviewed': record['reviewed'], 'source': record['source']}
+    return hashlib.sha256(json.dumps(relevant, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
 def preview_selected(statements, bookkeeping, *, owner, account, transaction_id, selections):
     """Read selected invoices via BookkeepingStore.get(owner, id), never form balances.
 
@@ -54,10 +61,7 @@ def preview_selected(statements, bookkeeping, *, owner, account, transaction_id,
                      'open_amount': _source_amount(fields.get('source_open_amount')),
                      'currency': fields['source_currency'], 'direction': fields.get('direction')})
         # Change token for later review; not an authorization token or atomic lock.
-        relevant = {'fields': fields, 'sha256': record.get('sha256'),
-                    'reviewed': record['reviewed'], 'source': record['source']}
-        revisions.append({'invoice_id': record['id'], 'snapshot_token': hashlib.sha256(
-            json.dumps(relevant, sort_keys=True, allow_nan=False).encode()).hexdigest()})
+        revisions.append({'invoice_id': record['id'], 'snapshot_token': invoice_snapshot_token(record)})
     result = preview_allocation(available_amount=transaction['amount'], direction=direction, allocations=rows)
     return {**result, 'status': 'unconfirmed_source_snapshot', 'read_only': True,
             'confirmation_supported': False, 'statement_digest': transaction['statement_digest'],

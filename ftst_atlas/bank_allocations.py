@@ -91,6 +91,16 @@ class DraftAllocations(StatementStore):
         if conflict:
             raise AllocationConflict('Quellstand geändert; aktive Entwürfe zuerst prüfen und zurücknehmen.')
 
+    def get_invoice_basis(self, *, actor, owner, invoice):
+        _scope(actor, owner, 'unused')
+        invoice = _id(invoice)
+        with closing(self._connect()) as db:
+            row = db.execute('SELECT revision,open_cents,direction,blocked FROM bank_draft_invoices_v1 WHERE owner=? AND invoice=?', (owner, invoice)).fetchone()
+        if row is None:
+            return None
+        return {'revision': row[0], 'open_amount': _money(row[1]),
+                'direction': row[2], 'blocked': bool(row[3]), 'state': 'unconfirmed_source_basis'}
+
     def invalidate_invoice(self, *, actor, owner, invoice):
         """Trusted adapter must call this on canceled/unusable/unknown source state."""
         _scope(actor, owner, 'unused')
